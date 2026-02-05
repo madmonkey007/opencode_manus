@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark transition-theme">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>OpenCode - AI Agent Interface</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#3B82F6",
+                        "background-light": "#F9FAFB",
+                        "background-dark": "#121214",
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#1E1E20",
+                        "border-light": "#E5E7EB",
+                        "border-dark": "#2D2D2F",
+                    },
+                    fontFamily: {
+                        sans: ['"Inter"', '"Noto Sans SC"', 'sans-serif'],
+                        display: ['"Noto Sans SC"', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                        'xl': '0.75rem',
+                        '2xl': '1rem',
+                    },
+                    typography: (theme) => ({
+                        DEFAULT: {
+                            css: {
+                                color: theme('colors.gray.700'),
+                                h1: {
+                                    color: theme('colors.gray.900'),
+                                    fontWeight: '700',
+                                    fontFamily: theme('fontFamily.display'),
+                                },
+                                h2: {
+                                    color: theme('colors.gray.900'),
+                                    fontWeight: '600',
+                                    fontFamily: theme('fontFamily.display'),
+                                },
+                                strong: {
+                                    color: theme('colors.gray.900'),
+                                    fontWeight: '600',
+                                },
+                            },
+                        },
+                        dark: {
+                            css: {
+                                color: theme('colors.gray.300'),
+                                h1: {
+                                    color: theme('colors.gray.100'),
+                                },
+                                h2: {
+                                    color: theme('colors.gray.100'),
+                                },
+                                strong: {
+                                    color: theme('colors.gray.100'),
+                                },
+                            },
+                        },
+                    }),
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                },
+            },
+        };
+    </script>
+    <style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #E5E7EB;
+            border-radius: 20px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #3F3F46;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #D1D5DB;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #52525B;
+        }
+        #vm-panel { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .tab-btn { transition: all 0.2s ease; border-bottom: 2px solid transparent; }
+        .active-tab { border-bottom: 2px solid #3B82F6; color: #3B82F6; }
+
+        .transition-theme {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        html.transition-theme, html.transition-theme *, html.transition-theme *::before, html.transition-theme *::after {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease !important;
+            transition-delay: 0s !important;
+        }
+        
+        /* Message Bubbles */
+        .message-bubble {
+            border-radius: 1.25rem;
+            padding: 1rem 1.25rem;
+            max-width: 85%;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: all 0.2s ease;
+        }
+        .user-bubble {
+            background-color: #3B82F6;
+            color: white;
+            border-bottom-right-radius: 0.25rem;
+            align-self: flex-end;
+        }
+        .assistant-bubble {
+            background-color: #FFFFFF;
+            color: #1F2937;
+            border: 1px solid #E5E7EB;
+            border-bottom-left-radius: 0.25rem;
+            align-self: flex-start;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        .dark .assistant-bubble {
+            background-color: #1E1E20;
+            color: #F3F4F6;
+            border-color: #2D2D2F;
+        }
+        
+        /* Timeline */
+        .timeline-line {
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, transparent, #E5E7EB 20px, #E5E7EB calc(100% - 20px), transparent);
+        }
+        .dark .timeline-line {
+            background: linear-gradient(to bottom, transparent, #2D2D2F 20px, #2D2D2F calc(100% - 20px), transparent);
+        }
+        .timeline-dot {
+            position: absolute;
+            left: 16px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #3B82F6;
+            border: 2px solid white;
+            z-index: 10;
+        }
+        .dark .timeline-dot {
+            border-color: #121214;
+        }
+
+        .tab-pane {
+            background-color: #F9FAFB;
+        }
+        .dark .tab-pane {
+            background-color: #121214;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Tool Cards Hover Effect */
+        .tool-card:hover {
+            border-color: #3B82F6;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.05);
+        }
+        .dark .tool-card:hover {
+            border-color: #3B82F6;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-sans h-screen w-screen overflow-hidden text-gray-800 dark:text-gray-200 flex transition-theme">
+
+        <!-- Sidebar -->
+    <aside id="sidebar" class="w-[260px] flex-shrink-0 bg-background-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark flex flex-col p-3 gap-1 transition-theme">
+        <div class="flex items-center gap-2 px-3 py-3 mb-2 text-gray-700 dark:text-gray-300 font-bold text-lg">
+            <span class="material-symbols-outlined text-2xl text-primary">eco</span>
+            <span>OpenCode</span>
+            <span class="flex-1"></span>
+            <div class="flex items-center gap-1">
+                <button id="theme-toggle" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/5 transition-all" title="切换主题">
+                    <span class="material-symbols-outlined text-[20px] dark:hidden">dark_mode</span>
+                    <span class="material-symbols-outlined text-[20px] hidden dark:inline">light_mode</span>
+                </button>
+                <button id="toggle-sidebar" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/5 transition-all" title="收起侧边栏">
+                    <span class="material-symbols-outlined text-[20px]">left_panel_close</span>
+                </button>
+            </div>
+        </div>
+        <div class="space-y-1">
+            <button id="new-task" class="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left">
+                <span class="material-symbols-outlined text-xl">edit_square</span>
+                新建任务
+            </button>
+            <div class="flex items-center gap-3 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-xl">search</span>
+                搜索
+            </div>
+        </div>
+        <div class="mt-4 px-3 text-xs font-medium text-gray-400 uppercase tracking-wider flex justify-between items-center">
+            所有任务
+            <span class="material-symbols-outlined text-sm">filter_list</span>
+        </div>
+        <div id="session-list" class="space-y-1 mt-2 flex-1 overflow-y-auto custom-scrollbar">
+            <!-- Sessions will be injected here -->
+        </div>
+        <div class="mt-auto bg-white/50 dark:bg-white/5 p-3 rounded-lg flex items-center gap-3 border border-border-light dark:border-white/10 transition-colors">
+            <span class="material-symbols-outlined text-primary">volunteer_activism</span>
+            <div class="text-xs">
+                <div class="font-medium text-gray-800 dark:text-gray-200">与好友分享 OpenCode</div>
+                <div class="text-gray-500">获取更多功能</div>
+            </div>
+            <span class="material-symbols-outlined text-gray-400 text-sm ml-auto">chevron_right</span>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 bg-white dark:bg-background-dark transition-theme">
+        <!-- Header -->
+        <header class="h-14 border-b border-border-light dark:border-border-dark flex items-center px-4 justify-between bg-white dark:bg-background-dark transition-theme">
+            <div class="flex items-center gap-4">
+                <button id="open-sidebar" class="hidden material-symbols-outlined text-gray-400 text-xl hover:text-gray-600 dark:hover:text-gray-200 transition-colors">menu</button>
+                <div id="current-task-title" class="text-sm font-medium text-gray-600 dark:text-gray-300 truncate max-w-[300px]">OpenCode 1.0</div>
+                <span class="material-symbols-outlined text-gray-400 text-sm">expand_more</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full text-[12px] border border-border-light dark:border-white/10 transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span class="text-gray-600 dark:text-gray-400">UVN Projection Active</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <div id="chat-scroll-area" class="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-background-light dark:bg-background-dark transition-theme">
+            <div id="welcome-message" class="h-full flex flex-col items-center justify-center text-center space-y-4">
+                <div class="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">O</div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">OpenCode - AI Agent Interface</h1>
+                <p class="text-gray-500 dark:text-gray-400 max-w-md text-sm">专业的 AI 智能助手，为您提供实时的虚拟机操作环境与代码执行反馈。</p>
+            </div>
+            <div id="chat-messages" class="max-w-3xl mx-auto flex flex-col space-y-6"></div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 border-t border-border-light dark:border-border-dark bg-white dark:bg-background-dark transition-theme">
+            <div class="max-w-3xl mx-auto relative">
+                <textarea id="prompt" rows="1" placeholder="给 OpenCode 发送消息..." class="w-full pl-4 pr-12 py-3 bg-gray-100 dark:bg-surface-dark rounded-2xl border-none focus:ring-2 focus:ring-blue-500 resize-none custom-scrollbar text-sm text-gray-900 dark:text-white transition-theme"></textarea>
+                <button id="runStream" class="absolute right-2 bottom-2 w-8 h-8 bg-primary text-white rounded-xl flex items-center justify-center hover:opacity-90 transition-opacity">
+                    <span class="material-symbols-outlined">arrow_upward</span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Right Panel (VM / Computer Preview) -->
+    <div id="vm-panel" class="w-[45%] border-l border-border-light dark:border-border-dark flex flex-col bg-background-light dark:bg-background-dark transition-theme">
+        <div class="h-14 border-b border-border-light dark:border-border-dark flex items-center px-4 justify-between bg-white dark:bg-surface-dark shrink-0 transition-theme">
+            <div class="flex items-center gap-4">
+                <button class="tab-btn active-tab text-sm font-medium px-2 py-4" data-tab="preview">Manus's Computer</button>
+                <button class="tab-btn text-sm font-medium px-2 py-4 text-gray-500 dark:text-gray-400" data-tab="files">Files</button>
+            </div>
+            <button id="close-vm-panel" class="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors" title="Close">
+                <span class="material-symbols-outlined text-[20px] text-gray-500">close</span>
+            </button>
+        </div>
+        
+        <div class="flex-1 relative overflow-hidden bg-white dark:bg-background-dark transition-theme">
+            <!-- Preview Tab (UVN Projection) -->
+            <div id="tab-preview" class="tab-pane h-full">
+                <!-- noVNC iframe -->
+                <iframe id="uvn-frame" src="http://localhost:6081/vnc.html?autoconnect=true&resize=scale" class="w-full h-full border-none"></iframe>
+                
+                <!-- Overlay for Status -->
+                <div class="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-surface-dark/90 p-3 rounded-xl border border-border-light dark:border-border-dark shadow-xl flex items-center justify-between z-50 backdrop-blur-sm transition-theme">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-blue-500 animate-spin">sync</span>
+                        <div>
+                            <div class="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-widest">UVN System Status</div>
+                            <div id="vm-status" class="text-sm font-bold text-gray-900 dark:text-white">OPERATING</div>
+                        </div>
+                    </div>
+                    <div id="vm-detail-status" class="text-[12px] text-gray-500 dark:text-gray-400 font-medium">Playwright in Docker</div>
+                </div>
+            </div>
+
+            <!-- Files Tab -->
+            <div id="tab-files" class="tab-pane h-full hidden flex flex-col transition-theme">
+                <!-- Filter Pills -->
+                <div class="px-5 py-4 flex items-center gap-2 overflow-x-auto scrollbar-hide shrink-0">
+                    <button id="filter-all" class="px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black rounded-full text-xs font-medium whitespace-nowrap transition-colors">All</button>
+                    <button id="filter-docs" class="px-4 py-1.5 bg-white border border-border-light dark:bg-surface-dark dark:border-border-dark text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 whitespace-nowrap transition-colors">Documents</button>
+                    <button id="filter-images" class="px-4 py-1.5 bg-white border border-border-light dark:bg-surface-dark dark:border-border-dark text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 whitespace-nowrap transition-colors">Images</button>
+                    <button id="filter-code" class="px-4 py-1.5 bg-white border border-border-light dark:bg-surface-dark dark:border-border-dark text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 whitespace-nowrap transition-colors">Code</button>
+                    <button id="filter-links" class="px-4 py-1.5 bg-white border border-border-light dark:bg-surface-dark dark:border-border-dark text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 whitespace-nowrap transition-colors">Links</button>
+                </div>
+
+                <!-- Search Bar (Sticky at top) -->
+                <div class="px-5 py-2 shrink-0">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            <span class="material-symbols-outlined text-[18px]">search</span>
+                        </span>
+                        <input id="file-search" class="w-full bg-gray-100 dark:bg-surface-dark border-none rounded-xl py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20 placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-white transition-all" placeholder="Search files..." type="text"/>
+                    </div>
+                </div>
+
+                <!-- File List -->
+                <div id="file-list-view" class="flex-1 overflow-y-auto custom-scrollbar px-5 py-2 space-y-1">
+                    <div class="text-sm text-gray-500 italic">No files generated yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/opencode.js"></script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+INFO:     172.19.0.1:57994 - "GET /static/index.html HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57994 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58002 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84Python%E5%BE%85%E5%8A%9E%E4%BA%8B%E9%A1%B9%E7%AE%A1%E7%90%86%E8%84%9A%E6%9C%AC&sid=ri9atfc HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48148 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48148 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48160 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:48160 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33968 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AApython%E7%9A%84tudolist%E8%84%9A%E6%9C%AC&sid=2qgq12v HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57892 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57892 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57896 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:44184 - "GET /opencode/run_sse?prompt=%E6%90%9C%E7%B4%A2%E7%BD%91%E9%A1%B5%E5%B9%B6%E5%B8%AE%E6%88%91%E6%90%9C%E7%B4%A2agentskills%E7%9A%84%E6%96%87%E7%AB%A0%EF%BC%8C%E6%80%BB%E7%BB%93%E5%90%8E%E5%8F%91%E7%BB%99%E6%88%91&sid=xhdwgoq HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60962 - "HEAD / HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:57206 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43280 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43280 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:43284 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E8%AE%A1%E7%AE%97%E5%99%A8&sid=8bq0448 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33362 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33374 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E6%9C%AC%EF%BC%8C%E7%AE%97%E7%9B%98%E5%8A%9F%E8%83%BD&sid=1aiqei7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57124 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E6%9C%AC%EF%BC%8C%E7%AE%97%E7%9B%98%E5%8A%9F%E8%83%BD&sid=1aiqei7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:52902 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:52910 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:52910 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:52910 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58810 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E7%94%9F%E6%88%90%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E7%94%B5%E5%AD%90%E8%AE%A1%E7%AE%97%E5%99%A8&sid=26yjqau HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42470 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42470 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:52886 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:52888 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E5%80%92%E8%AE%A1%E6%97%B6%E5%A7%8B%E7%BB%88&sid=s5cp729 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50380 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50380 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:50388 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E7%94%9F%E6%88%90%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%B5%81%E5%85%89%E6%95%88%E6%9E%9C%E7%9A%84%E7%99%BB%E5%BD%95%E9%A1%B5%E9%9D%A2%EF%BC%8C%E5%B9%B6%E5%B1%95%E7%A4%BA%E5%9C%A8%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%AD%E3%80%82&sid=nj6lbp0 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47900 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E7%94%9F%E6%88%90%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%B5%81%E5%85%89%E6%95%88%E6%9E%9C%E7%9A%84%E7%99%BB%E5%BD%95%E9%A1%B5%E9%9D%A2%EF%BC%8C%E5%B9%B6%E5%B1%95%E7%A4%BA%E5%9C%A8%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%AD%E3%80%82&sid=nj6lbp0 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44866 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E7%94%9F%E6%88%90%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%B5%81%E5%85%89%E6%95%88%E6%9E%9C%E7%9A%84%E7%99%BB%E5%BD%95%E9%A1%B5%E9%9D%A2%EF%BC%8C%E5%B9%B6%E5%B1%95%E7%A4%BA%E5%9C%A8%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%AD%E3%80%82&sid=nj6lbp0 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51250 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E7%94%9F%E6%88%90%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%B5%81%E5%85%89%E6%95%88%E6%9E%9C%E7%9A%84%E7%99%BB%E5%BD%95%E9%A1%B5%E9%9D%A2%EF%BC%8C%E5%B9%B6%E5%B1%95%E7%A4%BA%E5%9C%A8%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%AD%E3%80%82&sid=nj6lbp0 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36480 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36480 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:47500 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47500 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47500 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:50164 - "GET /opencode/list_session_files?sid=6w7vt92 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50164 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F&sid=6w7vt92 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36876 - "GET /opencode/list_session_files?sid=6w7vt92 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50164 - "GET /opencode/list_session_files?sid=6w7vt92 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:46520 - "GET /opencode/list_session_files?sid=6w7vt92 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53266 - "GET /static/index.html HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53266 - "GET /static/opencode.js HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:53266 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41160 - "GET /opencode/list_session_files?sid=ue7pwh9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41160 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%E5%B7%A5%E5%85%B7%EF%BC%8C%E8%A6%81%E6%B1%82%E8%AE%BE%E8%AE%A1%E7%AE%80%E6%B4%81%EF%BC%8C%E8%8B%B9%E6%9E%9C%E9%A3%8E%E6%A0%BC&sid=ue7pwh9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41160 - "GET /opencode/list_session_files?sid=ue7pwh9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47902 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47902 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47902 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:47900 - "GET /opencode/list_session_files?sid=bwkiy5b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47900 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E7%94%B5%E5%AD%90%E6%97%B6%E9%92%9F&sid=bwkiy5b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47900 - "GET /opencode/list_session_files?sid=bwkiy5b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41950 - "GET /opencode/list_session_files?sid=bwkiy5b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41966 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E7%94%A8%20Python%20%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E8%B4%AA%E5%90%83%E8%9B%87%E6%B8%B8%E6%88%8F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20snake.html%20%E5%B9%B6%E7%9B%B4%E6%8E%A5%E8%BF%90%E8%A1%8C%E5%B1%95%E7%A4%BA%E7%BB%99%E6%88%91%E7%9C%8B&sid=bwkiy5b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41966 - "GET /opencode/list_session_files?sid=bwkiy5b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60374 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60374 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60374 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:60368 - "GET /opencode/list_session_files?sid=mi0orcx HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60368 - "GET /opencode/run_sse?prompt=%E4%B8%BA%E6%88%91%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E7%94%B5%E5%AD%90%E9%97%B9%E9%92%9F%E7%9A%84%E7%BD%91%E9%A1%B5&sid=mi0orcx HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60368 - "GET /opencode/list_session_files?sid=mi0orcx HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40166 - "GET /opencode/list_session_files?sid=mi0orcx HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43266 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43266 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43266 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:43268 - "GET /opencode/list_session_files?sid=qkq8e01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39878 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E9%97%B9%E9%92%9F&sid=qkq8e01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39878 - "GET /opencode/list_session_files?sid=qkq8e01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60024 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:48522 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48522 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48546 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:49534 - "GET /opencode/run_sse?prompt=hello&sid=test-sid HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41012 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41012 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41012 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41010 - "GET /opencode/list_session_files?sid=rzql9gu HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41010 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%AF%9B%E7%8E%BB%E7%92%83%E7%89%B9%E6%95%88%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20clock.html%20%E5%B9%B6%E7%9B%B4%E6%8E%A5%E5%B1%95%E7%A4%BA%E3%80%82&sid=rzql9gu HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41010 - "GET /opencode/list_session_files?sid=rzql9gu HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44782 - "GET /opencode/list_session_files?sid=rzql9gu HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60968 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41864 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41864 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41866 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:57204 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:35478 - "GET /opencode/list_session_files?sid=pddazpq HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35478 - "GET /opencode/list_session_files?sid=pddazpq HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35478 - "GET /opencode/run_sse?prompt=%3Fplugins%3Dforms%2Ctypography%3A66%20cdn.tailwindcss.com%20should%20not%20be%20used%20in%20production.%20To%20use%20Tailwind%20CSS%20in%20production%2C%20install%20it%20as%20a%20PostCSS%20plugin%20or%20use%20the%20Tailwind%20CLI%3A%20https%3A%2F%2Ftailwindcss.com%2Fdocs%2Finstallation%0Aui.js%3A64%20%0A%20GET%20http%3A%2F%2Flocalhost%3A6081%2Fpackage.json%20404%20(File%20not%20found)%0Aui.js%3A75%20Couldn%27t%20fetch%20package.json%3A%20Error%3A%20404%20File%20not%20found%0Acontent_script.js%3A4874%20Immersive%20Translate%20INFO%3A%20%5Bentry%5D%20can%20not%20detect%20a%20valid%20body%3A%20%20http%3A%2F%2Flocalhost%3A6081%2Fvnc.html%3Fautoconnect%3Dtrue%26resize%3Dscale%0A%3A8088%2Ffavicon.ico%3A1%20%0A%20GET%20http%3A%2F%2Flocalhost%3A8088%2Ffavicon.ico%20404%20(Not%20Found)%0Avnc.html%3Fautoconnect%3Dtrue%26resize%3Dscale%3A1%20The%20resource%20http%3A%2F%2Flocalhost%3A6081%2Fapp%2Fimages%2Fwarning.svg%20was%20preloaded%20using%20link%20preload%20but%20not%20used%20within%20a%20few%20seconds%20from%20the%20window%27s%20load%20event.%20Please%20make%20sure%20it%20has%20an%20appropriate%20%60as%60%20value%20and%20it%20is%20preloaded%20intentionally.%0Avnc.html%3Fautoconnect%3Dtrue%26resize%3Dscale%3A1%20The%20resource%20http%3A%2F%2Flocalhost%3A6081%2Fapp%2Fimages%2Ferror.svg%20was%20preloaded%20using%20link%20preload%20but%20not%20used%20within%20a%20few%20seconds%20from%20the%20window%27s%20load%20event.%20Please%20make%20sure%20it%20has%20an%20appropriate%20%60as%60%20value%20and%20it%20is%20preloaded%20intentionally.&sid=pddazpq HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35478 - "GET /opencode/list_session_files?sid=pddazpq HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35492 - "GET /opencode/list_session_files?sid=pddazpq HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35492 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57116 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57132 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%AF%9B%E7%8E%BB%E7%92%83%E7%89%B9%E6%95%88%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20clock.html%20%E5%B9%B6%E7%9B%B4%E6%8E%A5%E5%B1%95%E7%A4%BA%E3%80%82%E2%80%9D&sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57132 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57116 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36308 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36308 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36308 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36308 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36308 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36308 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36308 - "GET /opencode/list_session_files?sid=4hrz6mk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51974 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51974 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51974 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:51976 - "GET /opencode/list_session_files?sid=s2mxb01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51976 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%AF%9B%E7%8E%BB%E7%92%83%E7%89%B9%E6%95%88%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20clock.html%20%E5%B9%B6%E7%9B%B4%E6%8E%A5%E5%9C%A8%E6%B5%8F%E8%A7%88%E5%99%A8%E5%B1%95%E7%A4%BA&sid=s2mxb01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51976 - "GET /opencode/list_session_files?sid=s2mxb01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35402 - "GET /opencode/list_session_files?sid=s2mxb01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47892 - "GET /opencode/list_session_files?sid=s2mxb01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60274 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:43756 - "GET /opencode/list_session_files?sid=s2mxb01 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43756 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43756 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:43762 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45558 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45558 - "GET /opencode/list_session_files?sid=ze0tbgg HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60460 - "GET /opencode/list_session_files?sid=ze0tbgg HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60460 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%AF%9B%E7%8E%BB%E7%92%83%E7%89%B9%E6%95%88%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20clock.html%20%E5%B9%B6%E7%9B%B4%E6%8E%A5%E5%9C%A8%E6%B5%8F%E8%A7%88%E5%99%A8%E5%B1%95%E7%A4%BA&sid=ze0tbgg HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60460 - "GET /opencode/list_session_files?sid=ze0tbgg HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60476 - "GET /opencode/list_session_files?sid=ze0tbgg HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58956 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58956 - "GET /static/opencode.js HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:58958 - "GET /opencode/list_session_files?sid=6qjuv00 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58958 - "GET /opencode/run_sse?prompt=%E2%80%9C%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E7%B2%BE%E7%BE%8E%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20my_clock.html%20%E5%B9%B6%E7%9B%B4%E6%8E%A5%E5%B1%95%E7%A4%BA&sid=6qjuv00 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40916 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42590 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42590 - "GET /static/opencode.js HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:42590 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:56480 - "GET /opencode/list_session_files?sid=y1mmujk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56480 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%AF%9B%E7%8E%BB%E7%92%83%E7%89%B9%E6%95%88%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20clock.html%20%E5%B9%B6%E5%B1%95%E7%A4%BA&sid=y1mmujk HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56484 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58004 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58008 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58004 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58004 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58004 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58004 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58004 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58004 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58008 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58008 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58008 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58004 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58004 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58004 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58004 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58004 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58004 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58004 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43072 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:47058 - "GET /opencode/list_session_files?sid=fu41o5m HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47058 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%AF%9B%E7%8E%BB%E7%92%83%E7%89%B9%E6%95%88%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20clock.html%20%E5%B9%B6%E5%B1%95%E7%A4%BA&sid=fu41o5m HTTP/1.1" 200 OK
+INFO:     172.19.0.1:52810 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E5%B8%A6%E6%AF%9B%E7%8E%BB%E7%92%83%E7%89%B9%E6%95%88%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20clock.html%20%E5%B9%B6%E5%B1%95%E7%A4%BA&sid=fu41o5m HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33322 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33334 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33322 - "GET /static/opencode.js HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:57164 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57164 - "GET /static/opencode.js HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:53238 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53254 - "GET /opencode/list_session_files?sid=hw09bdy HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53254 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E7%94%B5%E5%AD%90%E9%97%B9%E9%92%9F&sid=hw09bdy HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40438 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:50752 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E7%94%B5%E5%AD%90%E9%97%B9%E9%92%9F&sid=hw09bdy HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60968 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60976 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:60968 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60982 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40780 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40764 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40780 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40780 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40780 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40780 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40780 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40780 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40794 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40780 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40794 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40780 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40780 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40794 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40794 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40794 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40708 - "GET /opencode/list_session_files?sid=lv3oh0u HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40714 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%81%9A%E4%B8%80%E4%B8%AA%E7%B2%BE%E7%BE%8E%E7%9A%84%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F&sid=lv3oh0u HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45380 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found

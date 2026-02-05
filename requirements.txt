@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+playwright
+python-multipart
+asyncio
+openai
+python-dotenv
+tiktoken

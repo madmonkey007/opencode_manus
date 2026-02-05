@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单网页时钟</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .clock-container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .clock-title {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .clock {
+            font-size: 5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.4);
+            letter-spacing: 2px;
+        }
+        
+        .date {
+            font-size: 1.8rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .theme-selector {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .theme-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid white;
+            cursor: pointer;
+        }
+        
+        .theme-blue { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .theme-green { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        .theme-orange { background: linear-gradient(135deg, #f46b45 0%, #eea849 100%); }
+        .theme-dark { background: linear-gradient(135deg, #0f2027 0%, #203a43 100%); }
+        
+        .format-selector {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .format-selector label {
+            font-size: 1rem;
+        }
+        
+        .format-selector select {
+            padding: 8px 15px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .format-selector option {
+            background: #333;
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .clock {
+                font-size: 3.5rem;
+            }
+            
+            .date {
+                font-size: 1.5rem;
+            }
+            
+            .clock-title {
+                font-size: 2rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .clock {
+                font-size: 2.5rem;
+            }
+            
+            .date {
+                font-size: 1.2rem;
+            }
+            
+            .clock-title {
+                font-size: 1.5rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="clock-container">
+        <h1 class="clock-title">🕐 网页时钟</h1>
+        
+        <div class="clock" id="clock">00:00:00</div>
+        <div class="date" id="date">2024年1月1日 星期一</div>
+        
+        <div class="controls">
+            <button id="toggleFormat">切换12/24小时制</button>
+            <button id="toggleSeconds">显示/隐藏秒数</button>
+            <button id="toggleDate">显示/隐藏日期</button>
+        </div>
+        
+        <div class="format-selector">
+            <label for="timeFormat">时间格式:</label>
+            <select id="timeFormat">
+                <option value="24">24小时制</option>
+                <option value="12">12小时制</option>
+            </select>
+        </div>
+        
+        <div class="theme-selector">
+            <div class="theme-btn theme-blue" data-theme="blue"></div>
+            <div class="theme-btn theme-green" data-theme="green"></div>
+            <div class="theme-btn theme-orange" data-theme="orange"></div>
+            <div class="theme-btn theme-dark" data-theme="dark"></div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const clockElement = document.getElementById('clock');
+        const dateElement = document.getElementById('date');
+        const toggleFormatBtn = document.getElementById('toggleFormat');
+        const toggleSecondsBtn = document.getElementById('toggleSeconds');
+        const toggleDateBtn = document.getElementById('toggleDate');
+        const timeFormatSelect = document.getElementById('timeFormat');
+        const themeButtons = document.querySelectorAll('.theme-btn');
+        
+        // 状态变量
+        let is24HourFormat = true;
+        let showSeconds = true;
+        let showDate = true;
+        
+        // 星期几的中文名称
+        const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        
+        // 月份的中文名称
+        const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+        
+        // 更新时钟
+        function updateClock() {
+            const now = new Date();
+            
+            // 获取时间组件
+            let hours = now.getHours();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            
+            // 格式化小时（12/24小时制）
+            let formattedHours = hours;
+            let ampm = '';
+            
+            if (!is24HourFormat) {
+                ampm = hours >= 12 ? ' PM' : ' AM';
+                formattedHours = hours % 12 || 12;
+            }
+            
+            // 格式化时间字符串
+            let timeString = `${formattedHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            
+            if (showSeconds) {
+                timeString += `:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            if (!is24HourFormat) {
+                timeString += ampm;
+            }
+            
+            // 更新时钟显示
+            clockElement.textContent = timeString;
+            
+            // 更新日期显示
+            if (showDate) {
+                const year = now.getFullYear();
+                const month = months[now.getMonth()];
+                const day = now.getDate();
+                const weekday = weekdays[now.getDay()];
+                
+                dateElement.textContent = `${year}年${month}${day}日 ${weekday}`;
+                dateElement.style.display = 'block';
+            } else {
+                dateElement.style.display = 'none';
+            }
+        }
+        
+        // 切换12/24小时制
+        toggleFormatBtn.addEventListener('click', () => {
+            is24HourFormat = !is24HourFormat;
+            timeFormatSelect.value = is24HourFormat ? '24' : '12';
+            updateClock();
+        });
+        
+        // 切换秒数显示
+        toggleSecondsBtn.addEventListener('click', () => {
+            showSeconds = !showSeconds;
+            toggleSecondsBtn.textContent = showSeconds ? '隐藏秒数' : '显示秒数';
+            updateClock();
+        });
+        
+        // 切换日期显示
+        toggleDateBtn.addEventListener('click', () => {
+            showDate = !showDate;
+            toggleDateBtn.textContent = showDate ? '隐藏日期' : '显示日期';
+            updateClock();
+        });
+        
+        // 时间格式选择器
+        timeFormatSelect.addEventListener('change', (e) => {
+            is24HourFormat = e.target.value === '24';
+            updateClock();
+        });
+        
+        // 主题切换
+        themeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const theme = button.getAttribute('data-theme');
+                changeTheme(theme);
+            });
+        });
+        
+        // 更改主题
+        function changeTheme(theme) {
+            const body = document.body;
+            
+            // 移除所有主题类
+            body.classList.remove('theme-blue', 'theme-green', 'theme-orange', 'theme-dark');
+            
+            // 添加新主题类
+            switch(theme) {
+                case 'green':
+                    body.style.background = 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)';
+                    break;
+                case 'orange':
+                    body.style.background = 'linear-gradient(135deg, #f46b45 0%, #eea849 100%)';
+                    break;
+                case 'dark':
+                    body.style.background = 'linear-gradient(135deg, #0f2027 0%, #203a43 100%)';
+                    break;
+                default: // blue
+                    body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            }
+        }
+        
+        // 初始更新
+        updateClock();
+        
+        // 每秒更新一次
+        setInterval(updateClock, 1000);
+        
+        // 添加一些动画效果
+        clockElement.addEventListener('mouseenter', () => {
+            clockElement.style.transform = 'scale(1.05)';
+            clockElement.style.transition = 'transform 0.3s ease';
+        });
+        
+        clockElement.addEventListener('mouseleave', () => {
+            clockElement.style.transform = 'scale(1)';
+        });
+        
+        // 添加键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'f':
+                case 'F':
+                    is24HourFormat = !is24HourFormat;
+                    timeFormatSelect.value = is24HourFormat ? '24' : '12';
+                    updateClock();
+                    break;
+                case 's':
+                case 'S':
+                    showSeconds = !showSeconds;
+                    toggleSecondsBtn.textContent = showSeconds ? '隐藏秒数' : '显示秒数';
+                    updateClock();
+                    break;
+                case 'd':
+                case 'D':
+                    showDate = !showDate;
+                    toggleDateBtn.textContent = showDate ? '隐藏日期' : '显示日期';
+                    updateClock();
+                    break;
+            }
+        });
+        
+        // 显示键盘快捷键提示
+        console.log('键盘快捷键:');
+        console.log('F - 切换12/24小时制');
+        console.log('S - 显示/隐藏秒数');
+        console.log('D - 显示/隐藏日期');
+    </script>
+</body>
+</html>

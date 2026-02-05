@@ -1,0 +1,719 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "file:////app/opencode/config_host/node_modules/oh-my-opencode/dist/index.js",
+    "opencode-antigravity-auth@1.2.8",
+    "opencode-openai-codex-auth",
+    "opencode-pty",
+    "opencode-supermemory",
+    "@tarquinen/opencode-dcp@1.2.7",
+    "@franlol/opencode-md-table-formatter@0.0.3",
+    "oh-my-opencode@3.2.2"
+  ],
+  "provider": {
+    "google-ai-key1": {
+      "npm": "@ai-sdk/google",
+      "options": {
+        "apiKey": "AIzaSyB8_-uVvWr-XNvuut9nedO_-tNs5K_gEG8"
+      },
+      "models": {
+        "gemini-3-flash-preview": {
+          "name": "Gemini 3 Flash Preview (Key 1)",
+          "attachment": true,
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    "google-ai-key2": {
+      "npm": "@ai-sdk/google",
+      "options": {
+        "apiKey": "AIzaSyBy71UomGpQJSYtorSClOQxytsl_3UNxWk"
+      },
+      "models": {
+        "gemini-3-flash-preview": {
+          "name": "Gemini 3 Flash Preview (Key 2)",
+          "attachment": true,
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    "zhipu-glm": {
+      "npm": "@ai-sdk/openai",
+      "name": "GLM Coding Lite",
+      "options": {
+        "apiKey": "14684e2d78734901a100a057f6f284f6.H6GABhETTOEJ3nrB",
+        "baseURL": "https://open.bigmodel.cn/api/paas/v4"
+      },
+      "models": {
+        "glm-4-7": {
+          "name": "GLM-4.7 (Coding Lite)",
+          "attachment": true,
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "modalities": {
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "glm-4-flash": {
+          "name": "GLM-4 Flash (Coding Lite)",
+          "attachment": true,
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "modalities": {
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "glm-4-7-thinking": {
+          "name": "GLM-4.7 Thinking (Coding Lite)",
+          "attachment": true,
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "modalities": {
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    "google": {
+      "name": "Google",
+      "models": {
+        "antigravity-gemini-3-pro": {
+          "name": "Gemini 3 Pro (Antigravity)",
+          "limit": {
+            "context": 1048576,
+            "output": 65535
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "variants": {
+            "low": {
+              "thinkingLevel": "low"
+            },
+            "high": {
+              "thinkingLevel": "high"
+            }
+          }
+        },
+        "antigravity-gemini-3-flash": {
+          "name": "Gemini 3 Flash (Antigravity)",
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "variants": {
+            "minimal": {
+              "thinkingLevel": "minimal"
+            },
+            "low": {
+              "thinkingLevel": "low"
+            },
+            "medium": {
+              "thinkingLevel": "medium"
+            },
+            "high": {
+              "thinkingLevel": "high"
+            }
+          }
+        },
+        "antigravity-claude-sonnet-4-5": {
+          "name": "Claude Sonnet 4.5 (Antigravity)",
+          "limit": {
+            "context": 200000,
+            "output": 64000
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "antigravity-claude-sonnet-4-5-thinking": {
+          "name": "Claude Sonnet 4.5 Thinking (Antigravity)",
+          "limit": {
+            "context": 200000,
+            "output": 64000
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "variants": {
+            "low": {
+              "thinkingConfig": {
+                "thinkingBudget": 8192
+              }
+            },
+            "max": {
+              "thinkingConfig": {
+                "thinkingBudget": 32768
+              }
+            }
+          }
+        },
+        "antigravity-claude-opus-4-5-thinking": {
+          "name": "Claude Opus 4.5 Thinking (Antigravity)",
+          "limit": {
+            "context": 200000,
+            "output": 64000
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "variants": {
+            "low": {
+              "thinkingConfig": {
+                "thinkingBudget": 8192
+              }
+            },
+            "max": {
+              "thinkingConfig": {
+                "thinkingBudget": 32768
+              }
+            }
+          }
+        }
+      }
+    },
+    "new-api": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "New-API",
+      "options": {
+        "apiKey": "L8gI61ssTVTTFhG0kIvKwPlluZIYwtXZEfQzgLEtKhKX7Zvu",
+        "baseURL": "http://10.141.103.6:3030/v1"
+      },
+      "models": {
+        "gemini-3-pro-preview": {
+          "name": "Gemini 3 Pro"
+        },
+        "gemini-3-flash-preview": {
+          "name": "Gemini 3 Flash"
+        },
+        "gemini-2.5-pro": {
+          "name": "Gemini 2.5 Pro"
+        },
+        "gemini-2.5-flash": {
+          "name": "Gemini 2.5 Flash"
+        },
+        "claude-opus-4.5": {
+          "name": "Claude 4.5 Opus"
+        },
+        "claude-sonnet-4.5": {
+          "name": "Claude 4.5 Sonnet"
+        },
+        "claude-haiku-4.5": {
+          "name": "Claude 4.5 Haiku"
+        },
+        "gpt-5.2": {
+          "name": "GPT-5.2"
+        },
+        "glm-4.7": {
+          "name": "GLM-4.7"
+        }
+      }
+    },
+    "openai": {
+      "name": "OpenAI",
+      "models": {
+        "gpt-5.2": {
+          "name": "GPT 5.2 (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "variants": {
+            "none": {
+              "reasoningEffort": "none",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium"
+            },
+            "low": {
+              "reasoningEffort": "low",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium"
+            },
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium"
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium"
+            },
+            "xhigh": {
+              "reasoningEffort": "xhigh",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium"
+            }
+          }
+        },
+        "gpt-5.2-codex": {
+          "name": "GPT 5.2 Codex (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "variants": {
+            "low": {
+              "reasoningEffort": "low",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium"
+            },
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium"
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium"
+            },
+            "xhigh": {
+              "reasoningEffort": "xhigh",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium"
+            }
+          }
+        },
+        "gpt-5.1-codex-max": {
+          "name": "GPT 5.1 Codex Max (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "variants": {
+            "low": {
+              "reasoningEffort": "low",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium"
+            },
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium"
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium"
+            },
+            "xhigh": {
+              "reasoningEffort": "xhigh",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium"
+            }
+          }
+        }
+      },
+      "options": {
+        "reasoningEffort": "medium",
+        "reasoningSummary": "auto",
+        "textVerbosity": "medium",
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "store": false
+      }
+    }
+  },
+  "permission": {
+    "task": "deny",
+    "context7_*": "allow",
+    "exa_*": "allow",
+    "gh_grep_*": "allow",
+    "kagi_*": "deny",
+    "webfetch": "allow",
+    "worktree_*": "deny"
+  },
+  "agent": {
+    "researcher": {
+      "permission": {
+        "context7_*": "allow",
+        "exa_*": "allow",
+        "gh_grep_*": "allow",
+        "kagi_*": "deny",
+        "webfetch": "allow",
+        "write": "deny",
+        "edit": "deny",
+        "plan_read": "deny",
+        "todoread": "deny",
+        "bash": {
+          "*": "deny",
+          "gh repo view*": "allow",
+          "gh pr view*": "allow",
+          "gh pr list*": "allow",
+          "gh issue view*": "allow",
+          "gh issue list*": "allow",
+          "gh release view*": "allow",
+          "gh release list*": "allow",
+          "gh run view*": "allow",
+          "gh run list*": "allow",
+          "gh workflow list*": "allow",
+          "gh search *": "allow",
+          "gh api *": "allow",
+          "npm view*": "allow",
+          "npm info*": "allow",
+          "npm show*": "allow",
+          "pip show*": "allow",
+          "pip index*": "allow",
+          "cargo search*": "allow",
+          "cargo info*": "allow",
+          "man *": "allow",
+          "tldr *": "allow",
+          "dig *": "allow",
+          "nslookup *": "allow",
+          "whois *": "allow",
+          "host *": "allow",
+          "jq *": "allow",
+          "head *": "allow",
+          "tail *": "allow",
+          "base64 *": "allow",
+          "grep *": "allow",
+          "rg *": "allow",
+          "wc *": "allow",
+          "sort *": "allow",
+          "uniq *": "allow",
+          "cut *": "allow",
+          "awk *": "allow",
+          "tr *": "allow"
+        }
+      }
+    },
+    "scribe": {
+      "permission": {
+        "bash": {
+          "*": "deny"
+        },
+        "edit": "allow",
+        "glob": "allow",
+        "read": "allow",
+        "write": "allow",
+        "plan_read": "deny",
+        "todoread": "deny"
+      }
+    },
+    "coder": {
+      "permission": {
+        "context7_*": "allow",
+        "exa_*": "allow",
+        "gh_grep_*": "allow",
+        "read": "allow",
+        "write": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "bash": "allow",
+        "plan_read": "deny",
+        "todoread": "deny"
+      }
+    },
+    "reviewer": {
+      "temperature": 0.1,
+      "permission": {
+        "edit": "deny",
+        "write": "deny",
+        "bash": {
+          "*": "deny",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          "git blame*": "allow",
+          "rg *": "allow"
+        },
+        "plan_read": "allow",
+        "delegation_read": "allow",
+        "delegation_list": "allow"
+      }
+    },
+    "plan": {
+      "permission": {
+        "edit": "deny",
+        "write": "deny",
+        "bash": {
+          "*": "deny"
+        },
+        "task": "allow",
+        "worktree_*": "allow"
+      }
+    },
+    "build": {
+      "prompt": "You are a **build orchestrator**. You coordinate implementation through delegation - you do NOT implement directly.\\\\\\\\n\\\\\\\\n## Your Role\\\\\\\\n- Delegate implementation to `coder`\\\\\\\\n- Delegate documentation to `scribe`\\\\\\\\n- Delegate codebase analysis to `explore`\\\\\\\\n- Delegate external research to `researcher`\\\\\\\\n- Interpret results and decide next steps\\\\\\\\n\\\\\\\\n## Critical Constraint\\\\\\\\nYou CANNOT edit files or run commands directly. For ALL implementation and verification, delegate to `coder`.",
+      "permission": {
+        "edit": "deny",
+        "write": "deny",
+        "bash": {
+          "*": "deny"
+        },
+        "task": "allow",
+        "worktree_*": "allow"
+      }
+    },
+    "explore": {
+      "permission": {
+        "edit": "deny",
+        "write": "deny",
+        "plan_read": "deny",
+        "todoread": "deny",
+        "bash": {
+          "*": "deny",
+          "ls *": "allow",
+          "tree *": "allow",
+          "pwd": "allow",
+          "cat *": "allow",
+          "head *": "allow",
+          "tail *": "allow",
+          "wc *": "allow",
+          "file *": "allow",
+          "stat *": "allow",
+          "grep *": "allow",
+          "rg *": "allow",
+          "find *": "allow",
+          "git status*": "allow",
+          "git log*": "allow",
+          "git diff*": "allow",
+          "git show*": "allow",
+          "git blame*": "allow",
+          "git branch*": "allow",
+          "git ls-files*": "allow",
+          "uname*": "allow",
+          "hostname": "allow",
+          "whoami": "allow",
+          "which *": "allow",
+          "realpath *": "allow"
+        }
+      }
+    },
+    "sisyphus": {
+      "permission": {
+        "read": "allow",
+        "write": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "context7_*": "allow",
+        "exa_*": "allow",
+        "gh_grep_*": "allow",
+        "webfetch": "allow",
+        "bash": "allow"
+      }
+    },
+    "oracle": {
+      "permission": {
+        "read": "allow",
+        "write": "deny",
+        "edit": "deny",
+        "glob": "allow",
+        "grep": "allow",
+        "context7_*": "allow",
+        "exa_*": "allow",
+        "gh_grep_*": "allow",
+        "webfetch": "allow",
+        "bash": {
+          "*": "deny"
+        }
+      }
+    },
+    "librarian": {
+      "permission": {
+        "read": "allow",
+        "write": "deny",
+        "edit": "deny",
+        "glob": "allow",
+        "grep": "allow",
+        "context7_*": "allow",
+        "exa_*": "allow",
+        "gh_grep_*": "allow",
+        "webfetch": "allow",
+        "bash": {
+          "*": "deny",
+          "ls *": "allow",
+          "tree *": "allow",
+          "pwd": "allow",
+          "cat *": "allow",
+          "head *": "allow",
+          "tail *": "allow",
+          "grep *": "allow",
+          "rg *": "allow",
+          "git log*": "allow",
+          "git diff*": "allow",
+          "git show*": "allow"
+        }
+      }
+    },
+    "multimodal-looker": {
+      "permission": {
+        "read": "allow",
+        "write": "deny",
+        "edit": "deny",
+        "glob": "allow",
+        "context7_*": "allow",
+        "exa_*": "allow",
+        "gh_grep_*": "allow",
+        "webfetch": "allow",
+        "bash": {
+          "*": "deny"
+        }
+      }
+    },
+    "frontend-ui-ux-engineer": {
+      "permission": {
+        "read": "allow",
+        "write": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "context7_*": "allow",
+        "exa_*": "allow",
+        "gh_grep_*": "allow",
+        "webfetch": "allow",
+        "bash": "allow"
+      }
+    },
+    "document-writer": {
+      "permission": {
+        "read": "allow",
+        "write": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "context7_*": "allow",
+        "exa_*": "allow",
+        "gh_grep_*": "allow",
+        "webfetch": "allow",
+        "bash": {
+          "*": "deny"
+        }
+      }
+    }
+  },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": false,
+      "timeout": 60000
+    },
+    "exa": {
+      "type": "remote",
+      "url": "https://mcp.exa.ai/mcp",
+      "enabled": false,
+      "timeout": 60000
+    },
+    "gh_grep": {
+      "type": "remote",
+      "url": "https://mcp.grep.app",
+      "enabled": false,
+      "timeout": 60000
+    }
+  }
+}

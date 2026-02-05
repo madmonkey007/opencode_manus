@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单倒计时时钟</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+        
+        .timer-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+        
+        .time-unit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 15px;
+            border-radius: 15px;
+            min-width: 120px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .time-value {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .time-label {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            margin-top: 30px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .input-group label {
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        input[type="number"] {
+            width: 80px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+        
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        #startBtn {
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            color: white;
+        }
+        
+        #startBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+        
+        #resetBtn {
+            background: linear-gradient(135deg, #f44336 0%, #c62828 100%);
+            color: white;
+        }
+        
+        #resetBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+        }
+        
+        #pauseBtn {
+            background: linear-gradient(135deg, #FF9800 0%, #EF6C00 100%);
+            color: white;
+        }
+        
+        #pauseBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+        }
+        
+        .status {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            min-height: 30px;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .time-unit {
+                min-width: 100px;
+                padding: 20px 10px;
+            }
+            
+            .time-value {
+                font-size: 2.5rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⏰ 倒计时时钟</h1>
+        
+        <div class="input-group">
+            <label>设置倒计时时间：</label>
+            <div class="input-row">
+                <div>
+                    <input type="number" id="hours" min="0" max="99" value="0" placeholder="小时">
+                    <div class="time-label">小时</div>
+                </div>
+                <div>
+                    <input type="number" id="minutes" min="0" max="59" value="5" placeholder="分钟">
+                    <div class="time-label">分钟</div>
+                </div>
+                <div>
+                    <input type="number" id="seconds" min="0" max="59" value="0" placeholder="秒">
+                    <div class="time-label">秒</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="timer-container">
+            <div class="time-unit">
+                <div class="time-value" id="displayHours">00</div>
+                <div class="time-label">小时</div>
+            </div>
+            <div class="time-unit">
+                <div class="time-value" id="displayMinutes">05</div>
+                <div class="time-label">分钟</div>
+            </div>
+            <div class="time-unit">
+                <div class="time-value" id="displaySeconds">00</div>
+                <div class="time-label">秒</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">开始倒计时</button>
+            <button id="pauseBtn">暂停/继续</button>
+            <button id="resetBtn">重置</button>
+        </div>
+        
+        <div class="status" id="status">准备开始倒计时...</div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const hoursInput = document.getElementById('hours');
+        const minutesInput = document.getElementById('minutes');
+        const secondsInput = document.getElementById('seconds');
+        const displayHours = document.getElementById('displayHours');
+        const displayMinutes = document.getElementById('displayMinutes');
+        const displaySeconds = document.getElementById('displaySeconds');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const status = document.getElementById('status');
+        
+        // 倒计时变量
+        let totalSeconds = 300; // 默认5分钟
+        let timerInterval = null;
+        let isRunning = false;
+        let isPaused = false;
+        
+        // 更新显示
+        function updateDisplay() {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            
+            displayHours.textContent = hours.toString().padStart(2, '0');
+            displayMinutes.textContent = minutes.toString().padStart(2, '0');
+            displaySeconds.textContent = seconds.toString().padStart(2, '0');
+        }
+        
+        // 从输入框获取时间
+        function getTimeFromInputs() {
+            const hours = parseInt(hoursInput.value) || 0;
+            const minutes = parseInt(minutesInput.value) || 0;
+            const seconds = parseInt(secondsInput.value) || 0;
+            
+            return hours * 3600 + minutes * 60 + seconds;
+        }
+        
+        // 开始倒计时
+        function startCountdown() {
+            if (isRunning && !isPaused) return;
+            
+            if (!isRunning) {
+                totalSeconds = getTimeFromInputs();
+                if (totalSeconds <= 0) {
+                    status.textContent = "请设置一个有效的时间！";
+                    return;
+                }
+            }
+            
+            isRunning = true;
+            isPaused = false;
+            startBtn.disabled = true;
+            pauseBtn.textContent = "暂停";
+            status.textContent = "倒计时进行中...";
+            
+            updateDisplay();
+            
+            timerInterval = setInterval(() => {
+                if (totalSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    isRunning = false;
+                    startBtn.disabled = false;
+                    status.textContent = "⏰ 时间到！倒计时结束！";
+                    playAlertSound();
+                    return;
+                }
+                
+                totalSeconds--;
+                updateDisplay();
+                
+                // 最后10秒显示警告
+                if (totalSeconds <= 10) {
+                    status.textContent = `还剩 ${totalSeconds} 秒！`;
+                    if (totalSeconds <= 3) {
+                        flashTimer();
+                    }
+                }
+            }, 1000);
+        }
+        
+        // 暂停/继续
+        function togglePause() {
+            if (!isRunning) return;
+            
+            if (isPaused) {
+                isPaused = false;
+                pauseBtn.textContent = "暂停";
+                status.textContent = "倒计时继续...";
+                startCountdown();
+            } else {
+                isPaused = true;
+                clearInterval(timerInterval);
+                pauseBtn.textContent = "继续";
+                status.textContent = "倒计时已暂停";
+            }
+        }
+        
+        // 重置倒计时
+        function resetCountdown() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            isPaused = false;
+            startBtn.disabled = false;
+            pauseBtn.textContent = "暂停/继续";
+            
+            totalSeconds = getTimeFromInputs();
+            updateDisplay();
+            status.textContent = "已重置，准备开始倒计时...";
+            
+            // 移除闪烁效果
+            const timeUnits = document.querySelectorAll('.time-unit');
+            timeUnits.forEach(unit => {
+                unit.style.animation = 'none';
+                unit.style.backgroundColor = '';
+            });
+        }
+        
+        // 闪烁效果（最后3秒）
+        function flashTimer() {
+            const timeUnits = document.querySelectorAll('.time-unit');
+            timeUnits.forEach(unit => {
+                unit.style.animation = 'flash 0.5s infinite alternate';
+            });
+        }
+        
+        // 添加闪烁动画
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes flash {
+                from { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+                to { background: linear-gradient(135deg, #ff4444 0%, #ff0000 100%); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // 播放提示音（使用Web Audio API）
+        function playAlertSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 1);
+            } catch (e) {
+                console.log("音频播放失败:", e);
+            }
+        }
+        
+        // 输入框变化时更新显示
+        function updateDisplayFromInputs() {
+            if (!isRunning) {
+                totalSeconds = getTimeFromInputs();
+                updateDisplay();
+            }
+        }
+        
+        // 事件监听
+        startBtn.addEventListener('click', startCountdown);
+        pauseBtn.addEventListener('click', togglePause);
+        resetBtn.addEventListener('click', resetCountdown);
+        
+        hoursInput.addEventListener('input', updateDisplayFromInputs);
+        minutesInput.addEventListener('input', updateDisplayFromInputs);
+        secondsInput.addEventListener('input', updateDisplayFromInputs);
+        
+        // 限制输入范围
+        hoursInput.addEventListener('change', function() {
+            if (this.value < 0) this.value = 0;
+            if (this.value > 99) this.value = 99;
+        });
+        
+        minutesInput.addEventListener('change', function() {
+            if (this.value < 0) this.value = 0;
+            if (this.value > 59) this.value = 59;
+        });
+        
+        secondsInput.addEventListener('change', function() {
+            if (this.value < 0) this.value = 0;
+            if (this.value > 59) this.value = 59;
+        });
+        
+        // 初始化显示
+        updateDisplay();
+    </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+services:
+  opencode:
+    build: .
+    image: opencode:latest
+    container_name: opencode-container
+    ports:
+      - "8088:8000"  # Web UI
+      - "6081:6080"  # UVN Preview
+    environment:
+      - DISPLAY=:0
+      - PYTHONUNBUFFERED=1
+      - SCREEN_WIDTH=1280
+      - SCREEN_HEIGHT=720
+      - OPENCODE_CONFIG_DIR=/app/opencode/config_host
+    volumes:
+      - ./app:/app/opencode/app
+      - ./static:/app/opencode/static
+      - ./workspace:/app/opencode/workspace
+      - ./config:/app/opencode/config
+      - ./logs:/app/opencode/logs
+      - .env:/app/opencode/.env
+      # Removed :ro to allow plugins to initialize and write configs
+      - C:/Users/EDY/.config/opencode/skills:/app/opencode/config_host/skills
+      - C:/Users/EDY/.config/opencode/plugin:/app/opencode/config_host/plugin
+      - C:/Users/EDY/.config/opencode/opencode.json:/app/opencode/config_host/opencode.json
+      - C:/Users/EDY/.config/opencode/oh-my-opencode.json:/app/opencode/config_host/oh-my-opencode.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

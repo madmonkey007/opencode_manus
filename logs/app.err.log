@@ -1,0 +1,337 @@
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:__main__:Request received: prompt='帮我写一个python的tudolist脚本', sid='2qgq12v'
+INFO:__main__:SSE Stream started for sid: 2qgq12v
+INFO:__main__:Launching browser...
+INFO:__main__:Navigating to google for prompt: 帮我写一个python的tudolist脚本
+INFO:__main__:Browser closed.
+INFO:__main__:SSE Stream ended for sid: 2qgq12v
+INFO:__main__:Request received: prompt='搜索网页并帮我搜索agentskills的文章，总结后发给我', sid='xhdwgoq'
+INFO:__main__:SSE Stream started for sid: xhdwgoq
+INFO:__main__:Launching browser...
+INFO:__main__:Navigating to google for prompt: 搜索网页并帮我搜索agentskills的文章，总结后发给我
+INFO:__main__:Browser closed.
+INFO:__main__:SSE Stream ended for sid: xhdwgoq
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+Traceback (most recent call last):
+  File "/app/opencode/app/main.py", line 10, in <module>
+    from app.llm import LLM
+ModuleNotFoundError: No module named 'app'
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:httpx:HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-01-30 15:31:16,186 - opencode - INFO - Starting agent task for sid: 1aiqei7
+2026-01-30 15:31:16,732 - opencode - INFO - Launching browser...
+2026-01-30 15:31:18,589 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 15:32:49,689 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 15:43:59,300 - opencode - INFO - Starting agent task for sid: 26yjqau
+2026-01-30 15:44:00,280 - opencode - INFO - Launching browser...
+2026-01-30 15:44:01,716 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 15:44:16,118 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-01-30 16:03:26,574 - opencode - INFO - Starting task: 帮我创建一个简单的网页倒计时始终
+2026-01-30 16:03:29,180 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:04:53,991 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:04:56,841 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:04:59,533 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:05:02,168 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:05:09,815 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-01-30 16:12:34,789 - opencode - INFO - Starting task: 帮我生成一个带流光效果的登录页面，并展示在浏览器中。
+2026-01-30 16:12:37,655 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:14:28,832 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:14:32,946 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:14:36,288 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:14:42,832 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:16:25,520 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:16:29,114 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:16:34,122 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:16:36,755 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-01-30 16:18:51,057 - opencode - INFO - Starting task: 帮我生成一个带流光效果的登录页面，并展示在浏览器中。
+2026-01-30 16:18:57,833 - openai._base_client - INFO - Retrying request to /chat/completions in 0.496520 seconds
+2026-01-30 16:18:58,496 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:20:17,392 - openai._base_client - INFO - Retrying request to /chat/completions in 0.922355 seconds
+2026-01-30 16:20:18,528 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:21:58,570 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:22:01,586 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:22:04,394 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:22:08,323 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:22:53,485 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:22:56,675 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:23:11,573 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-01-30 16:24:17,111 - opencode - INFO - Starting task: 帮我生成一个带流光效果的登录页面，并展示在浏览器中。
+2026-01-30 16:24:18,810 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:26:00,448 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:26:03,064 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:26:06,123 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:27:07,649 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:27:15,268 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:16,598 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:19,968 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:23,188 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:30,117 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:33,273 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:37,116 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:40,031 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:43,449 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:28:46,464 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-01-30 16:30:34,692 - opencode - INFO - Starting task: 帮我生成一个带流光效果的登录页面，并展示在浏览器中。
+2026-01-30 16:30:37,670 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:32:15,107 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:32:17,619 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:32:20,470 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:33:22,282 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:33:25,444 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:33:28,187 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:33:30,627 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:33:33,651 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:33:40,719 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-30 16:33:44,647 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+  File "/app/opencode/app/main.py", line 182
+    result = f"STDOUT: {proc.stdout}
+             ^
+SyntaxError: unterminated f-string literal (detected at line 182)
+  File "/app/opencode/app/main.py", line 182
+    result = f"STDOUT: {proc.stdout}
+             ^
+SyntaxError: unterminated f-string literal (detected at line 182)
+  File "/app/opencode/app/main.py", line 182
+    result = f"STDOUT: {proc.stdout}
+             ^
+SyntaxError: unterminated f-string literal (detected at line 182)
+  File "/app/opencode/app/main.py", line 182
+    result = f"STDOUT: {proc.stdout}
+             ^
+SyntaxError: unterminated f-string literal (detected at line 182)
+INFO:     Started server process [8]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-01-31 07:10:01,062 - opencode - INFO - Agent session started: 6w7vt92
+2026-01-31 07:10:12,865 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-31 07:11:33,138 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-31 07:11:36,748 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+INFO:     Started server process [125]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-01-31 14:43:47,628 - opencode - INFO - Agent session started: ue7pwh9
+2026-01-31 14:43:49,965 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-01-31 14:45:53,150 - opencode - ERROR - Error: Unterminated string starting at: line 1 column 45 (char 44)
+INFO:     Started server process [88]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-02 08:23:21,870 - opencode - INFO - Official Kernel session started: bwkiy5b
+2026-02-02 08:23:21,916 - opencode - ERROR - Kernel bridge error: [Errno 2] No such file or directory: 'opencode-ai'
+2026-02-02 08:31:00,886 - opencode - INFO - Official Kernel session started: bwkiy5b
+2026-02-02 08:31:00,890 - opencode - ERROR - Kernel bridge error: [Errno 2] No such file or directory: 'opencode-ai'
+INFO:     Started server process [77]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [77]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [86]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [99]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-03 13:39:04,909 - opencode - INFO - Official Kernel session started: mi0orcx
+2026-02-03 13:39:04,928 - opencode - ERROR - Kernel bridge error: [Errno 2] No such file or directory: 'opencode-ai'
+INFO:     Started server process [77]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [78]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [78]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-04 05:00:25,969 - opencode - INFO - Official Kernel session started: qkq8e01
+2026-02-04 05:00:26,021 - opencode - ERROR - Kernel bridge error: [Errno 2] No such file or directory: 'opencode-ai'
+2026-02-04 05:17:07,076 - opencode - INFO - Official Kernel session started: test-sid
+2026-02-04 05:17:07,269 - opencode - ERROR - Kernel bridge error: [Errno 2] No such file or directory: 'opencode-ai'
+INFO:     Started server process [88]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [76]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-04 07:03:54,279 - opencode - INFO - Official Kernel session started: rzql9gu
+2026-02-04 07:05:22,166 - opencode - INFO - Official Kernel session started: pddazpq
+2026-02-04 07:05:40,909 - opencode - INFO - Official Kernel session started: 4hrz6mk
+INFO:     Started server process [76]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-04 08:12:53,759 - opencode - INFO - Official Kernel session started: s2mxb01
+2026-02-04 08:13:55,189 - opencode - INFO - Official Kernel session started: ze0tbgg
+INFO:     Started server process [80]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [23]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-04 08:52:32,993 - opencode - INFO - Official Kernel session started: 6qjuv00
+INFO:     Started server process [17]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [17]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-04 10:12:59,919 - opencode - INFO - Native Agent session started: y1mmujk
+2026-02-04 10:13:57,630 - opencode - INFO - Native Agent session started: fu41o5m
+2026-02-04 10:16:03,996 - opencode - INFO - Native Agent session started: fu41o5m
+INFO:     Started server process [17]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-04 15:17:45,876 - opencode - INFO - Official Kernel session started: hw09bdy
+INFO:     Started server process [16]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-02-04 16:05:09,156 - opencode - INFO - Official Kernel session started: hw09bdy
+2026-02-05 01:36:59,793 - opencode - INFO - Official Kernel session started: lv3oh0u
