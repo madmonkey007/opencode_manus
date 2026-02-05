@@ -408,11 +408,45 @@ function bindUI() {
 
     // VM Panel toggle
     const vmPanel = el('#vm-panel');
+    const mainContent = el('#main-content');
     const closeVmPanelBtn = el('#close-vm-panel');
+    const openVmPanelBtn = el('#open-vm-panel');
     
     if (closeVmPanelBtn) {
         closeVmPanelBtn.onclick = () => {
-            vmPanel.classList.add('hidden');
+            // 关闭右侧面板
+            vmPanel.classList.remove('w-[45%]');
+            vmPanel.classList.add('vm-panel-closed');
+            
+            // 隐藏关闭按钮，显示打开按钮
+            closeVmPanelBtn.classList.add('hidden');
+            if (openVmPanelBtn) {
+                openVmPanelBtn.classList.remove('hidden');
+            }
+            
+            // 中间面板居中（可选）
+            if (mainContent) {
+                mainContent.classList.add('main-content-centered');
+            }
+        };
+    }
+    
+    if (openVmPanelBtn) {
+        openVmPanelBtn.onclick = () => {
+            // 打开右侧面板
+            vmPanel.classList.remove('vm-panel-closed');
+            vmPanel.classList.add('w-[45%]');
+            
+            // 隐藏打开按钮，显示关闭按钮
+            openVmPanelBtn.classList.add('hidden');
+            if (closeVmPanelBtn) {
+                closeVmPanelBtn.classList.remove('hidden');
+            }
+            
+            // 移除中间面板居中
+            if (mainContent) {
+                mainContent.classList.remove('main-content-centered');
+            }
         };
     }
 
