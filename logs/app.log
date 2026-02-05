@@ -196,3 +196,27 @@ INFO:     172.19.0.1:40794 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 INFO:     172.19.0.1:40708 - "GET /opencode/list_session_files?sid=lv3oh0u HTTP/1.1" 200 OK
 INFO:     172.19.0.1:40714 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%81%9A%E4%B8%80%E4%B8%AA%E7%B2%BE%E7%BE%8E%E7%9A%84%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F&sid=lv3oh0u HTTP/1.1" 200 OK
 INFO:     172.19.0.1:45380 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:34298 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34298 - "GET /static/opencode.js HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:34314 - "GET /opencode/list_session_files?sid=z6uf410 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60458 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E7%94%B5%E5%AD%90%E9%97%B9%E9%92%9F%E9%A1%B5%E9%9D%A2&sid=z6uf410 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44900 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:51606 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:60312 - "GET /opencode/list_session_files?sid=e6chgk7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60328 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E7%94%B5%E5%AD%90%E6%97%B6%E9%92%9F%EF%BC%8C%E5%83%8F%E7%B4%A0%E9%A3%8E%E9%A3%8E%E6%A0%BC%EF%BC%8C%E6%97%B6%E9%92%9F%E6%95%B0%E5%AD%97%E8%A6%81%E5%A4%A7%EF%BC%8C%E7%81%B0%E8%89%B2%E8%83%8C%E6%99%AF&sid=e6chgk7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56932 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40736 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40736 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40746 - "GET /static/phase-progress.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40756 - "GET /static/right-panel-manager.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /static/enhanced-task-panel.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40774 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40774 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40774 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40774 - "GET /static/phase-progress.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /static/right-panel-manager.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40746 - "GET /static/opencode.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40756 - "GET /static/enhanced-task-panel.js HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53946 - "GET /opencode/list_session_files?sid=qku8lp3 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53958 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E7%B2%BE%E7%BE%8E%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20my_clock.html%20%E5%B9%B6%E5%B1%95%E7%A4%BA%E3%80%82&sid=qku8lp3 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33614 - "GET /opencode/list_session_files?sid=qku8lp3 HTTP/1.1" 200 OK
