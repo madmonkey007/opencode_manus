@@ -112,9 +112,19 @@ async function renderFiles() {
     }
 
     try {
-        const res = await fetch(`/opencode/list_session_files?sid=${s.id}`);
-        const data = await res.json();
-        let files = data.files || [];
+        // 优先使用本地 deliverables 数据（mock 模式）
+        let files = [];
+        if (s.deliverables && s.deliverables.length > 0) {
+            files = s.deliverables.map(f => ({
+                name: f.name,
+                path: f.path,
+                type: f.name.split('.').pop().toLowerCase()
+            }));
+        } else {
+            const res = await fetch(`/opencode/list_session_files?sid=${s.id}`);
+            const data = await res.json();
+            files = data.files || [];
+        }
 
         // Apply Search
         if (state.fileSearch) {
@@ -549,6 +559,15 @@ function bindUI() {
 }
 
 function init() {
+    // 加载 mock 数据（如果可用）
+    if (typeof MOCK_DATA !== 'undefined' && MOCK_DATA && MOCK_DATA.sessions && MOCK_DATA.sessions.length > 0) {
+        console.log('[Mock] Loading mock data...');
+        window.state = {
+            ...window.state,
+            ...MOCK_DATA
+        };
+        console.log('[Mock] Mock data loaded:', window.state.sessions.length, 'sessions');
+    }
     // Theme initialization
     const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     state.theme = savedTheme;
