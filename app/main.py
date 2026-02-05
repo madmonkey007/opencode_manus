@@ -41,6 +41,12 @@ async def read_index():
     path = os.path.join(static_dir, "index.html")
     return FileResponse(path)
 
+@app.get("/frontend")
+async def read_index_frontend():
+    """Frontend 分支的前端页面"""
+    path = os.path.join(static_dir, "index.html")
+    return FileResponse(path)
+
 def format_sse(data: dict) -> str:
     """Safely format SSE data using chr codes for newlines to avoid physical line break issues"""
     json_data = json.dumps(data)
