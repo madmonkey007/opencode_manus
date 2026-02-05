@@ -29,80 +29,80 @@ const FILE_TYPE_CONFIG = {
 const TOOL_ICON_CONFIG = {
     'read': { 
         icon: 'description', 
-        color: 'text-blue-500', 
-        bg: 'bg-blue-50 dark:bg-blue-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Read'
     },
     'write': { 
         icon: 'edit', 
-        color: 'text-green-500', 
-        bg: 'bg-green-50 dark:bg-green-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Write'
     },
     'edit': { 
         icon: 'edit_document', 
-        color: 'text-amber-500', 
-        bg: 'bg-amber-50 dark:bg-amber-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Edit'
     },
     'browser_search': { 
         icon: 'travel_explore', 
-        color: 'text-purple-500', 
-        bg: 'bg-purple-50 dark:bg-purple-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Browser Search'
     },
     'grep': { 
         icon: 'manage_search', 
-        color: 'text-indigo-500', 
-        bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Grep'
     },
     'bash': { 
         icon: 'terminal', 
-        color: 'text-gray-700 dark:text-gray-300', 
+        color: 'text-gray-600 dark:text-gray-400', 
         bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Bash'
     },
     'thought': { 
         icon: 'lightbulb', 
-        color: 'text-amber-500', 
-        bg: 'bg-amber-50 dark:bg-amber-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Thought'
     },
     'run_code': { 
         icon: 'play_circle', 
-        color: 'text-green-500', 
-        bg: 'bg-green-50 dark:bg-green-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Run Code'
     },
     'file_editor': { 
         icon: 'code', 
-        color: 'text-cyan-500', 
-        bg: 'bg-cyan-50 dark:bg-cyan-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'File Editor'
     },
     'code_editor': { 
         icon: 'edit_note', 
-        color: 'text-cyan-500', 
-        bg: 'bg-cyan-50 dark:bg-cyan-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Code Editor'
     },
     'browser_preview': { 
         icon: 'desktop_windows', 
-        color: 'text-pink-500', 
-        bg: 'bg-pink-50 dark:bg-pink-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Browser Preview'
     },
     'file_search': { 
         icon: 'search', 
-        color: 'text-teal-500', 
-        bg: 'bg-teal-50 dark:bg-teal-900/20',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'File Search'
     },
     'default': { 
         icon: 'settings', 
-        color: 'text-gray-500', 
-        bg: 'bg-gray-50 dark:bg-zinc-800',
+        color: 'text-gray-600 dark:text-gray-400', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
         label: 'Tool'
     }
 };
@@ -269,13 +269,14 @@ function renderResults() {
     el('#welcome-message')?.classList.add('hidden');
     
     // Use enhanced task panel if available
-    if (typeof renderEnhancedTaskPanel === 'function') {
-        const enhancedPanel = renderEnhancedTaskPanel(s);
-        convo.appendChild(enhancedPanel);
-        const area = el('#chat-scroll-area');
-        area.scrollTop = area.scrollHeight;
-        return;
-    }
+    // TODO: 临时禁用以显示默认的虚线timeline
+    // if (typeof renderEnhancedTaskPanel === 'function') {
+    //     const enhancedPanel = renderEnhancedTaskPanel(s);
+    //     convo.appendChild(enhancedPanel);
+    //     const area = el('#chat-scroll-area');
+    //     area.scrollTop = area.scrollHeight;
+    //     return;
+    // }
 
     if (s.prompt) {
         const m = document.createElement('div');
