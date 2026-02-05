@@ -25,6 +25,88 @@ const FILE_TYPE_CONFIG = {
     'default': { icon: 'description', color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-zinc-700' }
 };
 
+
+const TOOL_ICON_CONFIG = {
+    'read': { 
+        icon: 'description', 
+        color: 'text-blue-500', 
+        bg: 'bg-blue-50 dark:bg-blue-900/20',
+        label: 'Read'
+    },
+    'write': { 
+        icon: 'edit', 
+        color: 'text-green-500', 
+        bg: 'bg-green-50 dark:bg-green-900/20',
+        label: 'Write'
+    },
+    'edit': { 
+        icon: 'edit_document', 
+        color: 'text-amber-500', 
+        bg: 'bg-amber-50 dark:bg-amber-900/20',
+        label: 'Edit'
+    },
+    'browser_search': { 
+        icon: 'travel_explore', 
+        color: 'text-purple-500', 
+        bg: 'bg-purple-50 dark:bg-purple-900/20',
+        label: 'Browser Search'
+    },
+    'grep': { 
+        icon: 'manage_search', 
+        color: 'text-indigo-500', 
+        bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+        label: 'Grep'
+    },
+    'bash': { 
+        icon: 'terminal', 
+        color: 'text-gray-700 dark:text-gray-300', 
+        bg: 'bg-gray-100 dark:bg-zinc-800',
+        label: 'Bash'
+    },
+    'thought': { 
+        icon: 'lightbulb', 
+        color: 'text-amber-500', 
+        bg: 'bg-amber-50 dark:bg-amber-900/20',
+        label: 'Thought'
+    },
+    'run_code': { 
+        icon: 'play_circle', 
+        color: 'text-green-500', 
+        bg: 'bg-green-50 dark:bg-green-900/20',
+        label: 'Run Code'
+    },
+    'file_editor': { 
+        icon: 'code', 
+        color: 'text-cyan-500', 
+        bg: 'bg-cyan-50 dark:bg-cyan-900/20',
+        label: 'File Editor'
+    },
+    'code_editor': { 
+        icon: 'edit_note', 
+        color: 'text-cyan-500', 
+        bg: 'bg-cyan-50 dark:bg-cyan-900/20',
+        label: 'Code Editor'
+    },
+    'browser_preview': { 
+        icon: 'desktop_windows', 
+        color: 'text-pink-500', 
+        bg: 'bg-pink-50 dark:bg-pink-900/20',
+        label: 'Browser Preview'
+    },
+    'file_search': { 
+        icon: 'search', 
+        color: 'text-teal-500', 
+        bg: 'bg-teal-50 dark:bg-teal-900/20',
+        label: 'File Search'
+    },
+    'default': { 
+        icon: 'settings', 
+        color: 'text-gray-500', 
+        bg: 'bg-gray-50 dark:bg-zinc-800',
+        label: 'Tool'
+    }
+};
+
 function applyTheme() {
     if (state.theme === 'dark') {
         document.documentElement.classList.add('dark');
@@ -197,7 +279,7 @@ function renderResults() {
 
     if (s.prompt) {
         const m = document.createElement('div');
-        m.className = 'message-bubble user-bubble animate-fade-in self-end mb-6 text-sm shadow-md';
+        m.className = 'message-bubble user-bubble animate-fade-in ml-auto mb-6 text-sm shadow-md';
         m.textContent = s.prompt;
         convo.appendChild(m);
     }
@@ -206,16 +288,25 @@ function renderResults() {
         const card = document.createElement('div');
         card.className = 'tool-card border border-border-light dark:border-border-dark rounded-xl mb-3 bg-white dark:bg-surface-dark shadow-sm overflow-hidden transition-all duration-200';
         
+        // 获取工具图标配置
+        const toolName = ev.tool || 'default';
+        const iconConfig = TOOL_ICON_CONFIG[toolName] || TOOL_ICON_CONFIG['default'];
         const isThought = ev.type === 'thought';
-        const icon = isThought ? 'lightbulb' : (ev.status === 'running' ? 'settings' : 'check');
-        const iconClass = isThought ? 'text-amber-500' : (ev.status === 'running' ? 'text-blue-500 animate-spin' : 'text-green-500');
-        const toolName = ev.tool || 'Kernel Process';
-        const title = isThought ? 'Thought' : `Using ${toolName}`;
+        
+        // 根据运行状态添加动画效果
+        const isRunning = ev.status === 'running';
+        const iconClass = isRunning 
+            ? iconConfig.color + ' animate-spin' 
+            : iconConfig.color;
+        
+        const title = isThought ? 'Thought' : (iconConfig.label || toolName);
         
         card.innerHTML = `
             <div class="card-header p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                 <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined ${iconClass} text-[20px]">${icon}</span>
+                    <div class="${iconConfig.bg} p-1.5 rounded-lg">
+                        <span class="material-symbols-outlined ${iconClass} text-[20px]">${iconConfig.icon}</span>
+                    </div>
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${title}</span>
                 </div>
                 <span class="material-symbols-outlined text-gray-400 expand-icon transition-transform duration-200">expand_more</span>
