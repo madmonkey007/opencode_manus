@@ -26,21 +26,27 @@ const FILE_TYPE_CONFIG = {
 };
 
 
-// 统一的灰色图标配置（参考 manus.html）
-const TOOL_ICON_CONFIG = {
-    'read': { icon: 'description' },
-    'write': { icon: 'edit' },
-    'edit': { icon: 'edit_document' },
-    'browser_search': { icon: 'travel_explore' },
-    'grep': { icon: 'search' },
-    'bash': { icon: 'terminal' },
-    'thought': { icon: 'lightbulb' },
-    'run_code': { icon: 'play_circle' },
-    'file_editor': { icon: 'code' },
-    'code_editor': { icon: 'edit_note' },
-    'browser_preview': { icon: 'desktop_windows' },
-    'file_search': { icon: 'search' },
-    'default': { icon: 'settings' }
+// 工具图标配置（一比一复制自 manus.html）
+// 使用 SVG 图标，所有图标统一灰色系
+const TOOL_SVG_ICONS = {
+    'thought': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 6.75C13 4.14831 10.7836 2 8 2C5.2164 2 3 4.14831 3 6.75C3 8.22815 3.71089 9.55442 4.83789 10.4297C5.14832 10.6707 5.47707 10.9539 5.74219 11.3115L6.25195 12H9.74805L10.2578 11.3115C10.5229 10.9539 10.8517 10.6707 11.1621 10.4297C12.2891 9.55442 13 8.22815 13 6.75ZM14 6.75C14 8.56029 13.1275 10.1697 11.7754 11.2197C11.4899 11.4414 11.2458 11.6587 11.0615 11.9072L10.5518 12.5957C10.3631 12.8501 10.0648 13 9.74805 13H6.25195C5.93524 13 5.63686 12.8501 5.44824 12.5957L4.93848 11.9072C4.75423 11.6587 4.51014 11.4414 4.22461 11.2197C2.87253 10.1697 2 8.56029 2 6.75C2 3.5527 4.70847 1 8 1C11.2915 1 14 3.5527 14 6.75Z" fill="#666"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M11 6.5C11 5.91262 10.7013 5.28334 10.209 4.79102C9.71666 4.29869 9.08738 4 8.5 4C8.22386 4 8 3.77614 8 3.5C8 3.22386 8.22386 3 8.5 3C9.41262 3 10.2833 3.45131 10.916 4.08398C11.5487 4.71666 12 5.58738 12 6.5C12 6.77614 11.7761 7 11.5 7C11.2239 7 11 6.77614 11 6.5Z" fill="#666"></path><path d="M9.5 14C9.77614 14 10 14.2239 10 14.5C10 14.7761 9.77614 15 9.5 15H6.5C6.22386 15 6 14.7761 6 14.5C6 14.2239 6.22386 14 6.5 14H9.5Z" fill="#666"></path></svg>`,
+    'default': `<svg style="width:14px;height:14px;color:#666" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`
+};
+
+// 工具名称映射
+const TOOL_LABELS = {
+    'read': 'Read',
+    'write': 'Write',
+    'edit': 'Edit',
+    'browser_search': 'Browser Search',
+    'grep': 'Grep',
+    'bash': 'Bash',
+    'thought': '思考过程',
+    'code_editor': 'Code Editor',
+    'browser_preview': 'Browser Preview',
+    'file_editor': 'File Editor',
+    'run_code': 'Run Code',
+    'default': 'Tool'
 };
 
 function applyTheme() {
@@ -225,21 +231,19 @@ function renderResults() {
         const card = document.createElement('div');
         card.className = 'tool-card border border-border-light dark:border-border-dark rounded-xl mb-3 bg-white dark:bg-surface-dark shadow-sm overflow-hidden transition-all duration-200';
         
-        // 获取工具图标配置
         const toolName = ev.tool || 'default';
-        const iconConfig = TOOL_ICON_CONFIG[toolName] || TOOL_ICON_CONFIG['default'];
         const isThought = ev.type === 'thought';
         const isRunning = ev.status === 'running';
         
-        // 简化的图标样式（灰色系）
-        const iconClass = isRunning ? 'text-gray-400 animate-spin' : 'text-gray-500';
-        const title = isThought ? 'Thought' : (toolName.charAt(0).toUpperCase() + toolName.slice(1));
+        // 使用 SVG 图标（一比一复制自 manus.html）
+        const svgIcon = TOOL_SVG_ICONS[isThought ? 'thought' : 'default'];
+        const label = TOOL_LABELS[toolName] || TOOL_LABELS['default'];
         
         card.innerHTML = `
             <div class="card-header p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined ${iconClass} text-[20px]">${iconConfig.icon}</span>
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${title}</span>
+                <div class="flex items-center gap-2">
+                    ${svgIcon}
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${label}</span>
                 </div>
                 <span class="material-symbols-outlined text-gray-400 expand-icon transition-transform duration-200">expand_more</span>
             </div>
