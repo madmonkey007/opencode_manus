@@ -82,7 +82,7 @@ async def get_file_content(path: str):
             content = f.read()
         return {"content": content, "filename": os.path.basename(full_path), "type": "text"}
     except Exception as e:
-        return {"content": f"Error reading file: {str(e)}", "type": "error"}
+        return {"content": "Error reading file: " + str(e), "type": "error"}
 
 async def run_agent(prompt: str, sid: str):
     """
@@ -105,10 +105,14 @@ async def run_agent(prompt: str, sid: str):
         })
 
         try:
-            # Command to run official opencode-ai CLI
-            cmd = ["opencode", "run", prompt]
+            # FIX: Specify a valid model to avoid ProviderModelNotFoundError
+            # In this environment, new-api/gemini-3-flash-preview is requested
+            cmd = ["opencode", "run", prompt, "-m", "new-api/gemini-3-flash-preview"]
             
-            env = {**os.environ, "DISPLAY": ":0"}
+            env = {**os.environ}
+            env["DISPLAY"] = ":0"
+            env["PATH"] = "/root/.bun/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
+            
             patched_config = "/app/opencode/config/opencode.json"
             if os.path.exists(patched_config):
                 env["OPENCODE_CONFIG_FILE"] = patched_config
@@ -139,7 +143,8 @@ async def run_agent(prompt: str, sid: str):
                     text = await asyncio.wait_for(queue.get(), timeout=0.1)
                     if not text: continue
                     
-                    # Log parsing for SSE mapping
+                    logger.info(f"CLI LOG: {text}")
+
                     # 1. Thought detection
                     thought_match = re.search(r"(?:🤔\s*Thought:|Thought:|Thought\s+>)\s*(.*)", text, re.IGNORECASE)
                     if thought_match:
@@ -156,7 +161,7 @@ async def run_agent(prompt: str, sid: str):
                             yield format_sse({"type": "tool_event", "data": {"type": "activate", "tool": t_name, "status": "running"}})
                             continue
                     
-                    # 3. File streaming detection (Manus-level feature)
+                    # 3. File streaming detection
                     if "writing to" in text.lower() or "updating" in text.lower():
                         yield format_sse({"type": "file_content_append", "content": text + chr(10), "filename": "output.txt"})
 

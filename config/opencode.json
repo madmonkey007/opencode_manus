@@ -1,7 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "threshold": 0.85
+  },
   "plugin": [
-    "file:////app/opencode/config_host/node_modules/oh-my-opencode/dist/index.js",
+    "file:///root/.cache/opencode/node_modules/oh-my-opencode/dist/index.js",
     "opencode-antigravity-auth@1.2.8",
     "opencode-openai-codex-auth",
     "opencode-pty",

@@ -5,7 +5,7 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>OpenCode - AI Agent Interface</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
@@ -20,10 +20,10 @@
                         "surface-light": "#FFFFFF",
                         "surface-dark": "#1E1E20",
                         "border-light": "#E5E7EB",
-                        "border-dark": "#2D2D2F",
+                        "border-dark": "#334155",
                     },
                     fontFamily: {
-                        sans: ['"Inter"', '"Noto Sans SC"', 'sans-serif'],
+                        sans: ['"Plus Jakarta Sans"', '"Noto Sans SC"', 'sans-serif'],
                         display: ['"Noto Sans SC"', 'sans-serif'],
                     },
                     borderRadius: {
@@ -108,8 +108,29 @@
             background-color: #52525B;
         }
         #vm-panel { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .tab-btn { transition: all 0.2s ease; border-bottom: 2px solid transparent; }
-        .active-tab { border-bottom: 2px solid #3B82F6; color: #3B82F6; }
+
+        /* Tab Buttons */
+        .tab-btn {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            border-bottom: none;
+        }
+
+        .tab-btn.active {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .dark .tab-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+        }
 
         .transition-theme {
             transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
@@ -182,21 +203,155 @@
         }
 
         .animate-fade-in {
-            animation: fadeIn 0.3s ease-out forwards;
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Tool Cards Hover Effect */
+        .tool-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
         .tool-card:hover {
             border-color: #3B82F6;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.1);
         }
         .dark .tool-card:hover {
             border-color: #3B82F6;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+            box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Session Items (Left Sidebar) */
+        .session-item {
+            position: relative;
+            padding: 8px 12px;
+            margin: 4px 0;
+            border-radius: 8px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            min-height: 40px;
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .dark .session-item {
+            background: #374151;
+            color: #9ca3af;
+        }
+
+        .session-item:hover {
+            background: #e5e7eb;
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+        }
+
+        .dark .session-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .session-item.active {
+            background: #e5e7eb;
+            color: #6b7280;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .dark .session-item.active {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .session-item-icon {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            transition: all 0.25s;
+        }
+
+        .session-item:hover .session-item-icon {
+            background: rgba(59, 130, 246, 0.2);
+            transform: scale(1.05);
+        }
+
+        .session-item-title {
+            font-weight: 500;
+            line-height: 1.4;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 180px;
+        }
+
+        /* File Items (Right Panel) */
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            margin: 4px 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dark .file-item {
+            background: #2d2d2d;
+            border-color: #404040;
+        }
+
+        .file-item:hover {
+            background: #f9fafb;
+            border-color: #3b82f6;
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+        }
+
+        .dark .file-item:hover {
+            background: #3a3a3a;
+        }
+
+        /* Input Zone - Glassmorphism */
+        .input-zone-refined {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid #e5e7eb;
+            border-radius: 2.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dark .input-zone-refined {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: #334155;
+        }
+
+        .input-zone-refined:focus-within {
+            border-color: #94a3b8;
+            box-shadow: 0 0 0 8px rgba(148, 163, 184, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .dark .input-zone-refined:focus-within {
+            border-color: #475569;
+            box-shadow: 0 0 0 8px rgba(71, 85, 105, 0.2);
         }
     </style>
 </head>
@@ -274,8 +429,8 @@
 
         <!-- Input Area -->
         <div class="p-4 border-t border-border-light dark:border-border-dark bg-white dark:bg-background-dark transition-theme">
-            <div class="max-w-3xl mx-auto relative">
-                <textarea id="prompt" rows="1" placeholder="给 OpenCode 发送消息..." class="w-full pl-4 pr-12 py-3 bg-gray-100 dark:bg-surface-dark rounded-2xl border-none focus:ring-2 focus:ring-blue-500 resize-none custom-scrollbar text-sm text-gray-900 dark:text-white transition-theme"></textarea>
+            <div class="max-w-3xl mx-auto relative input-zone-refined">
+                <textarea id="prompt" rows="1" placeholder="给 OpenCode 发送消息..." class="w-full pl-4 pr-12 py-3 bg-transparent border-none focus:ring-0 resize-none custom-scrollbar text-sm text-gray-900 dark:text-white transition-all"></textarea>
                 <button id="runStream" class="absolute right-2 bottom-2 w-8 h-8 bg-primary text-white rounded-xl flex items-center justify-center hover:opacity-90 transition-opacity">
                     <span class="material-symbols-outlined">arrow_upward</span>
                 </button>
@@ -343,6 +498,13 @@
         </div>
     </div>
 
-    <script src="/static/opencode.js"></script>
+    <!-- 核心功能组件 -->
+    <script src="/static/tool-icons.js?v=6"></script>
+    <script src="/static/enhanced-task-panel.js?v=6"></script>
+    <script src="/static/right-panel-manager.js?v=6"></script>
+    <script src="/static/files-manager.js?v=6"></script>
+    <script src="/static/mock-data.js?v=6"></script>
+    <script src="/static/enable-mock.js?v=6"></script>
+    <script src="/static/opencode.js?v=6"></script>
 </body>
 </html>

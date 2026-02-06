@@ -18,11 +18,28 @@ const FILE_TYPE_MAP = {
 };
 
 const FILE_TYPE_CONFIG = {
-    'documents': { icon: 'article', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    'images': { icon: 'image', color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
-    'code': { icon: 'code', color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20' },
-    'links': { icon: 'language', color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-zinc-700' },
-    'default': { icon: 'description', color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-zinc-700' }
+    'documents': { icon: 'article', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' },
+    'images': { icon: 'image', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' },
+    'code': { icon: 'code', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' },
+    'links': { icon: 'language', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' },
+    'default': { icon: 'description', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' }
+};
+
+// SVG 图标配置（从 manus.html 复制）
+const TOOL_SVG_ICONS = {
+    'thought': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 6.75C13 4.14831 10.7836 2 8 2C5.2164 2 3 4.14831 3 6.75C3 8.22062 3.78012 9.51358 4.98463 10.3028C5.06178 10.3533 5.12 10.4284 5.14844 10.5135L5.59619 11.8568C5.70422 12.181 6.02844 12.3846 6.36958 12.342L7.41652 12.2121C7.47921 12.2043 7.54269 12.2075 7.60428 12.2217L8.60547 12.4453C8.86719 12.5039 9.13477 12.4355 9.33691 12.2617L10.1123 11.5957C10.2842 11.4482 10.5156 11.3887 10.7393 11.4336L11.6904 11.625C12.165 11.7188 12.6191 11.3828 12.668 10.9023L12.751 10.0996C12.7637 9.9707 12.8203 9.84961 12.9121 9.75781L13.5166 9.15332C13.8281 8.8418 14 8.42773 14 8V6.75H13ZM6.5 6.75C6.5 6.33579 6.83579 6 7.25 6C7.66421 6 8 6.33579 8 6.75C8 7.16421 7.66421 7.5 7.25 7.5C6.83579 7.5 6.5 7.16421 6.5 6.75ZM9.5 6.75C9.5 6.33579 9.83579 6 10.25 6C10.6642 6 11 6.33579 11 6.75C11 7.16421 10.6642 7.5 10.25 7.5C9.83579 7.5 9.5 7.16421 9.5 6.75Z" fill="#666"></path>
+    </svg>`,
+    'default': `<svg style="width:14px;height:14px;color:#666" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+    </svg>`
+};
+
+const TOOL_LABELS = {
+    'thought': '思考过程',
+    'read': 'Read',
+    'write': 'Write',
+    'default': 'Tool'
 };
 
 function applyTheme() {
@@ -47,6 +64,9 @@ function getFileTypeCategory(ext) {
 }
 
 function renderAll() {
+    console.log('🔄 renderAll 被调用');
+    console.log('  - sessions 数量:', state.sessions.length);
+    console.log('  - activeId:', state.activeId);
     renderSidebar();
     renderResults();
     renderFiles();
@@ -58,8 +78,13 @@ function renderSidebar() {
     state.sessions.forEach(s => {
         const item = document.createElement('div');
         const isActive = s.id === state.activeId;
-        item.className = `p-3 rounded-xl cursor-pointer mb-1 text-sm transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 font-medium' : 'hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-700 dark:text-gray-300'}`;
-        item.textContent = s.prompt ? (s.prompt.substring(0, 24) + (s.prompt.length > 24 ? '...' : '')) : 'New Task';
+        item.className = `session-item cursor-pointer mb-1 transition-all ${isActive ? 'active' : ''}`;
+        item.innerHTML = `
+            <div class="session-item-icon">
+                <span class="material-symbols-outlined text-[14px]">task</span>
+            </div>
+            <span class="session-item-title">${s.prompt ? (s.prompt.substring(0, 24) + (s.prompt.length > 24 ? '...' : '')) : 'New Task'}</span>
+        `;
         item.onclick = () => { state.activeId = s.id; renderAll(); };
         list.appendChild(item);
     });
@@ -138,7 +163,7 @@ async function renderFiles() {
                 const config = FILE_TYPE_CONFIG[cat] || FILE_TYPE_CONFIG['default'];
                 
                 const item = document.createElement('div');
-                item.className = 'flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg group cursor-pointer transition-colors';
+                item.className = 'file-item group cursor-pointer';
                 item.innerHTML = `
                     <div class="${config.bg} p-2 rounded-lg ${config.color}">
                         <span class="material-symbols-outlined text-[20px]">${config.icon}</span>
@@ -194,19 +219,19 @@ function renderResults() {
 
     const renderEvent = (ev) => {
         const card = document.createElement('div');
-        card.className = 'tool-card border border-border-light dark:border-border-dark rounded-xl mb-3 bg-white dark:bg-surface-dark shadow-sm overflow-hidden transition-all duration-200';
-        
+        card.className = 'tool-card border border-border-light dark:border-border-dark rounded-[2rem] mb-3 bg-white dark:bg-surface-dark shadow-sm overflow-hidden transition-all duration-300';
+
         const isThought = ev.type === 'thought';
-        const icon = isThought ? 'lightbulb' : (ev.status === 'running' ? 'settings' : 'check');
-        const iconClass = isThought ? 'text-amber-500' : (ev.status === 'running' ? 'text-blue-500 animate-spin' : 'text-green-500');
+        const svgIcon = isThought ? TOOL_SVG_ICONS['thought'] : TOOL_SVG_ICONS['default'];
         const toolName = ev.tool || 'Kernel Process';
-        const title = isThought ? 'Thought' : `Using ${toolName}`;
-        
+        const label = isThought ? TOOL_LABELS['thought'] : (TOOL_LABELS[toolName] || TOOL_LABELS['default']);
+        const title = isThought ? TOOL_LABELS['thought'] : `Using ${toolName}`;
+
         card.innerHTML = `
             <div class="card-header p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined ${iconClass} text-[20px]">${icon}</span>
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${title}</span>
+                <div class="flex items-center gap-2">
+                    ${svgIcon}
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${label}</span>
                 </div>
                 <span class="material-symbols-outlined text-gray-400 expand-icon transition-transform duration-200">expand_more</span>
             </div>
@@ -556,30 +581,6 @@ function init() {
 
     bindUI();
     renderAll();
-}
-
-function applyTheme() {
-    const isDark = state.theme === 'dark';
-    document.documentElement.classList.toggle('dark', isDark);
-    localStorage.setItem('theme', state.theme);
-    
-    // Update Icons
-    const lightIcon = el('.light-icon');
-    const darkIcon = el('.dark-icon');
-    if (lightIcon && darkIcon) {
-        if (isDark) {
-            lightIcon.classList.add('hidden');
-            darkIcon.classList.remove('hidden');
-        } else {
-            lightIcon.classList.remove('hidden');
-            darkIcon.classList.add('hidden');
-        }
-    }
-}
-
-function toggleTheme() {
-    state.theme = state.theme === 'dark' ? 'light' : 'dark';
-    applyTheme();
 }
 
 // Wait for DOM to be fully loaded

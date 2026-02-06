@@ -173,7 +173,7 @@ function createActionItem(action, index) {
     const isRunning = action.status === 'running';
     const isSuccess = action.status === 'success';
     const isFailed = action.status === 'failed';
-    
+
     let statusIcon, statusClass;
     if (isSuccess) {
         statusIcon = 'check_circle';
@@ -188,14 +188,24 @@ function createActionItem(action, index) {
         statusIcon = 'schedule';
         statusClass = 'text-gray-400';
     }
-    
+
+    // 获取工具图标配置
+    const toolIconConfig = getToolIcon(action.tool);
+    const toolIconHtml = `
+        <div class="flex items-center justify-center ${toolIconConfig.bg} rounded-lg p-1.5 flex-shrink-0">
+            <span class="material-symbols-outlined ${toolIconConfig.text} text-[16px]">
+                ${toolIconConfig.icon}
+            </span>
+        </div>
+    `;
+
     item.className = 'action-item bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer';
     item.innerHTML = `
         <div class="flex items-start gap-3">
-            <span class="material-symbols-outlined ${statusClass} text-[18px] mt-0.5">${statusIcon}</span>
+            ${toolIconHtml}
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                    <span class="text-xs font-mono px-1.5 py-0.5 bg-white dark:bg-zinc-900 border border-border-light dark:border-border-dark rounded text-gray-600 dark:text-gray-400">${action.tool || 'unknown'}</span>
+                    <span class="text-xs font-mono px-1.5 py-0.5 bg-white dark:bg-zinc-900 border border-border-light dark:border-border-dark rounded ${toolIconConfig.text}">${action.tool || 'unknown'}</span>
                     <span class="text-xs text-gray-500 dark:text-gray-400">${action.timestamp || ''}</span>
                 </div>
                 <div class="text-sm text-gray-700 dark:text-gray-300">${escapeHtml(action.description || action.brief || '执行中...')}</div>

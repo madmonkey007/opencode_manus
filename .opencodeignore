@@ -1,3 +1,4 @@
+# --- 媒体与二进制文件 ---
 *.png
 *.jpg
 *.jpeg
@@ -5,4 +6,36 @@
 *.exe
 *.dll
 *.bin
+*.pdf
+*.zip
+*.tar.gz
+
+# --- 核心屏蔽（防止 Token 爆炸的关键） ---
+.git/
+.svn/
+.idea/
+.vscode/
+.history/
+.cache/
+
+# --- 项目特定与临时文件 ---
 workspace/
+logs/
+*.log
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# --- 依赖与编译产物 ---
+node_modules/
+vendor/
+dist/
+build/
+target/
+obj/
+bin/
+pkg/
+
+# --- 自身配置文件 ---
+.opencodeignore
