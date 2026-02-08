@@ -18,34 +18,27 @@ const FILE_TYPE_MAP = {
 };
 
 const FILE_TYPE_CONFIG = {
-    'documents': { icon: 'article', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    'images': { icon: 'image', color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
-    'code': { icon: 'code', color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20' },
-    'links': { icon: 'language', color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-zinc-700' },
-    'default': { icon: 'description', color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-zinc-700' }
+    'documents': { icon: 'article', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' },
+    'images': { icon: 'image', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' },
+    'code': { icon: 'code', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' },
+    'links': { icon: 'language', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' },
+    'default': { icon: 'description', color: 'text-gray-600', bg: 'bg-gray-50 dark:bg-zinc-800' }
 };
 
-
-// 工具图标配置（一比一复制自 manus.html）
-// 使用 SVG 图标，所有图标统一灰色系
+// SVG 图标配置（从 manus.html 复制）
 const TOOL_SVG_ICONS = {
-    'thought': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 6.75C13 4.14831 10.7836 2 8 2C5.2164 2 3 4.14831 3 6.75C3 8.22815 3.71089 9.55442 4.83789 10.4297C5.14832 10.6707 5.47707 10.9539 5.74219 11.3115L6.25195 12H9.74805L10.2578 11.3115C10.5229 10.9539 10.8517 10.6707 11.1621 10.4297C12.2891 9.55442 13 8.22815 13 6.75ZM14 6.75C14 8.56029 13.1275 10.1697 11.7754 11.2197C11.4899 11.4414 11.2458 11.6587 11.0615 11.9072L10.5518 12.5957C10.3631 12.8501 10.0648 13 9.74805 13H6.25195C5.93524 13 5.63686 12.8501 5.44824 12.5957L4.93848 11.9072C4.75423 11.6587 4.51014 11.4414 4.22461 11.2197C2.87253 10.1697 2 8.56029 2 6.75C2 3.5527 4.70847 1 8 1C11.2915 1 14 3.5527 14 6.75Z" fill="#666"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M11 6.5C11 5.91262 10.7013 5.28334 10.209 4.79102C9.71666 4.29869 9.08738 4 8.5 4C8.22386 4 8 3.77614 8 3.5C8 3.22386 8.22386 3 8.5 3C9.41262 3 10.2833 3.45131 10.916 4.08398C11.5487 4.71666 12 5.58738 12 6.5C12 6.77614 11.7761 7 11.5 7C11.2239 7 11 6.77614 11 6.5Z" fill="#666"></path><path d="M9.5 14C9.77614 14 10 14.2239 10 14.5C10 14.7761 9.77614 15 9.5 15H6.5C6.22386 15 6 14.7761 6 14.5C6 14.2239 6.22386 14 6.5 14H9.5Z" fill="#666"></path></svg>`,
-    'default': `<svg style="width:14px;height:14px;color:#666" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`
+    'thought': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 6.75C13 4.14831 10.7836 2 8 2C5.2164 2 3 4.14831 3 6.75C3 8.22062 3.78012 9.51358 4.98463 10.3028C5.06178 10.3533 5.12 10.4284 5.14844 10.5135L5.59619 11.8568C5.70422 12.181 6.02844 12.3846 6.36958 12.342L7.41652 12.2121C7.47921 12.2043 7.54269 12.2075 7.60428 12.2217L8.60547 12.4453C8.86719 12.5039 9.13477 12.4355 9.33691 12.2617L10.1123 11.5957C10.2842 11.4482 10.5156 11.3887 10.7393 11.4336L11.6904 11.625C12.165 11.7188 12.6191 11.3828 12.668 10.9023L12.751 10.0996C12.7637 9.9707 12.8203 9.84961 12.9121 9.75781L13.5166 9.15332C13.8281 8.8418 14 8.42773 14 8V6.75H13ZM6.5 6.75C6.5 6.33579 6.83579 6 7.25 6C7.66421 6 8 6.33579 8 6.75C8 7.16421 7.66421 7.5 7.25 7.5C6.83579 7.5 6.5 7.16421 6.5 6.75ZM9.5 6.75C9.5 6.33579 9.83579 6 10.25 6C10.6642 6 11 6.33579 11 6.75C11 7.16421 10.6642 7.5 10.25 7.5C9.83579 7.5 9.5 7.16421 9.5 6.75Z" fill="#666"></path>
+    </svg>`,
+    'default': `<svg style="width:14px;height:14px;color:#666" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+    </svg>`
 };
 
-// 工具名称映射
 const TOOL_LABELS = {
+    'thought': '思考过程',
     'read': 'Read',
     'write': 'Write',
-    'edit': 'Edit',
-    'browser_search': 'Browser Search',
-    'grep': 'Grep',
-    'bash': 'Bash',
-    'thought': '思考过程',
-    'code_editor': 'Code Editor',
-    'browser_preview': 'Browser Preview',
-    'file_editor': 'File Editor',
-    'run_code': 'Run Code',
     'default': 'Tool'
 };
 
@@ -71,9 +64,57 @@ function getFileTypeCategory(ext) {
 }
 
 function renderAll() {
+    console.log('🔄 renderAll 被调用');
+    console.log('  - sessions 数量:', state.sessions.length);
+    console.log('  - activeId:', state.activeId);
     renderSidebar();
     renderResults();
     renderFiles();
+}
+
+function saveState() {
+    try {
+        const stateToSave = {
+            activeId: state.activeId,
+            sessions: state.sessions.map(s => ({
+                id: s.id,
+                prompt: s.prompt,
+                phases: s.phases,
+                // We don't save full logs/events to keep localStorage light, 
+                // but we need enough to resume. 
+                // Actually, since we can refetch logs from backend, we might only need ID.
+                // But for immediate UI feedback, saving phases is good.
+                response: s.response || '',
+                deliverables: s.deliverables || []
+            }))
+        };
+        localStorage.setItem('opencode_state', JSON.stringify(stateToSave));
+    } catch (e) {
+        console.warn('Failed to save state to localStorage', e);
+    }
+}
+
+function loadState() {
+    try {
+        const saved = localStorage.getItem('opencode_state');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.sessions && Array.isArray(parsed.sessions)) {
+                state.sessions = parsed.sessions.map(s => ({
+                    ...s,
+                    // Ensure these arrays exist
+                    actions: [],
+                    orphanEvents: [],
+                    uploadedFiles: s.uploadedFiles || []
+                }));
+            }
+            if (parsed.activeId) {
+                state.activeId = parsed.activeId;
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load state from localStorage', e);
+    }
 }
 
 function renderSidebar() {
@@ -82,9 +123,14 @@ function renderSidebar() {
     state.sessions.forEach(s => {
         const item = document.createElement('div');
         const isActive = s.id === state.activeId;
-        item.className = `p-3 rounded-xl cursor-pointer mb-1 text-sm transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 font-medium' : 'hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-700 dark:text-gray-300'}`;
-        item.textContent = s.prompt ? (s.prompt.substring(0, 24) + (s.prompt.length > 24 ? '...' : '')) : 'New Task';
-        item.onclick = () => { state.activeId = s.id; renderAll(); };
+        item.className = `session-item cursor-pointer mb-1 transition-all ${isActive ? 'active' : ''}`;
+        item.innerHTML = `
+            <div class="session-item-icon">
+                <span class="material-symbols-outlined text-[14px]">task</span>
+            </div>
+            <span class="session-item-title">${s.prompt ? (s.prompt.substring(0, 24) + (s.prompt.length > 24 ? '...' : '')) : 'New Task'}</span>
+        `;
+        item.onclick = () => { state.activeId = s.id; renderAll(); saveState(); };
         list.appendChild(item);
     });
 }
@@ -136,19 +182,9 @@ async function renderFiles() {
     }
 
     try {
-        // 优先使用本地 deliverables 数据（mock 模式）
-        let files = [];
-        if (s.deliverables && s.deliverables.length > 0) {
-            files = s.deliverables.map(f => ({
-                name: f.name,
-                path: f.path,
-                type: f.name.split('.').pop().toLowerCase()
-            }));
-        } else {
-            const res = await fetch(`/opencode/list_session_files?sid=${s.id}`);
-            const data = await res.json();
-            files = data.files || [];
-        }
+        const res = await fetch(`/opencode/list_session_files?sid=${s.id}`);
+        const data = await res.json();
+        let files = data.files || [];
 
         // Apply Search
         if (state.fileSearch) {
@@ -172,7 +208,7 @@ async function renderFiles() {
                 const config = FILE_TYPE_CONFIG[cat] || FILE_TYPE_CONFIG['default'];
                 
                 const item = document.createElement('div');
-                item.className = 'flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg group cursor-pointer transition-colors';
+                item.className = 'file-item group cursor-pointer';
                 item.innerHTML = `
                     <div class="${config.bg} p-2 rounded-lg ${config.color}">
                         <span class="material-symbols-outlined text-[20px]">${config.icon}</span>
@@ -207,38 +243,34 @@ function renderResults() {
     const convo = el('#chat-messages'); if (!convo) return;
     const s = state.sessions.find(x => x.id === state.activeId);
     convo.innerHTML = '';
-    if (!s) { el('#welcome-message')?.classList.remove('hidden'); return; }
-    el('#welcome-message')?.classList.add('hidden');
-    
+    if (!s) { return; }
+
     // Use enhanced task panel if available
-    // TODO: 临时禁用以显示默认的虚线timeline
-    // if (typeof renderEnhancedTaskPanel === 'function') {
-    //     const enhancedPanel = renderEnhancedTaskPanel(s);
-    //     convo.appendChild(enhancedPanel);
-    //     const area = el('#chat-scroll-area');
-    //     area.scrollTop = area.scrollHeight;
-    //     return;
-    // }
+    if (typeof renderEnhancedTaskPanel === 'function') {
+        const enhancedPanel = renderEnhancedTaskPanel(s);
+        convo.appendChild(enhancedPanel);
+        const area = el('#chat-scroll-area');
+        area.scrollTop = area.scrollHeight;
+        return;
+    }
 
     if (s.prompt) {
         const m = document.createElement('div');
-        m.className = 'message-bubble user-bubble animate-fade-in ml-auto mb-6 text-sm shadow-md';
+        m.className = 'message-bubble user-bubble animate-fade-in self-end mb-6 text-sm shadow-md';
         m.textContent = s.prompt;
         convo.appendChild(m);
     }
 
     const renderEvent = (ev) => {
         const card = document.createElement('div');
-        card.className = 'tool-card border border-border-light dark:border-border-dark rounded-xl mb-3 bg-white dark:bg-surface-dark shadow-sm overflow-hidden transition-all duration-200';
-        
-        const toolName = ev.tool || 'default';
+        card.className = 'tool-card border border-border-light dark:border-border-dark rounded-[2rem] mb-3 bg-white dark:bg-surface-dark shadow-sm overflow-hidden transition-all duration-300';
+
         const isThought = ev.type === 'thought';
-        const isRunning = ev.status === 'running';
-        
-        // 使用 SVG 图标（一比一复制自 manus.html）
-        const svgIcon = TOOL_SVG_ICONS[isThought ? 'thought' : 'default'];
-        const label = TOOL_LABELS[toolName] || TOOL_LABELS['default'];
-        
+        const svgIcon = isThought ? TOOL_SVG_ICONS['thought'] : TOOL_SVG_ICONS['default'];
+        const toolName = ev.tool || 'Kernel Process';
+        const label = isThought ? TOOL_LABELS['thought'] : (TOOL_LABELS[toolName] || TOOL_LABELS['default']);
+        const title = isThought ? TOOL_LABELS['thought'] : `Using ${toolName}`;
+
         card.innerHTML = `
             <div class="card-header p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                 <div class="flex items-center gap-2">
@@ -315,75 +347,649 @@ function renderResults() {
         r.innerHTML = marked.parse(s.response);
         convo.appendChild(r);
     }
-    
+
     const area = el('#chat-scroll-area');
     area.scrollTop = area.scrollHeight;
+
+    // Save state on every render to ensure latest progress is saved
+    saveState();
+
+    // Update interface mode based on session content
+    if (window.updateInterfaceMode) {
+        window.updateInterfaceMode();
+    }
+}
+
+function parseLogLine(line, s) {
+    if (!line || !line.trim()) return;
+    
+    // Try to parse as JSON first
+    if (line.trim().startsWith('{') && line.trim().endsWith('}')) {
+        try {
+            const event = JSON.parse(line);
+            const eventType = event.type;
+            
+            if (eventType === 'step_start') {
+                // Update phase
+                if (s.phases && s.phases.length > 1) {
+                    const executionPhase = s.phases.find(p => p.number === 2);
+                    if (executionPhase) {
+                        executionPhase.status = 'active';
+                        s.currentPhase = executionPhase.id;
+                    }
+                }
+            } else if (eventType === 'tool_use') {
+                const part = event.part || {};
+                const toolName = part.tool;
+                const state = part.state || {};
+                const status = state.status;
+                const output = state.output || "";
+                
+                const toolEvent = {
+                    type: "activate", 
+                    tool: toolName, 
+                    status: status,
+                    output: output
+                };
+                
+                // Add to actions
+                if (!s.actions) s.actions = [];
+                s.actions.push(toolEvent);
+                
+                // Add to events
+                if (s.currentPhase) {
+                    const phase = s.phases.find(p => p.id === s.currentPhase);
+                    if (phase) {
+                        if (!phase.events) phase.events = [];
+                        phase.events.push(toolEvent);
+                    }
+                } else {
+                    if (!s.orphanEvents) s.orphanEvents = [];
+                    s.orphanEvents.push(toolEvent);
+                }
+                
+                // If output exists, also show as text
+                if (output) {
+                    s.response += `\n\`${toolName}\` output:\n${output}\n`;
+                }
+            } else if (eventType === 'text') {
+                const chunk = (event.part || {}).text || "";
+                if (chunk) s.response += chunk;
+            } else if (eventType === 'error') {
+                const errMsg = event.message || "Unknown error";
+                const errEvent = { type: "error", content: errMsg };
+                if (s.currentPhase) {
+                    const phase = s.phases.find(p => p.id === s.currentPhase);
+                    if (phase) {
+                        if (!phase.events) phase.events = [];
+                        phase.events.push(errEvent);
+                    }
+                } else {
+                    if (!s.orphanEvents) s.orphanEvents = [];
+                    s.orphanEvents.push(errEvent);
+                }
+            }
+            return;
+        } catch (e) {
+            // Not valid JSON, fall through to text parsing
+        }
+    }
+    
+    // Text parsing (Thought regex)
+    const thoughtMatch = line.match(/(?:🤔\s*Thought:|Thought:|Thought\s*>\s*|思考[:：])\s*(.*)/i);
+    if (thoughtMatch) {
+        const content = thoughtMatch[1].trim();
+        if (content) {
+            const thoughtEvent = { type: "thought", content: content };
+            if (s.currentPhase) {
+                const phase = s.phases.find(p => p.id === s.currentPhase);
+                if (phase) {
+                    if (!phase.events) phase.events = [];
+                    phase.events.push(thoughtEvent);
+                }
+            } else {
+                if (!s.orphanEvents) s.orphanEvents = [];
+                s.orphanEvents.push(thoughtEvent);
+            }
+            
+            // Ensure phase 2 is active
+             if (s.phases && s.phases.length > 1) {
+                const executionPhase = s.phases.find(p => p.number === 2);
+                if (executionPhase) {
+                    executionPhase.status = 'active';
+                    s.currentPhase = executionPhase.id;
+                }
+            }
+        }
+        return;
+    }
+    
+    // Regular text (skip noise)
+    const noiseKeywords = ["opencode run", "options:", "positionals:", "message  message to send", "run opencode with"];
+    if (!noiseKeywords.some(k => line.toLowerCase().includes(k))) {
+        s.response += line + "\n";
+    }
+}
+
+async function startPolling(sid) {
+    console.log(`[Polling] Starting polling for session ${sid}`);
+    const s = state.sessions.find(x => x.id === sid);
+    if (!s) return;
+    
+    // Initialize polling state if not exists
+    if (typeof s.logOffset === 'undefined') s.logOffset = 0;
+    
+    const poll = async () => {
+        // If session changed active, we might still want to poll in background, 
+        // but for now let's only poll if it's the active one or just poll regardless?
+        // Better to poll regardless to keep data up to date.
+        
+        try {
+            const res = await fetch(`/opencode/get_log?sid=${sid}&offset=${s.logOffset}`);
+            const data = await res.json();
+            
+            if (data.content) {
+                // Parse new content
+                const lines = data.content.split('\n');
+                lines.forEach(line => parseLogLine(line, s));
+                
+                s.logOffset = data.next_offset;
+                renderResults();
+                renderFiles(); // Update files if any
+            }
+            
+            if (data.status === 'completed' || data.status === 'done') {
+                console.log(`[Polling] Task completed`);
+                // Update final phase
+                 if (s.phases && s.phases.length > 2) {
+                    const finalPhase = s.phases.find(p => p.number === 3);
+                    if (finalPhase) finalPhase.status = 'completed';
+                }
+                renderResults();
+                return; // Stop polling
+            } else if (data.status === 'error') {
+                console.error(`[Polling] Task error`);
+                return;
+            }
+            
+            // Schedule next poll
+            setTimeout(poll, 2000); // Poll every 2 seconds
+            
+        } catch (e) {
+            console.error("[Polling] Error fetching log:", e);
+            setTimeout(poll, 5000); // Retry later
+        }
+    };
+    
+    poll();
 }
 
 function bindUI() {
+    // Welcome Interface Logic
+    const welcomeInterface = el('#welcome-interface');
+    const chatMessages = el('#chat-messages');
+    const bottomInputContainer = el('#bottom-input-container');
+    const promptWelcome = el('#prompt-welcome');
+    const promptBottom = el('#prompt');
+    const runStreamWelcome = el('#runStream-welcome');
+    const taskTags = els('.task-tag');
+
+    // Function to switch to chat mode (bottom input)
+    function switchToChatMode() {
+        if (welcomeInterface) welcomeInterface.classList.add('hidden');
+        if (chatMessages) {
+            chatMessages.classList.remove('hidden');
+        }
+        if (bottomInputContainer) {
+            bottomInputContainer.classList.remove('hidden');
+        }
+    }
+
+    // Function to switch back to welcome mode
+    function switchToWelcomeMode() {
+        if (welcomeInterface) welcomeInterface.classList.remove('hidden');
+        if (chatMessages) chatMessages.classList.add('hidden');
+        if (bottomInputContainer) bottomInputContainer.classList.add('hidden');
+    }
+
+    // Task Tag Selection Logic
+    const tagSuggestions = {
+        '生成幻灯片': [
+            '帮我创建一个关于人工智能的产品介绍PPT',
+            '生成一个技术分享的演示文稿'
+        ],
+        '撰写文档': [
+            '帮我为智能家居行业起草一个竞品对比框架',
+            '写一篇纽约时报风格的文章，报道最新热点新闻'
+        ],
+        '生成设计': [
+            '设计一个现代化的移动应用界面',
+            '创建一个简洁的品牌Logo'
+        ],
+        '创建故事绘本': [
+            '创作一个关于友谊的儿童绘本故事',
+            '编写一个科幻短篇故事'
+        ],
+        '批量调研': [
+            '帮我搜集10家同行业公司的最新动态',
+            '调研2024年AI行业的发展趋势'
+        ],
+        '分析数据': [
+            '给我一个家庭健身市场的快速概览，并提取主要结论',
+            '分析这组销售数据，找出增长机会'
+        ],
+        '创建网页': [
+            '帮我创建一个响应式的个人博客网站',
+            '开发一个产品落地页'
+        ],
+        '翻译PDF': [
+            '帮我翻译这份PDF文档',
+            '将PDF内容翻译成中文'
+        ],
+        '总结视频': [
+            '总结这个YouTube视频的主要内容',
+            '提取视频中的关键信息点'
+        ],
+        '转写音频': [
+            '将这段音频转写成文字',
+            '把会议录音转写为文档'
+        ]
+    };
+
+    taskTags.forEach(tagBtn => {
+        tagBtn.onclick = () => {
+            const tagName = tagBtn.getAttribute('data-tag');
+            const suggestions = tagSuggestions[tagName] || [];
+
+            // Clear all active states
+            taskTags.forEach(t => {
+                t.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-600', 'dark:bg-blue-900/20', 'dark:border-blue-500', 'dark:text-blue-400');
+                t.classList.add('bg-gray-50', 'border-gray-200', 'dark:bg-gray-800', 'dark:border-gray-700');
+            });
+
+            // Set active state for clicked tag
+            tagBtn.classList.remove('bg-gray-50', 'border-gray-200', 'dark:bg-gray-800', 'dark:border-gray-700');
+            tagBtn.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-600', 'dark:bg-blue-900/20', 'dark:border-blue-500', 'dark:text-blue-400');
+
+            // Show selected tag in input area
+            const selectedTagsContainer = el('#selected-tags-container');
+            if (selectedTagsContainer) {
+                selectedTagsContainer.classList.remove('hidden');
+                selectedTagsContainer.innerHTML = `
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-[#f1f5ff] text-[#4d7fff] rounded-full text-sm font-light dark:bg-blue-900/30 dark:text-blue-300">
+                        <span class="material-symbols-outlined text-base font-light">description</span>
+                        <span class="tracking-wide">${tagName}</span>
+                        <button class="ml-0.5 hover:opacity-70 flex items-center close-selected-tag">
+                            <span class="material-symbols-outlined text-[14px] font-light">close</span>
+                        </button>
+                    </div>
+                `;
+
+                // Add close button functionality
+                const closeBtn = selectedTagsContainer.querySelector('.close-selected-tag');
+                if (closeBtn) {
+                    closeBtn.onclick = () => {
+                        selectedTagsContainer.classList.add('hidden');
+                        selectedTagsContainer.innerHTML = '';
+                        taskTags.forEach(t => {
+                            t.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-600', 'dark:bg-blue-900/20', 'dark:border-blue-500', 'dark:text-blue-400');
+                            t.classList.add('bg-gray-50', 'border-gray-200', 'dark:bg-gray-800', 'dark:border-gray-700');
+                        });
+                        el('#tag-suggestions')?.classList.add('hidden');
+                    };
+                }
+            }
+
+            // Update placeholder
+            if (promptWelcome) {
+                promptWelcome.placeholder = `请输入${tagName}的具体要求...`;
+
+                // Show suggestions below the input
+                let suggestionsDiv = el('#tag-suggestions');
+                if (suggestionsDiv) {
+                    suggestionsDiv.innerHTML = suggestions.map(text => `
+                        <button class="suggestion-item w-full text-left py-2.5 px-4 rounded-xl text-gray-500 hover:text-gray-900 transition-all text-[15px] font-light tracking-wide" onclick="document.querySelector('#prompt-welcome').value = '${text.replace(/'/g, "\\'")}';document.querySelector('#tag-suggestions').classList.add('hidden');">
+                            ${text}
+                        </button>
+                    `).join('');
+                    suggestionsDiv.classList.remove('hidden');
+                }
+            }
+        };
+    });
+
+    // Sync both inputs
+    if (promptWelcome && promptBottom) {
+        promptWelcome.addEventListener('input', (e) => {
+            promptBottom.value = e.target.value;
+        });
+        promptBottom.addEventListener('input', (e) => {
+            promptWelcome.value = e.target.value;
+        });
+    }
+
+    // Handle welcome input submit
+    if (runStreamWelcome) {
+        runStreamWelcome.onclick = () => {
+            if (promptWelcome && promptBottom) {
+                promptBottom.value = promptWelcome.value;
+                const runBtn = el('#runStream');
+                if (runBtn) runBtn.click();
+                switchToChatMode();
+            }
+        };
+    }
+
+    // Check if should show welcome or chat mode
+    function updateInterfaceMode() {
+        const activeSession = state.sessions.find(s => s.id === state.activeId);
+        const hasMessages = activeSession && (
+            activeSession.response ||
+            (activeSession.phases && activeSession.phases.length > 0) ||
+            (activeSession.actions && activeSession.actions.length > 0)
+        );
+
+        if (hasMessages) {
+            switchToChatMode();
+        } else {
+            switchToWelcomeMode();
+        }
+    }
+
+    // Store function in global scope for access in renderResults
+    window.updateInterfaceMode = updateInterfaceMode;
+
     el('#theme-toggle').onclick = toggleTheme;
 
     // Sidebar toggle
     const sidebar = el('#sidebar');
-    const openSidebarBtn = el('#open-sidebar');
+    const expandSidebarBtn = el('#expand-sidebar');
     const toggleSidebarBtn = el('#toggle-sidebar');
-    
+    const openSidebarBtn = el('#open-sidebar');
+    const sidebarContent = el('#sidebar-content');
+    const sidebarLogo = el('#sidebar-logo');
+    const newTaskBtn = el('#new-task');
+    const historyBtn = el('#history-btn');
+    const sessionList = el('#session-list');
+    const sectionTitle = el('.sidebar-section-title');
+    const themeToggle = el('#theme-toggle');
+    const profileBtn = el('#my-profile-btn');
+    const profileAvatar = el('#profile-avatar');
+    const bottomSettings = el('#bottom-settings');
+
     if (toggleSidebarBtn) {
         toggleSidebarBtn.onclick = () => {
-            sidebar.classList.add('hidden');
-            openSidebarBtn.classList.remove('hidden');
+            sidebar.classList.add('collapsed');
+            sidebar.style.width = '64px';
+            sidebar.style.minWidth = '64px';
+            sidebar.style.maxWidth = '64px';
+
+            if (sidebarLogo) sidebarLogo.style.display = 'none';
+            toggleSidebarBtn.style.display = 'none';
+            expandSidebarBtn.classList.remove('hidden');
+
+            if (sessionList) sessionList.style.display = 'none';
+            if (sectionTitle) sectionTitle.style.display = 'none';
+            if (historyBtn) historyBtn.classList.remove('hidden');
+
+            if (newTaskBtn) {
+                newTaskBtn.style.padding = '12px';
+                newTaskBtn.style.margin = '8px';
+                newTaskBtn.style.minWidth = '48px';
+                newTaskBtn.style.justifyContent = 'center';
+                const newTaskParent = newTaskBtn.parentElement;
+                if (newTaskParent) {
+                    newTaskParent.style.display = 'flex';
+                    newTaskParent.style.justifyContent = 'center';
+                }
+                const textSpan = newTaskBtn.querySelector('span:not(.material-symbols-outlined)');
+                if (textSpan) textSpan.style.display = 'none';
+            }
+
+            // Handle bottom settings area - collapse to icon only
+            if (bottomSettings) {
+                bottomSettings.style.padding = '8px';
+                bottomSettings.style.flexDirection = 'column';
+                bottomSettings.style.gap = '8px';
+            }
+
+            // Collapse profile button to icon only
+            if (profileBtn) {
+                profileBtn.style.padding = '12px';
+                profileBtn.style.margin = '0';
+                profileBtn.style.minWidth = '48px';
+                profileBtn.style.justifyContent = 'center';
+                // Hide avatar and text
+                if (profileAvatar) profileAvatar.style.display = 'none';
+                const flex1Div = profileBtn.querySelector('.flex-1');
+                if (flex1Div) flex1Div.style.display = 'none';
+            }
+
+            // Theme button stays as is (already an icon button)
+            if (themeToggle) {
+                themeToggle.style.width = '48px';
+                themeToggle.style.height = '48px';
+            }
         };
     }
-    
+
+    if (expandSidebarBtn) {
+        expandSidebarBtn.onclick = () => {
+            sidebar.classList.remove('collapsed');
+            sidebar.style.width = '260px';
+            sidebar.style.minWidth = '260px';
+            sidebar.style.maxWidth = '260px';
+
+            if (sidebarLogo) sidebarLogo.style.display = 'flex';
+            toggleSidebarBtn.style.display = 'flex';
+            expandSidebarBtn.classList.add('hidden');
+
+            if (sessionList) sessionList.style.display = '';
+            if (sectionTitle) sectionTitle.style.display = '';
+            if (historyBtn) historyBtn.classList.add('hidden');
+
+            if (newTaskBtn) {
+                newTaskBtn.style.padding = '';
+                newTaskBtn.style.margin = '';
+                newTaskBtn.style.minWidth = '';
+                newTaskBtn.style.justifyContent = '';
+                const newTaskParent = newTaskBtn.parentElement;
+                if (newTaskParent) {
+                    newTaskParent.style.display = '';
+                    newTaskParent.style.justifyContent = '';
+                }
+                const textSpan = newTaskBtn.querySelector('span:not(.material-symbols-outlined)');
+                if (textSpan) textSpan.style.display = '';
+            }
+
+            // Restore bottom settings area
+            if (bottomSettings) {
+                bottomSettings.style.padding = '';
+                bottomSettings.style.flexDirection = '';
+                bottomSettings.style.gap = '';
+            }
+
+            // Restore profile button
+            if (profileBtn) {
+                profileBtn.style.padding = '';
+                profileBtn.style.margin = '';
+                profileBtn.style.minWidth = '';
+                profileBtn.style.justifyContent = '';
+                // Show avatar and text
+                if (profileAvatar) profileAvatar.style.display = 'flex';
+                const flex1Div = profileBtn.querySelector('.flex-1');
+                if (flex1Div) flex1Div.style.display = '';
+            }
+
+            // Restore theme button size
+            if (themeToggle) {
+                themeToggle.style.width = '';
+                themeToggle.style.height = '';
+            }
+        };
+    }
+
     if (openSidebarBtn) {
         openSidebarBtn.onclick = () => {
-            sidebar.classList.remove('hidden');
+            sidebar.classList.remove('collapsed');
+            sidebar.style.width = '260px';
+            sidebar.style.minWidth = '260px';
+            sidebar.style.maxWidth = '260px';
+
+            if (sidebarLogo) sidebarLogo.style.display = 'flex';
+            toggleSidebarBtn.style.display = 'flex';
+            expandSidebarBtn.classList.add('hidden');
             openSidebarBtn.classList.add('hidden');
+
+            if (sessionList) sessionList.style.display = '';
+            if (sectionTitle) sectionTitle.style.display = '';
+            if (historyBtn) historyBtn.classList.add('hidden');
+
+            if (newTaskBtn) {
+                newTaskBtn.style.padding = '';
+                newTaskBtn.style.margin = '';
+                newTaskBtn.style.minWidth = '';
+                newTaskBtn.style.justifyContent = '';
+                const newTaskParent = newTaskBtn.parentElement;
+                if (newTaskParent) {
+                    newTaskParent.style.display = '';
+                    newTaskParent.style.justifyContent = '';
+                }
+                const textSpan = newTaskBtn.querySelector('span:not(.material-symbols-outlined)');
+                if (textSpan) textSpan.style.display = '';
+            }
+
+            // Restore bottom settings area
+            if (bottomSettings) {
+                bottomSettings.style.padding = '';
+                bottomSettings.style.flexDirection = '';
+                bottomSettings.style.gap = '';
+            }
+
+            // Restore profile button
+            if (profileBtn) {
+                profileBtn.style.padding = '';
+                profileBtn.style.margin = '';
+                profileBtn.style.minWidth = '';
+                profileBtn.style.justifyContent = '';
+                // Show avatar and text
+                if (profileAvatar) profileAvatar.style.display = 'flex';
+                const flex1Div = profileBtn.querySelector('.flex-1');
+                if (flex1Div) flex1Div.style.display = '';
+            }
+
+            // Restore theme button size
+            if (themeToggle) {
+                themeToggle.style.width = '';
+                themeToggle.style.height = '';
+            }
         };
     }
 
     // VM Panel toggle
     const vmPanel = el('#vm-panel');
-    const mainContent = el('#main-content');
     const closeVmPanelBtn = el('#close-vm-panel');
-    const openVmPanelBtn = el('#open-vm-panel');
-    
+
     if (closeVmPanelBtn) {
         closeVmPanelBtn.onclick = () => {
-            // 关闭右侧面板
             vmPanel.classList.remove('w-[45%]');
-            vmPanel.classList.add('vm-panel-closed');
-            
-            // 隐藏关闭按钮，显示打开按钮
-            closeVmPanelBtn.classList.add('hidden');
-            if (openVmPanelBtn) {
-                openVmPanelBtn.classList.remove('hidden');
-            }
-            
-            // 中间面板居中（可选）
-            if (mainContent) {
-                mainContent.classList.add('main-content-centered');
-            }
+            vmPanel.classList.add('w-0');
+
+            // Remove active state from top action buttons
+            els('.top-action-btn').forEach(b => b.classList.remove('active'));
         };
     }
-    
-    if (openVmPanelBtn) {
-        openVmPanelBtn.onclick = () => {
-            // 打开右侧面板
-            vmPanel.classList.remove('vm-panel-closed');
+
+    // Top action buttons - Files/Preview toggle
+    const filesBtn = el('#toggle-files-panel');
+    const previewBtn = el('#toggle-preview-panel');
+
+    function togglePanel(panelType) {
+        if (!vmPanel) return;
+
+        const isCollapsed = vmPanel.classList.contains('w-0');
+
+        if (isCollapsed) {
+            // Expand panel
+            vmPanel.classList.remove('w-0');
             vmPanel.classList.add('w-[45%]');
-            
-            // 隐藏打开按钮，显示关闭按钮
-            openVmPanelBtn.classList.add('hidden');
-            if (closeVmPanelBtn) {
-                closeVmPanelBtn.classList.remove('hidden');
+
+            // Switch to correct tab
+            if (panelType === 'files') {
+                const filesTabBtn = el('[data-tab="files"]');
+                if (filesTabBtn) {
+                    els('.tab-btn').forEach(b => b.classList.remove('active-tab'));
+                    filesTabBtn.classList.add('active-tab');
+                }
+                const filesTabPane = el('#tab-files');
+                if (filesTabPane) {
+                    els('.tab-pane').forEach(p => p.classList.add('hidden'));
+                    filesTabPane.classList.remove('hidden');
+                }
+                if (typeof renderFiles === 'function') renderFiles();
+            } else if (panelType === 'preview') {
+                const previewTabBtn = el('[data-tab="preview"]');
+                if (previewTabBtn) {
+                    els('.tab-btn').forEach(b => b.classList.remove('active-tab'));
+                    previewTabBtn.classList.add('active-tab');
+                }
+                const previewTabPane = el('#tab-preview');
+                if (previewTabPane) {
+                    els('.tab-pane').forEach(p => p.classList.add('hidden'));
+                    previewTabPane.classList.remove('hidden');
+                }
             }
-            
-            // 移除中间面板居中
-            if (mainContent) {
-                mainContent.classList.remove('main-content-centered');
+
+            // Update top button active states
+            els('.top-action-btn').forEach(b => b.classList.remove('active'));
+            if (panelType === 'files' && filesBtn) {
+                filesBtn.classList.add('active');
+            } else if (panelType === 'preview' && previewBtn) {
+                previewBtn.classList.add('active');
             }
-        };
+        } else {
+            // Already expanded - just switch tabs
+            if (panelType === 'files') {
+                const filesTabBtn = el('[data-tab="files"]');
+                if (filesTabBtn) {
+                    els('.tab-btn').forEach(b => b.classList.remove('active-tab'));
+                    filesTabBtn.classList.add('active-tab');
+                }
+                const filesTabPane = el('#tab-files');
+                if (filesTabPane) {
+                    els('.tab-pane').forEach(p => p.classList.add('hidden'));
+                    filesTabPane.classList.remove('hidden');
+                }
+                if (typeof renderFiles === 'function') renderFiles();
+            } else if (panelType === 'preview') {
+                const previewTabBtn = el('[data-tab="preview"]');
+                if (previewTabBtn) {
+                    els('.tab-btn').forEach(b => b.classList.remove('active-tab'));
+                    previewTabBtn.classList.add('active-tab');
+                }
+                const previewTabPane = el('#tab-preview');
+                if (previewTabPane) {
+                    els('.tab-pane').forEach(p => p.classList.add('hidden'));
+                    previewTabPane.classList.remove('hidden');
+                }
+            }
+
+            // Update top button active states
+            els('.top-action-btn').forEach(b => b.classList.remove('active'));
+            if (panelType === 'files' && filesBtn) {
+                filesBtn.classList.add('active');
+            } else if (panelType === 'preview' && previewBtn) {
+                previewBtn.classList.add('active');
+            }
+        }
+    }
+
+    if (filesBtn) {
+        filesBtn.onclick = () => togglePanel('files');
+    }
+
+    if (previewBtn) {
+        previewBtn.onclick = () => togglePanel('preview');
     }
 
     el('#new-task').onclick = () => {
@@ -478,14 +1084,16 @@ function bindUI() {
     });
 
     const rs = el('#runStream');
+    const stopBtn = el('#stopStream');
+
     if (rs) rs.onclick = async () => {
         // Show VM panel when task starts and load iframe if not loaded
         const vmPanel = el('#vm-panel');
         const uvnFrame = el('#uvn-frame');
-        
+
         if (vmPanel) {
             vmPanel.classList.remove('hidden');
-            
+
             // Lazy load iframe on first use
             if (uvnFrame && uvnFrame.hasAttribute('data-src')) {
                 const src = uvnFrame.getAttribute('data-src');
@@ -494,33 +1102,100 @@ function bindUI() {
                 console.log('VNC iframe loaded on demand');
             }
         }
+
+        // Show stop button, hide send button
+        if (stopBtn) stopBtn.classList.remove('hidden');
+        if (rs) rs.classList.add('hidden');
+
         const input = el('#prompt'); if (!input.value.trim()) return;
         const p = input.value.trim();
         let s = state.sessions.find(x => x.id === state.activeId);
+        
+        // Default phases for immediate feedback
+        const defaultPhases = [
+            {number: 1, title: "Analyzing Request", status: "active", events: []},
+            {number: 2, title: "Executing Task", status: "pending", events: []},
+            {number: 3, title: "Summarizing Results", status: "pending", events: []}
+        ];
+
         if (!s) {
             const id = Math.random().toString(36).slice(2, 9);
-            s = { id, prompt: p, response: '', phases: [], orphanEvents: [], actions: [], currentPhase: null };
+            s = { id, prompt: p, response: '', phases: defaultPhases, orphanEvents: [], actions: [], currentPhase: null };
             state.sessions.unshift(s);
             state.activeId = id;
         } else {
             s.prompt = p;
             s.response = '';
-            s.phases = [];
+            s.phases = defaultPhases;
             s.orphanEvents = [];
             s.actions = [];
             s.currentPhase = null;
         }
+        
+        // Immediate feedback
+        s.orphanEvents.push({
+            type: "thought",
+            content: "Initializing engine... Please wait a moment for the environment to start."
+        });
+        
         input.value = '';
         renderAll();
+        saveState();
 
-        const es = new EventSource(`/opencode/run_sse?prompt=${encodeURIComponent(p)}&sid=${state.activeId}`);
-        es.onmessage = (e) => {
-            console.log("SSE Message:", e.data);
-            const data = JSON.parse(e.data);
-            if (data.type === 'phases_init') {
-                s.phases = (data.phases || []).map(p => ({ ...p, events: [] }));
-                s.currentPhase = data.phases.find(p => p.status === 'active')?.id || null;
-            } else if (data.type === 'actions_init') {
+        const connectSSE = () => {
+            const es = new EventSource(`/opencode/run_sse?prompt=${encodeURIComponent(p)}&sid=${state.activeId}`);
+
+            // Store active SSE connection
+            state.activeSSE = es;
+
+            // SSE Error Handling
+            es.onerror = (err) => {
+                console.warn("SSE connection error or disconnected.", err);
+                es.close();
+                state.activeSSE = null;
+
+                // Restore send button
+                if (rs) rs.classList.remove('hidden');
+                if (stopBtn) stopBtn.classList.add('hidden');
+                
+                // Try to reconnect SSE once after a delay, or switch to polling
+                // Since our backend now supports reconnecting, we can try re-establishing EventSource
+                // But browsers automatically retry EventSource unless we close it.
+                // If we are here, it means we closed it or it failed fatally.
+                
+                // Let's try one aggressive reconnect
+                if (!s.retryCount) s.retryCount = 0;
+                
+                if (s.retryCount < 3) {
+                    s.retryCount++;
+                    console.log(`Attempting SSE reconnect (${s.retryCount}/3)...`);
+                    setTimeout(() => connectSSE(), 2000);
+                } else {
+                    console.warn("SSE failed repeatedly. Switching to polling mode...");
+                    startPolling(state.activeId);
+                }
+            };
+
+            es.onmessage = (e) => {
+                // Reset retry count on successful message
+                s.retryCount = 0;
+                
+                console.log("SSE Message:", e.data);
+                const data = JSON.parse(e.data);
+                
+                if (data.type === 'ping') {
+                    // Heartbeat received, connection is alive
+                    return;
+                }
+                
+                if (data.type === 'phases_init') {
+                    // Only overwrite if we don't have phases or if it's a fresh start
+                    // If resuming, we might want to keep existing phases but update status
+                    if (!s.phases || s.phases.length === 0) {
+                        s.phases = (data.phases || []).map(p => ({ ...p, events: [] }));
+                    }
+                    s.currentPhase = data.phases.find(p => p.status === 'active')?.id || null;
+                } else if (data.type === 'actions_init') {
                 s.actions = data.actions || [];
             } else if (data.type === 'action') {
                 // Add or update action
@@ -572,6 +1247,11 @@ function bindUI() {
                 }
             } else if (data.type === 'tool_event') {
                 const event = data.data;
+                
+                // 同时同步到 actions 列表，供增强面板使用
+                if (!s.actions) s.actions = [];
+                s.actions.push(event);
+
                 // Map to phase if specified, otherwise to the current active phase
                 let targetPhase = null;
                 if (event.phase !== undefined) {
@@ -599,15 +1279,60 @@ function bindUI() {
                 s.deliverables = data.items || [];
             } else if (data.type === 'status' && data.value === 'done') {
                 es.close();
+                state.activeSSE = null;
+
+                // Restore send button
+                if (rs) rs.classList.remove('hidden');
+                if (stopBtn) stopBtn.classList.add('hidden');
+
                 renderFiles();
             }
             renderResults();
         };
     };
 
-    el('#prompt').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); rs.click(); } };
-    
-    els('.tab-btn').forEach(btn => {
+    // Initial call
+    connectSSE();
+
+    // Stop button handler
+    if (stopBtn) {
+        stopBtn.onclick = () => {
+            // Close active SSE connection
+            if (state.activeSSE) {
+                state.activeSSE.close();
+                state.activeSSE = null;
+            }
+
+            // Add stopped status to current session
+            const s = state.sessions.find(x => x.id === state.activeId);
+            if (s) {
+                s.orphanEvents.push({
+                    type: "thought",
+                    content: "任务已被用户停止"
+                });
+
+                // Mark current phase as completed
+                if (s.phases && s.phases.length > 0) {
+                    const activePhase = s.phases.find(p => p.status === 'active');
+                    if (activePhase) {
+                        activePhase.status = 'done';
+                    }
+                }
+            }
+
+            // Restore send button
+            if (rs) rs.classList.remove('hidden');
+            if (stopBtn) stopBtn.classList.add('hidden');
+
+            renderAll();
+            saveState();
+        };
+    }
+};
+
+el('#prompt').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); rs.click(); } };
+
+els('.tab-btn').forEach(btn => {
         btn.onclick = () => {
             els('.tab-btn').forEach(b => b.classList.remove('active-tab'));
             btn.classList.add('active-tab');
@@ -620,46 +1345,34 @@ function bindUI() {
 }
 
 function init() {
-    // 加载 mock 数据（如果可用）
-    if (typeof MOCK_DATA !== 'undefined' && MOCK_DATA && MOCK_DATA.sessions && MOCK_DATA.sessions.length > 0) {
-        console.log('[Mock] Loading mock data...');
-        window.state = {
-            ...window.state,
-            ...MOCK_DATA
-        };
-        console.log('[Mock] Mock data loaded:', window.state.sessions.length, 'sessions');
-    }
     // Theme initialization
     const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     state.theme = savedTheme;
     applyTheme();
 
+    loadState();
     bindUI();
     renderAll();
-}
 
-function applyTheme() {
-    const isDark = state.theme === 'dark';
-    document.documentElement.classList.toggle('dark', isDark);
-    localStorage.setItem('theme', state.theme);
-    
-    // Update Icons
-    const lightIcon = el('.light-icon');
-    const darkIcon = el('.dark-icon');
-    if (lightIcon && darkIcon) {
-        if (isDark) {
-            lightIcon.classList.add('hidden');
-            darkIcon.classList.remove('hidden');
-        } else {
-            lightIcon.classList.remove('hidden');
-            darkIcon.classList.add('hidden');
+    // Auto-resume if active session exists
+    if (state.activeId) {
+        const s = state.sessions.find(x => x.id === state.activeId);
+        // Only resume if it's not completed and has a prompt
+        if (s && s.prompt && (!s.phases || s.phases.length < 3 || s.phases[2].status !== 'completed')) {
+            console.log('Resuming session:', state.activeId);
+            // Simulate run button click but skip prompt check
+            // Actually, we can just call the SSE logic directly or click the button if input is populated.
+            // Better to trigger the button click logic programmatically or extract it.
+            // For simplicity, let's populate input and click.
+            const input = el('#prompt');
+            const runBtn = el('#runStream');
+            if (input && runBtn) {
+                input.value = s.prompt;
+                // Wait a tick for UI
+                setTimeout(() => runBtn.click(), 100);
+            }
         }
     }
-}
-
-function toggleTheme() {
-    state.theme = state.theme === 'dark' ? 'light' : 'dark';
-    applyTheme();
 }
 
 // Wait for DOM to be fully loaded

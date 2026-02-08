@@ -12,7 +12,7 @@
     "opencode-supermemory",
     "@tarquinen/opencode-dcp@1.2.7",
     "@franlol/opencode-md-table-formatter@0.0.3",
-    "oh-my-opencode@3.3.1"
+    "oh-my-opencode@3.3.2"
   ],
   "provider": {
     "google-ai-key1": {
