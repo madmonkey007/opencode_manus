@@ -12,12 +12,29 @@ import logging
 import subprocess
 import shlex
 
-# Configure logging
+# Configure logging FIRST before using logger
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("opencode")
+
+# 导入历史追踪服务
+try:
+    from .history_service import get_history_service
+    history_service = get_history_service()
+    logger.info("History service initialized")
+except ImportError as e:
+    logger.warning(f"Failed to import history service: {e}")
+    history_service = None
+
+# 导入新架构 API（阶段 2）
+try:
+    from .api import router as api_router
+    logger.info("New API router imported successfully")
+except ImportError as e:
+    logger.warning(f"Failed to import new API router: {e}")
+    api_router = None
 
 app = FastAPI()
 
@@ -29,9 +46,113 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ====================================================================
+# Prompt Enhancement System
+# ====================================================================
+
+def enhance_prompt(user_prompt: str) -> str:
+    """
+    智能增强用户提示词，添加必要的技术指导
+
+    目的：将用户的自然语言需求转换为 Agent 可以明确执行的指令
+    原则：
+    1. 保持用户的原始意图
+    2. 识别任务类型并补充技术细节
+    3. 不改变用户想要实现的目标
+    """
+
+    prompt_lower = user_prompt.lower()
+
+    # 检测任务类型
+    task_indicators = {
+        'code_creation': [
+            '创建', '生成', '写', '设计', '开发', '实现', 'build', 'create',
+            'make', 'generate', 'design', 'implement', 'write'
+        ],
+        'file_operation': [
+            '文件', '保存', '存储', '本地', 'file', 'save', 'store', 'local'
+        ],
+        'web_development': [
+            '网页', '网站', '前端', 'html', 'css', 'javascript', 'web', 'website',
+            'frontend', 'page', '界面', 'ui'
+        ],
+        'code_edit': [
+            '修改', '编辑', '改变', '更新', '修复', 'edit', 'modify', 'change',
+            'update', 'fix', 'refactor'
+        ]
+    }
+
+    # 统计匹配的任务类型
+    detected_tasks = []
+    for task_type, keywords in task_indicators.items():
+        if any(keyword in prompt_lower for keyword in keywords):
+            detected_tasks.append(task_type)
+
+    # 根据检测到的任务类型添加增强指令
+    enhancements = []
+
+    # 代码创建任务的增强
+    if 'code_creation' in detected_tasks or 'web_development' in detected_tasks:
+        if 'file_operation' in detected_tasks or '本地' in user_prompt or '存储' in user_prompt:
+            # 明确要求使用正确的工具写入完整代码
+            enhancements.append("""
+【重要技术要求】
+1. 必须使用 file_editor 或 write 工具创建文件
+2. 写入完整的、可直接运行的代码内容
+3. 不要只创建空文件或使用 touch 命令
+4. 确保每个文件都包含完整的实现代码
+""")
+
+    # Web 开发任务的额外指导
+    if 'web_development' in detected_tasks:
+        enhancements.append("""
+【Web 开发规范】
+- HTML: 包含完整的文档结构和语义化标签
+- CSS: 包含响应式设计、配色方案和布局
+- JavaScript: 包含完整的交互逻辑和功能实现
+""")
+
+    # 代码编辑任务的增强
+    if 'code_edit' in detected_tasks:
+        enhancements.append("""
+【代码编辑要求】
+1. 使用 edit 工具精确修改代码
+2. 保持代码风格一致
+3. 确保修改后的代码可以正常运行
+""")
+
+    # 如果没有检测到特定任务，添加通用指导
+    if not enhancements:
+        # 检测是否涉及任何编程任务
+        programming_keywords = ['代码', '程序', '功能', 'feature', 'function', 'code']
+        if any(keyword in prompt_lower for keyword in programming_keywords):
+            enhancements.append("""
+【执行要求】
+- 使用合适的工具完成任务
+- 确保输出完整、可运行的代码或配置
+- 验证实现的正确性
+""")
+
+    # 组合最终提示词
+    if enhancements:
+        enhanced_prompt = f"{user_prompt}\n\n{''.join(enhancements)}"
+        logger.info(f"Prompt enhanced: detected tasks={detected_tasks}")
+        return enhanced_prompt
+
+    return user_prompt
+
 # Workspace setup
 WORKSPACE_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../workspace"))
 os.makedirs(WORKSPACE_BASE, exist_ok=True)
+
+# ====================================================================
+# 注册新架构 API Router（阶段 2）
+# ====================================================================
+if api_router:
+    app.include_router(api_router)
+    logger.info("New API router registered at /opencode")
+else:
+    logger.warning("New API router not available, using legacy API only")
 
 # Mount static files
 static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../static"))
@@ -56,7 +177,9 @@ def format_sse(data: dict) -> str:
 
 @app.get("/opencode/list_session_files")
 async def list_session_files(sid: str):
-    session_dir = os.path.join(WORKSPACE_BASE, sid)
+    # 如果前端 sid 有映射到实际的 opencode sid，使用实际的
+    actual_sid = _session_id_map.get(sid, sid)
+    session_dir = os.path.join(WORKSPACE_BASE, actual_sid)
     if not os.path.exists(session_dir):
         return {"files": []}
     
@@ -154,14 +277,23 @@ class SessionManager:
             f.write(f"Session started: {sid}\n")
 
         try:
+            # ====================================================================
+            # 智能提示词增强：在执行前根据用户意图添加技术指导
+            # ====================================================================
+            enhanced_prompt = enhance_prompt(prompt)
+            logger.info(f"Original prompt: {prompt[:100]}...")
+            logger.info(f"Enhanced prompt length: {len(enhanced_prompt)} chars")
+
             # Use script to fake a TTY, forcing unbuffered output
             # We must quote the prompt safely
-            safe_prompt = shlex.quote(prompt)
+            safe_prompt = shlex.quote(enhanced_prompt)
             # Ensure PATH includes bun location
             path_env = "/root/.bun/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
             
             # Construct the inner command
-            inner_cmd = f"opencode run --model new-api/gemini-3-flash-preview --format json {safe_prompt}"
+            # 添加 --thinking 参数以显示 AI 思考过程
+            # 不传递 --session，让 OpenCode 自己创建（避免 "session not found" 错误）
+            inner_cmd = f"opencode run --model new-api/gemini-3-flash-preview --format json --thinking {safe_prompt}"
             
             # Wrap with script
             cmd = ["script", "-q", "-c", inner_cmd, "/dev/null"]
@@ -232,6 +364,15 @@ class SessionManager:
 
 session_manager = SessionManager()
 
+# Track whether we've already sent phases_init for this session
+_phases_initialized = {}
+# Track the number of phases for each session (to detect when Agent merges tasks)
+_phase_counts = {}
+# Track frontend_sid -> actual_opencode_sid mapping
+# OpenCode generates its own session IDs, so we need to map them
+_session_id_map = {}
+_reverse_session_id_map = {}  # actual_opencode_sid -> frontend_sid (for reverse lookup)
+
 async def run_agent(prompt: str, sid: str):
     """
     Bridge to the official opencode CLI with Manus-level SSE extensions
@@ -247,14 +388,20 @@ async def run_agent(prompt: str, sid: str):
     
     async def event_generator():
         logger.info(f"Manus-Integrated Agent session attached: {sid}")
-        
-        # 1. Initialize Manus-style phases
+
+        # Always reset phases_initialized flag for new/resumed sessions
+        # This ensures we always generate phases from the first todowrite
+        _phases_initialized[sid] = False
+        # Also reset phase count tracking
+        if sid in _phase_counts:
+            del _phase_counts[sid]
+
+        # 1. Initialize with a temporary "Planning" phase
+        # 这个阶段会被后续的 todowrite 动态生成的阶段替换
         yield format_sse({
             "type": "phases_init",
             "phases": [
-                {"number": 1, "title": "Analyzing Request", "status": "active"},
-                {"number": 2, "title": "Executing Task", "status": "pending"},
-                {"number": 3, "title": "Summarizing Results", "status": "pending"}
+                {"id": "phase_planning", "number": 0, "title": "📋 正在制定执行计划...", "status": "active"}
             ]
         })
 
@@ -267,7 +414,7 @@ async def run_agent(prompt: str, sid: str):
                         line = line.strip()
                         if line:
                              # Process historical line same as new line
-                             async for event in process_log_line(line):
+                             async for event in process_log_line(line, sid):
                                  yield event
             except Exception as e:
                 logger.error(f"Error reading history: {e}")
@@ -282,7 +429,7 @@ async def run_agent(prompt: str, sid: str):
                     text = await asyncio.wait_for(queue.get(), timeout=1.0)
                     last_activity = asyncio.get_running_loop().time()
                     
-                    async for event in process_log_line(text):
+                    async for event in process_log_line(text, sid):
                         yield event
                         
                 except asyncio.TimeoutError:
@@ -290,7 +437,20 @@ async def run_agent(prompt: str, sid: str):
                     session = session_manager.sessions.get(sid)
                     if session and session["status"] in ["completed", "error"] and queue.empty():
                         if session["status"] == "completed":
-                            yield format_sse({"type": "phase_update", "number": 3, "status": "completed"})
+                            # 完成时，将所有剩余阶段标记为完成
+                            phase_count = _phase_counts.get(sid, 0)
+                            logger.info(f"[DEBUG] Task completed, marking all remaining phases as completed (count: {phase_count})")
+
+                            # 标记所有阶段为完成
+                            for idx in range(1, phase_count + 1):
+                                phase_id = f"phase_{idx}"
+                                yield format_sse({"type": "phase_update", "phase_id": phase_id, "status": "completed"})
+                                logger.info(f"[DEBUG] Marked {phase_id} as completed")
+
+                            # 也标记 summary 阶段为完成
+                            yield format_sse({"type": "phase_update", "phase_id": "phase_summary", "status": "completed"})
+                            logger.info(f"[DEBUG] Marked phase_summary as completed")
+
                             yield format_sse({"type": "file_update", "sid": sid})
                         break
                     
@@ -329,41 +489,254 @@ def map_tool_to_type(tool_name: str) -> str:
         
     return "file_editor"  # Default fallback
 
-async def process_log_line(text: str):
+async def process_log_line(text: str, sid: str = None):
+    # MARKER: 追踪函数调用
+    import sys
+    sys.stdout.flush()
+    sys.stderr.flush()
+    logger.info(f"[MARKER] process_log_line called - text_length={len(text)}, sid={sid}")
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    # ========================================================================
+    # 检测 "Session started: {actual_sid}" 并建立映射关系
+    # ========================================================================
+    session_match = re.search(r'Session started:\s+(\S+)', text, re.IGNORECASE)
+    if session_match:
+        actual_sid = session_match.group(1)
+        if actual_sid != sid:
+            # OpenCode 生成了自己的 session ID，建立映射
+            _session_id_map[sid] = actual_sid
+            _reverse_session_id_map[actual_sid] = sid
+            logger.info(f"[SESSION MAP] Mapped frontend_sid={sid} -> actual_sid={actual_sid}")
+    # ========================================================================
+
     # Try to parse as JSON if it looks like one
     if text.startswith("{") and text.endswith("}"):
         try:
             event = json.loads(text)
             event_type = event.get("type")
-            
-            if event_type == "step_start":
-                yield format_sse({"type": "phase_update", "number": 2, "status": "active"})
-            
+
+            # ====================================================================
+            # 检测 todowrite 事件，动态生成执行阶段
+            # ====================================================================
+            if event_type == "tool_use" and event.get("part", {}).get("tool") == "todowrite":
+                logger.info(f"[DEBUG] Processing todowrite event for sid: {sid}")
+                logger.info(f"[DEBUG] _phases_initialized.get(sid): {_phases_initialized.get(sid, False)}")
+
+                part = event.get("part", {})
+                state = part.get("state", {})
+                input_data = state.get("input", {})
+                todos = input_data.get("todos", [])
+
+                logger.info(f"[DEBUG] Found {len(todos)} todos in todowrite")
+
+                if todos:
+                    # 第一次 todowrite：发送完整的 phases_init（包含总结阶段）
+                    if not _phases_initialized.get(sid, False):
+                        # 将 todowrite 的 todos 转换为 phases
+                        phases = []
+                        for idx, todo in enumerate(todos, 1):
+                            phases.append({
+                                "id": f"phase_{idx}",
+                                "number": idx,
+                                "title": todo.get("content", f"Step {idx}"),
+                                "status": todo.get("status", "pending")
+                            })
+
+                        # 添加固定的"总结"阶段作为最后一个阶段
+                        phases.append({
+                            "id": "phase_summary",
+                            "number": len(todos) + 1,
+                            "title": "📝 总结生成内容",
+                            "status": "pending"
+                        })
+
+                        logger.info(f"[DEBUG] Generated {len(phases)} phases from todowrite (including summary)")
+                        logger.info(f"[DEBUG] Phase IDs: {[p['id'] for p in phases]}")
+
+                        event_data = {
+                            "type": "phases_init",
+                            "phases": phases
+                        }
+                        logger.info(f"[DEBUG] Sending phases_init event: {event_data}")
+                        yield format_sse(event_data)
+
+                        _phases_initialized[sid] = True
+                        # 记录初始阶段数量（不包括 summary 阶段）
+                        _phase_counts[sid] = len(todos)
+                        logger.info(f"[DEBUG] Set _phases_initialized[{sid}] = True, _phase_counts[{sid}] = {len(todos)}")
+                    else:
+                        # 后续 todowrite：只更新对应 phase 的状态
+                        logger.info(f"[DEBUG] Updating existing phases (already initialized)")
+
+                        # 获取之前记录的阶段数量（如果有的话）
+                        previous_phase_count = _phase_counts.get(sid, len(todos))
+
+                        # 更新当前批次的阶段状态
+                        for idx, todo in enumerate(todos, 1):
+                            phase_id = f"phase_{idx}"
+                            status = todo.get("status", "pending")
+                            event_data = {
+                                "type": "phase_update",
+                                "phase_id": phase_id,
+                                "status": status
+                            }
+                            logger.info(f"[DEBUG] Sending phase_update: {event_data}")
+                            yield format_sse(event_data)
+
+                        # 如果新的 todos 数量比之前的少，说明 Agent 合并了任务
+                        # 需要把"消失"的那些旧阶段标记为 completed
+                        if len(todos) < previous_phase_count:
+                            logger.info(f"[DEBUG] Agent merged tasks: {previous_phase_count} -> {len(todos)}")
+                            logger.info(f"[DEBUG] Marking phases {len(todos)+1} to {previous_phase_count} as completed")
+                            for idx in range(len(todos) + 1, previous_phase_count + 1):
+                                phase_id = f"phase_{idx}"
+                                event_data = {
+                                    "type": "phase_update",
+                                    "phase_id": phase_id,
+                                    "status": "completed"
+                                }
+                                logger.info(f"[DEBUG] Auto-completed merged phase: {event_data}")
+                                yield format_sse(event_data)
+
+                        # 更新记录的阶段数量
+                        _phase_counts[sid] = len(todos)
+                        logger.info(f"[DEBUG] Updated {len(todos)} phase statuses from todowrite")
+                else:
+                    logger.warning(f"[DEBUG] No todos found in todowrite event!")
+
+            if event_type == "step_start" or event_type == "step-start":
+                # 激活第一个 pending 状态的 phase（如果有动态阶段）
+                # 这里不需要额外发送，前端会自动管理
+                pass
+
+            elif event_type == "step_finish" or event_type == "step-finish":
+                # 检查是否有 reasoning tokens，如果有则生成思考事件
+                part = event.get("part", {})
+
+                # tokens 可能在多个位置：
+                # 1. event.tokens (直接在事件中)
+                # 2. event.part.tokens (在 part 中)
+                tokens = event.get("tokens", {}) or part.get("tokens", {})
+
+                reasoning_tokens = tokens.get("reasoning", 0)
+
+                # 如果有 reasoning tokens，生成一个思考事件
+                if reasoning_tokens > 0:
+                    thought_content = f"AI 进行了 {reasoning_tokens} 个 tokens 的推理思考"
+                    yield format_sse({
+                        "type": "tool_event",
+                        "data": {
+                            "type": "thought",
+                            "content": thought_content,
+                            "reasoning_tokens": reasoning_tokens
+                        }
+                    })
+                    logger.info(f"Generated synthetic thought event: {reasoning_tokens} reasoning tokens")
+
             elif event_type == "tool_use":
                 part = event.get("part", {})
                 tool_name = part.get("tool", "unknown")
                 state = part.get("state", {})
                 status = state.get("status")
                 output = state.get("output", "")
-                
-                # Map to standard type
-                display_type = map_tool_to_type(tool_name)
-                
-                # Send as tool_event for the enhanced panel
-                yield format_sse({
-                    "type": "tool_event", 
-                    "data": {
-                        "type": "tool",  # Keep generic 'tool' type for frontend logic
-                        "tool": display_type,  # Use mapped type as tool name for icon lookup
-                        "status": status,
-                        "output": output
-                    }
-                })
-                
-                # If there's output, also send it as a chunk for visibility
-                if output:
-                    display_text = f"\n`{tool_name}` output:\n{output}\n"
-                    yield format_sse({"type": "answer_chunk", "text": display_text})
+                input_data = part.get("input", {})
+
+                # 跳过 todowrite，因为已经在上面处理过了
+                if tool_name != "todowrite":
+                    # ================================================================
+                    # 历史追踪：捕获工具使用
+                    # ================================================================
+                    step_id = str(uuid.uuid4())
+                    capture_result = None
+
+                    if history_service and sid:
+                        try:
+                            capture_result = await history_service.capture_tool_use(
+                                session_id=sid,
+                                tool_name=tool_name,
+                                tool_input=input_data,
+                                step_id=step_id
+                            )
+
+                            # 文件操作：发送预览事件
+                            if tool_name in ['write', 'edit', 'file_editor']:
+                                file_path = input_data.get('file_path') or input_data.get('path', '')
+                                content = input_data.get('content', '')
+
+                                logger.info(f"[PREVIEW] Sending preview_start for {tool_name}: {file_path}")
+                                logger.info(f"[PREVIEW] Content length: {len(content)} chars")
+                                logger.info(f"[PREVIEW] Action type: {capture_result['action_type']}")
+
+                                # 预览开始
+                                yield format_sse({
+                                    "type": "preview_start",
+                                    "step_id": step_id,
+                                    "file_path": file_path,
+                                    "action": capture_result['action_type']
+                                })
+
+                                # 流式推送内容（打字机效果）
+                                if content:
+                                    logger.info(f"[PREVIEW] Starting typewriter effect with {len(content)} chars")
+                                    for i, char in enumerate(content):
+                                        yield format_sse({
+                                            "type": "preview_delta",
+                                            "step_id": step_id,
+                                            "delta": {"type": "insert", "position": i, "content": char}
+                                        })
+                                        await asyncio.sleep(0.005)  # 打字机速度
+                                    logger.info(f"[PREVIEW] Typewriter effect completed")
+
+                                # 预览结束
+                                yield format_sse({
+                                    "type": "preview_end",
+                                    "step_id": step_id,
+                                    "file_path": file_path
+                                })
+
+                                # 保存快照
+                                await history_service.capture_file_change(
+                                    step_id=step_id,
+                                    file_path=file_path,
+                                    content=content,
+                                    operation_type='created' if tool_name == 'write' else 'modified'
+                                )
+
+                            # 时间轴更新
+                            if capture_result:
+                                yield format_sse({
+                                    "type": "timeline_update",
+                                    "step": {
+                                        "step_id": capture_result['step_id'],
+                                        "action": capture_result['action_type'],
+                                        "path": capture_result['file_path'],
+                                        "timestamp": capture_result['timestamp']
+                                    }
+                                })
+
+                        except Exception as e:
+                            logger.error(f"Failed to capture history: {e}")
+
+                    # Map to standard type
+                    display_type = map_tool_to_type(tool_name)
+
+                    # Send as tool_event for the enhanced panel
+                    yield format_sse({
+                        "type": "tool_event",
+                        "data": {
+                            "type": "tool",  # Keep generic 'tool' type for frontend logic
+                            "tool": display_type,  # Use mapped type as tool name for icon lookup
+                            "status": status,
+                            "output": output
+                        }
+                    })
+
+                    # If there's output, also send it as a chunk for visibility
+                    if output:
+                        display_text = f"\n`{tool_name}` output:\n{output}\n"
+                        yield format_sse({"type": "answer_chunk", "text": display_text})
 
 
             elif event_type == "text":
@@ -385,10 +758,11 @@ async def process_log_line(text: str):
         content = thought_match.group(1).strip()
         if content:
             yield format_sse({
-                "type": "tool_event", 
+                "type": "tool_event",
                 "data": {"type": "thought", "content": content}
             })
-            yield format_sse({"type": "phase_update", "number": 2, "status": "active"})
+            # 使用 phase_id 而不是 number
+            yield format_sse({"type": "phase_update", "phase_id": "phase_2", "status": "active"})
         return
     
     if not text.startswith("{"):
@@ -402,6 +776,56 @@ async def run_sse(prompt: str, sid: str | None = None):
     if not sid: sid = str(uuid.uuid4())
     generator_func = await run_agent(prompt, sid)
     return StreamingResponse(generator_func(), media_type="text/event-stream")
+
+
+# ================================================================
+# 历史查询 API 端点
+# ================================================================
+
+@app.get("/opencode/get_file_at_step")
+async def get_file_at_step(session_id: str, file_path: str, step_id: str):
+    """获取指定步骤时刻的文件内容"""
+    if not history_service:
+        raise HTTPException(status_code=503, detail="History service not available")
+
+    content = await history_service.get_file_at_step(
+        session_id=session_id,
+        file_path=file_path,
+        target_step_id=step_id
+    )
+
+    if content is None:
+        raise HTTPException(status_code=404, detail="File not found at this step")
+
+    return {
+        "content": content,
+        "file_path": file_path,
+        "step_id": step_id
+    }
+
+
+@app.get("/opencode/get_timeline")
+async def get_timeline(session_id: str):
+    """获取会话的完整时间轴"""
+    if not history_service:
+        raise HTTPException(status_code=503, detail="History service not available")
+
+    timeline = await history_service.get_timeline(session_id)
+    return {"timeline": timeline}
+
+
+@app.get("/opencode/get_step_info")
+async def get_step_info(step_id: str):
+    """获取单个步骤的详细信息"""
+    if not history_service:
+        raise HTTPException(status_code=503, detail="History service not available")
+
+    # 这里需要在 history_service 中添加相应方法
+    # 暂时返回基本信息
+    return {
+        "step_id": step_id,
+        "message": "Step info retrieval not fully implemented"
+    }
 
 if __name__ == "__main__":
     import uvicorn
