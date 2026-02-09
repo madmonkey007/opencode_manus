@@ -10,6 +10,7 @@
 ## 📋 目录
 
 - [项目概述](#项目概述)
+- [原方案架构（CLI 单任务模式）](#原方案架构cli-单任务模式)
 - [当前产品架构](#当前产品架构)
 - [实现方案](#实现方案)
 - [已实现的功能](#已实现的功能)
@@ -48,6 +49,431 @@
 - RESTful API + SSE 事件流
 - Session + Message + Part 数据模型
 - 内存存储（未来可扩展到数据库）
+
+---
+
+## 原方案架构（CLI 单任务模式）
+
+### 架构概述
+
+原方案基于 **CLI 单任务执行模式**，每次用户提问都会调用一次 `opencode run` 命令，通过 SSE 流式返回结果。多轮对话是通过前端拼接 prompt/response 来模拟的。
+
+### 架构图（原方案）
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         用户界面                              │
+│  ┌──────────────┐  ┌──────────────┐                         │
+│  │  输入框       │  │  任务面板     │                          │
+│  └──────────────┘  └──────────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                      前端 (JavaScript)                        │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  opencode.js (主逻辑)                                  │   │
+│  │  - 提交任务                                            │   │
+│  │  - SSE 事件处理                                        │   │
+│  │  - Session 管理 (全局 sid 变量)                       │   │
+│  │  - 多轮对话拼接 (prompt/response 拼接)                │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  enhanced-task-panel.js (任务面板)                    │   │
+│  │  - 阶段显示                                            │   │
+│  │  - 工具事件渲染                                        │   │
+│  │  - 文件列表                                            │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                       API 层 (FastAPI)                        │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  GET /opencode/run_sse?prompt=xxx&sid=yyy            │   │
+│  │  - 调用 opencode run CLI 命令                         │   │
+│  │  - 返回 SSE 事件流                                    │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  GET /opencode/get_log?sid=yyy&offset=zzz            │   │
+│  │  - 获取日志文件（用于轮询/重连）                       │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  GET /opencode/get_file_content?path=xxx             │   │
+│  │  - 获取文件内容                                       │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    CLI 执行层                                │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  subprocess.Popen()                                   │   │
+│  │  ↓                                                    │   │
+│  │  script -q -c "opencode run --format json --thinking  │   │
+│  │                \"{prompt}\"" /dev/null                 │   │
+│  │  ↓                                                    │   │
+│  │  解析 stdout 输出 → SSE 事件                           │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                  OpenCode CLI (外部)                         │
+│  执行单次任务，返回 JSON 格式的事件流                        │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│                  工作区存储                                  │
+│  workspace/{sid}/                                           │
+│  ├── run.log        # 执行日志                              │
+│  ├── status.txt     # 任务状态                              │
+│  └── {created files} # 创建的文件                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 数据流（原方案）
+
+#### 1. 首次提问
+
+```
+用户输入: "帮我创建一个 Python 文件"
+    ↓
+前端: sid = uuid()
+    ↓
+API: GET /opencode/run_sse?prompt="帮我创建一个 Python 文件"&sid={sid}
+    ↓
+后端: 创建 workspace/{sid}/
+    ↓
+后端: 执行 opencode run "帮我创建一个 Python 文件"
+    ↓
+CLI: 输出 JSON 事件流
+    ↓
+前端: 接收 SSE 事件
+    ├── text 事件 → 累积到 response
+    ├── tool_use 事件 → 显示工具调用
+    ├── todowrite 事件 → 生成阶段
+    └── answer_chunk 事件 → 累积回答
+    ↓
+前端: s.prompt = "帮我创建一个 Python 文件"
+        s.response = "好的，我来创建..."
+        s.phases = [{id: "phase_1", title: "...", status: "completed"}]
+```
+
+#### 2. 追问（原方案）
+
+```
+用户输入: "再添加一个函数"
+    ↓
+前端: 检测到 sid 已存在
+    ↓
+前端: s.prompt += "\n\n---\n\n" + "再添加一个函数"
+    ↓
+API: GET /opencode/run_sse?prompt="帮我创建一个 Python 文件\n\n---\n\n再添加一个函数"&sid={sid}
+    ↓
+后端: **重新执行** opencode run（使用完整拼接后的 prompt）
+    ↓
+CLI: 输出 JSON 事件流（将完整对话视为一个任务）
+    ↓
+前端:
+    s.response += "\n\n---\n\n**新的回答：**\n\n"
+    s.response += "好的，我来添加..."
+    s.phases = emptyPhases  ⚠️ 阶段重置！
+```
+
+### 数据结构（原方案）
+
+#### Session 对象（全局变量）
+
+```javascript
+// opencode.js
+let sessions = {};
+
+let currentSessionId = null;
+
+// Session 结构
+{
+    sid: "uuid-string",
+    prompt: "Q1\n\n---\n\nQ2",  // 拼接后的完整 prompt
+    response: "A1\n\n---\n\n**新的回答：**\n\nA2",  // 拼接后的完整 response
+    phases: [
+        {id: "phase_1", number: 1, title: "创建文件", status: "completed"},
+        {id: "phase_2", number: 2, title: "添加函数", status: "active"},
+        {id: "phase_summary", number: 3, title: "总结", status: "pending"}
+    ],
+    currentPhase: "phase_2",
+    orphanEvents: [],  // 未关联到阶段的工具事件
+    actions: [],  // 所有工具调用记录
+    deliverables: []  // 创建的文件列表
+}
+```
+
+#### SSE 事件类型（原方案）
+
+```javascript
+// 1. 初始化阶段
+{"type": "phases_init", "phases": [...]}
+
+// 2. 阶段更新
+{"type": "phase_update", "phase_id": "phase_1", "status": "completed"}
+
+// 3. 工具事件
+{"type": "tool_event", "data": {
+    "type": "tool",
+    "tool": "write",
+    "status": "running",
+    "output": "..."
+}}
+
+// 4. 思考事件
+{"type": "tool_event", "data": {
+    "type": "thought",
+    "content": "AI 正在思考..."
+}}
+
+// 5. 回答内容
+{"type": "answer_chunk", "text": "好的，我来..."}
+
+// 6. 文件更新
+{"type": "file_update", "sid": "xxx"}
+
+// 7. 心跳
+{"type": "ping", "timestamp": 1234567890}
+
+// 8. 完成
+{"type": "status", "value": "done"}
+```
+
+### 关键实现（原方案）
+
+#### 1. 任务提交（opencode.js）
+
+```javascript
+function submitTask() {
+    const prompt = el('#prompt-input').value.trim();
+    if (!prompt) return;
+
+    // 首次提问或追问
+    if (!currentSessionId) {
+        // 首次提问
+        currentSessionId = str(uuid());
+        sessions[currentSessionId] = {
+            sid: currentSessionId,
+            prompt: prompt,
+            response: "",
+            phases: emptyPhases,
+            orphanEvents: [],
+            actions: [],
+            currentPhase: null,
+            deliverables: []
+        };
+    } else {
+        // 追问模式
+        const s = sessions[currentSessionId];
+        const previousPrompt = s.prompt ? s.prompt + '\n\n---\n\n' : '';
+        s.prompt = previousPrompt + prompt;
+        s.phases = emptyPhases;  // ⚠️ 重置阶段
+        s.orphanEvents = [];
+        s.actions = [];
+        s.currentPhase = null;
+    }
+
+    // 创建 SSE 连接
+    const source = new EventSource(
+        `/opencode/run_sse?prompt=${encodeURIComponent(prompt)}&sid=${currentSessionId}`
+    );
+
+    source.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleEvent(data, currentSessionId);
+    };
+
+    source.onerror = (error) => {
+        console.warn('SSE connection lost');
+        source.close();
+        // 可选：切换到轮询模式
+    };
+}
+```
+
+#### 2. 多轮对话解析（enhanced-task-panel.js v16）
+
+```javascript
+function parseConversationHistory(prompt, response) {
+    // 解析 prompt 中的问题（按 "---" 分隔）
+    const questions = prompt.split(/\n\n---\n\n/);
+
+    // 解析 response 中的回答（按 "---\n\n**新的回答：**" 分隔）
+    const responses = response.split(/\n\n---\n\n\*\*新的回答：\*\*\n\n/);
+
+    return {
+        questions: questions,
+        responses: responses
+    };
+}
+
+// 渲染对话
+function renderEnhancedTaskPanel(session) {
+    const conversation = parseConversationHistory(session.prompt, session.response);
+    const questionCount = conversation.questions.length;
+    const responseCount = conversation.responses.length;
+    const hasNewQuestionWithoutAnswer = questionCount > responseCount;
+
+    if (hasNewQuestionWithoutAnswer) {
+        // Q1 → A1, ..., Qn → 阶段（新问题还没有回答）
+        for (let i = 0; i < responseCount; i++) {
+            // 显示历史问答对
+            createUserPromptCard(conversation.questions[i]);
+            createAssistantResponseCard(conversation.responses[i]);
+        }
+        // 显示当前新问题
+        createUserPromptCard(conversation.questions[questionCount - 1]);
+        // 显示当前任务阶段
+        createPhasesCard(session.phases);
+    } else {
+        // Q1 → A1, ..., Qn → 阶段 → An（多轮完成）
+        for (let i = 0; i < questionCount - 1; i++) {
+            createUserPromptCard(conversation.questions[i]);
+            createAssistantResponseCard(conversation.responses[i]);
+        }
+        // 显示最后一轮
+        createUserPromptCard(conversation.questions[questionCount - 1]);
+        createPhasesCard(session.phases);
+        createAssistantResponseCard(conversation.responses[responseCount - 1]);
+    }
+}
+```
+
+#### 3. 阶段管理（opencode.js）
+
+```javascript
+// todowrite 事件 → 动态生成阶段
+if (data.type === 'tool_use' && data.part?.tool === 'todowrite') {
+    const todos = data.part.state.input.todos;
+
+    if (!_phases_initialized[sid]) {
+        // 第一次 todowrite：生成完整阶段列表
+        const phases = [];
+        for (let i = 0; i < todos.length; i++) {
+            phases.push({
+                id: `phase_${i + 1}`,
+                number: i + 1,
+                title: todos[i].content,
+                status: todos[i].status
+            });
+        }
+        phases.push({
+            id: 'phase_summary',
+            number: todos.length + 1,
+            title: '📝 总结生成内容',
+            status: 'pending'
+        });
+
+        yield format_sse({"type": "phases_init", "phases": phases});
+        _phases_initialized[sid] = true;
+    } else {
+        // 后续 todowrite：更新阶段状态
+        for (let i = 0; i < todos.length; i++) {
+            yield format_sse({
+                "type": "phase_update",
+                "phase_id": `phase_${i + 1}`,
+                "status": todos[i].status
+            });
+        }
+    }
+}
+
+// phase_planning 自动完成
+if (hasDynamicPhases && planningPhase && planningPhase.status === 'active') {
+    planningPhase.status = 'completed';
+}
+```
+
+### 原方案的优势
+
+✅ **简单直接**
+- 一次 CLI 调用完成一次任务
+- 前端逻辑相对简单
+- 不需要复杂的 Session 管理
+
+✅ **SSE 实时性好**
+- 使用 script 伪造 TTY，强制无缓冲输出
+- 实时显示任务进度
+- 打字机效果流畅
+
+✅ **快速原型**
+- 可以快速迭代和验证功能
+- 不依赖外部数据库
+- 易于调试
+
+### 原方案的问题
+
+❌ **多轮对话是模拟的**
+- 每次追问都是重新执行 CLI
+- 阶段信息会重置
+- 无法追踪每轮对话的独立阶段
+- 无法实现真正的历史回溯
+
+❌ **数据持久化困难**
+- Session 数据只存在前端内存
+- 刷新页面会丢失所有历史
+- 无法支持断线重连后恢复
+
+❌ **无法实现文件历史**
+- 没有完整的 Message/Part 结构
+- 无法存储文件在某个时刻的快照
+- 无法实现"点击时间轴查看文件内容"
+
+❌ **扩展性差**
+- 难以支持多用户
+- 难以支持数据库持久化
+- 难以支持高级功能（如标注、收藏等）
+
+### 原方案的关键文件
+
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `app/main.py` | ~800 | FastAPI 主入口，CLI 调用，SSE 事件生成 |
+| `static/opencode.js` | ~1400 | 前端主逻辑，Session 管理，事件处理 |
+| `static/enhanced-task-panel.js` | ~500 | 任务面板，对话解析，阶段显示 |
+| `static/tool-icons.js` | ~100 | 工具图标映射 |
+| `app/history_service.py` | ~400 | 文件快照存储（已实现，但未充分利用） |
+| **总计** | **~3200** | **原方案代码** |
+
+### 原方案使用的技术
+
+1. **FastAPI SSE 流**
+   ```python
+   async def event_generator():
+       yield format_sse({"type": "phases_init", ...})
+       async for line in process.stdout:
+           event = parse_line(line)
+           yield format_sse(event)
+       yield format_sse({"type": "status", "value": "done"})
+
+   return StreamingResponse(event_generator(), media_type="text/event-stream")
+   ```
+
+2. **script 伪造 TTY**
+   ```python
+   cmd = ["script", "-q", "-c",
+           f"opencode run --format json --thinking {shlex.quote(prompt)}",
+           "/dev/null"]
+   ```
+
+3. **前端 EventSource**
+   ```javascript
+   const source = new EventSource(`/opencode/run_sse?prompt=${prompt}&sid=${sid}`);
+   source.onmessage = (event) => {
+       const data = JSON.parse(event.data);
+       handleEvent(data);
+   };
+   ```
+
+4. **多轮对话拼接**
+   ```javascript
+   // Prompt 拼接
+   s.prompt = s.prompt + '\n\n---\n\n' + newPrompt;
+
+   // Response 拼接
+   s.response = s.response + '\n\n---\n\n**新的回答：**\n\n' + newResponse;
+   ```
 
 ---
 
