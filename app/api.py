@@ -10,6 +10,7 @@ from typing import List, Optional
 import asyncio
 import json
 import logging
+import os
 import time
 from datetime import datetime
 
@@ -233,10 +234,17 @@ async def send_message(
     logger.info(f"Created assistant message: {assistant_message_id} for session: {session_id}")
 
     # 3. 发送消息更新事件（通过 SSE 广播）
-    # 注意：这里暂时不做实际的广播，等 SSE 端点实现后再处理
+    await broadcast_message_update(session_id, assistant_message)
 
-    # 4. 后台执行任务（阶段 3 实现）
-    # background_tasks.add_task(execute_opencode_message, session_id, assistant_message_id, user_text)
+    # 4. 后台执行 OpenCode CLI 任务
+    workspace_base = os.path.abspath(os.path.join(os.path.dirname(__file__), "../workspace"))
+    background_tasks.add_task(
+        execute_opencode_message,
+        session_id,
+        assistant_message_id,
+        user_text,
+        workspace_base
+    )
 
     return SendMessageResponse(
         id=assistant_message_id,
