@@ -151,22 +151,26 @@
         // 处理特殊事件类型
         if (adaptedEvent.type === 'preview_start') {
             // 文件预览开始
-            if (window.codePreviewOverlay && window.previewConfig?.isEventEnabled(adaptedEvent.action)) {
-                window.codePreviewOverlay.setStepId(adaptedEvent.step_id);
-                window.codePreviewOverlay.show(
+            const previewOverlay = window.enhancedCodePreview || window.codePreviewOverlay;
+            if (previewOverlay && window.previewConfig?.isEventEnabled(adaptedEvent.action)) {
+                previewOverlay.setStepId(adaptedEvent.step_id);
+                previewOverlay.setFilePath(adaptedEvent.file_path);
+                previewOverlay.show(
                     adaptedEvent.file_path.split('/').pop(),
                     adaptedEvent.action
                 );
             }
         } else if (adaptedEvent.type === 'preview_delta') {
             // 文件预览增量（打字机效果）
-            if (window.codePreviewOverlay && window.previewConfig?.enableTypewriter) {
-                window.codePreviewOverlay.appendDelta(adaptedEvent.delta);
+            const previewOverlay = window.enhancedCodePreview || window.codePreviewOverlay;
+            if (previewOverlay && window.previewConfig?.enableTypewriter) {
+                previewOverlay.appendDelta(adaptedEvent.delta);
             }
         } else if (adaptedEvent.type === 'preview_end') {
             // 文件预览结束
-            if (window.codePreviewOverlay) {
-                window.codePreviewOverlay.setStatus('完成');
+            const previewOverlay = window.enhancedCodePreview || window.codePreviewOverlay;
+            if (previewOverlay) {
+                previewOverlay.setStatus('完成');
             }
         } else if (adaptedEvent.type === 'timeline_update') {
             // 时间轴更新

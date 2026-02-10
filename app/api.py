@@ -434,10 +434,86 @@ async def get_info():
             },
             "events": {
                 "stream": "GET /opencode/events?session_id={id}"
+            },
+            "history": {
+                "get_file_history": "GET /opencode/get_file_history",
+                "get_file_at_step": "GET /opencode/get_file_at_step"
             }
         },
         "documentation": "/docs"
     }
+
+
+@router.get("/get_file_history")
+async def get_file_history(session_id: str, file_path: str):
+    """
+    获取文件的历史记录
+
+    Args:
+        session_id: 会话ID
+        file_path: 文件路径
+
+    Returns:
+        历史记录列表
+    """
+    try:
+        timeline = await session_manager.get_timeline(session_id)
+
+        # 过滤特定文件的历史记录
+        file_history = [
+            {
+                "step_id": step.step_id,
+                "action": step.action,
+                "path": step.path,
+                "timestamp": step.timestamp,
+                "operation": step.operation
+            }
+            for step in timeline
+            if step.path == file_path
+        ]
+
+        return {
+            "file_path": file_path,
+            "history": file_history,
+            "count": len(file_history)
+        }
+    except Exception as e:
+        logger.error(f"Error getting file history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get file history: {str(e)}")
+
+
+@router.get("/get_file_at_step")
+async def get_file_at_step(session_id: str, file_path: str, step_id: str):
+    """
+    获取文件在特定步骤时的内容
+
+    Args:
+        session_id: 会话ID
+        file_path: 文件路径
+        step_id: 步骤ID
+
+    Returns:
+        文件内容
+    """
+    try:
+        content = await session_manager.get_file_at_step(session_id, file_path, step_id)
+
+        if content is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"File not found at step: {file_path} @ {step_id}"
+            )
+
+        return {
+            "file_path": file_path,
+            "step_id": step_id,
+            "content": content
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting file at step: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get file at step: {str(e)}")
 
 
 # ====================================================================
