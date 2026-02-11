@@ -572,8 +572,117 @@ location /opencode {
 
 ---
 
-**项目状态**: ✅ 完成
-**版本**: 2.0.0
-**最后更新**: 2026-02-10
-**Git 标签**: `opencode-v2-complete`
+**项目状态**: ✅ 完成 + 阶段8优化
+**版本**: 2.1.0
+**最后更新**: 2026-02-11
+**Git 标签**: `opencode-v2-complete` (v2.1.0 待添加)
 **维护者**: OpenCode Team
+
+---
+
+## 🔧 阶段8: Web界面集成优化 (2026-02-11)
+
+### 📋 更新概述
+
+本阶段在v2.0.0基础上进行Web界面优化，解决用户反馈的显示问题和体验问题。
+
+### ✅ 完成的修复
+
+#### 1. 修复"两个query+任务在规划中"显示问题
+
+**问题**: 用户点击历史记录后，界面显示重复的阶段（phase_planning + 实际阶段）
+
+**根本原因**: OpenCode-AI发送两次`phases_init`事件，前端同时显示造成视觉混乱
+
+**修复代码**: `static/opencode.js` 第1282-1299行
+
+```javascript
+// 改进的阶段处理逻辑：
+// 1. 如果有实际的执行阶段（phase_1, phase_2等），自动隐藏 phase_planning
+const hasDynamicPhases = s.phases.some(p => p.id?.startsWith('phase_')
+    && p.id !== 'phase_planning'
+    && p.id !== 'phase_summary');
+const planningPhase = s.phases.find(p => p.id === 'phase_planning');
+
+if (hasDynamicPhases && planningPhase) {
+    s.phases = s.phases.filter(p => p.id !== 'phase_planning');
+    console.log('📋 [DEBUG] Hidden phase_planning (dynamic phases detected)');
+}
+```
+
+#### 2. 禁用无用的token计数思考事件
+
+**问题**: 用户反馈不需要"AI 进行了 231 个 tokens 的推理思考"这类无意义事件
+
+**修复**: `app/main.py` 第631-645行 - 注释掉token计数思考事件生成代码
+
+#### 3. 禁用opencode-new-api-patch.js
+
+**问题**: 控制台大量重复报错`[NewAPI] submitTask not found after 50 retries`
+
+**修复**: `static/index.html` 第941-942行 - 注释掉脚本引用
+
+#### 4. 优化Web开发任务的Prompt增强
+
+**尝试**: 在`app/main.py`中添加更强的指令，要求模型直接使用Write工具
+
+**结果**:
+- ✅ Prompt增强正常工作
+- ❌ 模型通过web界面仍然不生成文件
+- ✅ **直接CLI执行可以正常工作**
+
+### ⚠️ 已识别但未完全解决的问题
+
+#### OpenCode通过web界面不生成文件
+
+**对比测试**:
+- ✅ 直接CLI: 成功创建文件
+- ❌ Web界面: 只执行bash检查，不创建文件
+
+**临时解决方案**:
+```bash
+# 使用CLI直接执行
+docker exec opencode-container sh -c "cd /app/opencode/workspace/目录 && opencode run --model new-api/gemini-3-flash-preview '任务'"
+```
+
+**建议后续工作**:
+1. 深入调查OpenCode-AI的CLI和web调用环境差异
+2. 测试不同的模型配置
+3. 检查SSE流处理是否丢失事件
+
+### 📁 阶段8修改文件清单
+
+**前端文件**:
+- `static/opencode.js` - 改进phase合并逻辑（第1282-1299行）
+- `static/index.html` - 禁用new-api-patch（第941-942行）
+
+**后端文件**:
+- `app/main.py` - 禁用token计数思考（第631-645行）
+- `app/main.py` - 优化Web开发任务prompt（第106-119行）
+
+**文档文件**:
+- `HANDOVER_修复工作.md` - 更新至v2.1版本
+- `claude.md` - 添加本章节
+
+### 🎯 验证清单
+
+- [x] phase_planning阶段正确隐藏
+- [x] 不再显示token计数思考事件
+- [x] 不再显示NewAPI错误
+- [ ] Web界面文件生成（建议使用CLI）
+
+### 📝 重要提示
+
+**对于新贡献者**:
+1. Web界面调用OpenCode时模型行为可能与CLI不同
+2. 建议复杂任务使用CLI直接执行
+3. 显示问题已修复，用户体验得到改善
+
+**对于用户**:
+1. ✅ 可以正常使用Web界面查看任务进度
+2. ⚠️ 文件创建任务建议使用CLI或等待进一步优化
+3. ✅ 界面显示更加清晰，不再有视觉混乱
+
+---
+
+**原文档结束**

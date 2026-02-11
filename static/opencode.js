@@ -70,6 +70,11 @@ function renderAll() {
     renderSidebar();
     renderResults();
     renderFiles();
+
+    // 更新界面模式（欢迎界面 vs 聊天界面）
+    if (window.updateInterfaceMode) {
+        window.updateInterfaceMode();
+    }
 }
 
 function saveState() {
@@ -130,7 +135,16 @@ function renderSidebar() {
             </div>
             <span class="session-item-title">${s.prompt ? (s.prompt.substring(0, 24) + (s.prompt.length > 24 ? '...' : '')) : 'New Task'}</span>
         `;
-        item.onclick = () => { state.activeId = s.id; renderAll(); saveState(); };
+        item.onclick = () => {
+            console.log('[点击历史记录] session:', s);
+            console.log('  - id:', s.id);
+            console.log('  - prompt:', s.prompt);
+            console.log('  - response:', s.response);
+            console.log('  - phases:', s.phases);
+            state.activeId = s.id;
+            renderAll();
+            saveState();
+        };
         list.appendChild(item);
     });
 }
@@ -138,12 +152,18 @@ function renderSidebar() {
 async function openFile(filePath) {
     const ext = filePath.split('.').pop().toLowerCase();
     const renderable = ['html', 'htm', 'png', 'jpg', 'jpeg', 'gif', 'pdf', 'svg'];
-    
+
     // Switch to preview tab if it's a renderable file
     if (renderable.includes(ext)) {
-        els('.tab-btn').find(b => b.dataset.tab === 'preview').click();
+        // 首先确保右侧面板展开并切换到预览标签
+        if (typeof togglePanel === 'function') {
+            togglePanel('preview');
+        }
+
         const frame = el('#uvn-frame');
-        frame.src = `/opencode/get_file_content?path=${encodeURIComponent(filePath)}`;
+        if (frame) {
+            frame.src = `/opencode/get_file_content?path=${encodeURIComponent(filePath)}`;
+        }
     } else {
         // Fetch text content
         try {
@@ -370,12 +390,12 @@ function parseLogLine(line, s) {
             const eventType = event.type;
             
             if (eventType === 'step_start') {
-                // Update phase
-                if (s.phases && s.phases.length > 1) {
-                    const executionPhase = s.phases.find(p => p.number === 2);
-                    if (executionPhase) {
-                        executionPhase.status = 'active';
-                        s.currentPhase = executionPhase.id;
+                // 激活第一个 pending 状态的阶段
+                if (s.phases && s.phases.length > 0) {
+                    const firstPending = s.phases.find(p => p.status === 'pending');
+                    if (firstPending) {
+                        firstPending.status = 'active';
+                        s.currentPhase = firstPending.id;
                     }
                 }
             } else if (eventType === 'tool_use') {
@@ -451,13 +471,13 @@ function parseLogLine(line, s) {
                 if (!s.orphanEvents) s.orphanEvents = [];
                 s.orphanEvents.push(thoughtEvent);
             }
-            
-            // Ensure phase 2 is active
-             if (s.phases && s.phases.length > 1) {
-                const executionPhase = s.phases.find(p => p.number === 2);
-                if (executionPhase) {
-                    executionPhase.status = 'active';
-                    s.currentPhase = executionPhase.id;
+
+            // 激活第一个 pending 状态的阶段（如果有）
+            if (s.phases && s.phases.length > 0) {
+                const firstPending = s.phases.find(p => p.status === 'pending');
+                if (firstPending) {
+                    firstPending.status = 'active';
+                    s.currentPhase = firstPending.id;
                 }
             }
         }
@@ -497,13 +517,16 @@ async function startPolling(sid) {
                 renderResults();
                 renderFiles(); // Update files if any
             }
-            
+
             if (data.status === 'completed' || data.status === 'done') {
                 console.log(`[Polling] Task completed`);
-                // Update final phase
-                 if (s.phases && s.phases.length > 2) {
-                    const finalPhase = s.phases.find(p => p.number === 3);
-                    if (finalPhase) finalPhase.status = 'completed';
+                // 标记所有未完成的阶段为 completed
+                if (s.phases && s.phases.length > 0) {
+                    s.phases.forEach(p => {
+                        if (p.status !== 'completed') {
+                            p.status = 'completed';
+                        }
+                    });
                 }
                 renderResults();
                 return; // Stop polling
@@ -683,21 +706,36 @@ function bindUI() {
     // Check if should show welcome or chat mode
     function updateInterfaceMode() {
         const activeSession = state.sessions.find(s => s.id === state.activeId);
+
+        console.log('[updateInterfaceMode] 调试信息:');
+        console.log('  - activeId:', state.activeId);
+        console.log('  - sessions 数量:', state.sessions.length);
+        console.log('  - activeSession:', activeSession);
+
         const hasMessages = activeSession && (
+            activeSession.prompt ||
             activeSession.response ||
             (activeSession.phases && activeSession.phases.length > 0) ||
             (activeSession.actions && activeSession.actions.length > 0)
         );
 
+        console.log('  - hasMessages:', hasMessages);
+        console.log('  - prompt:', activeSession?.prompt);
+        console.log('  - response:', activeSession?.response);
+
         if (hasMessages) {
+            console.log('✓ 切换到聊天模式');
             switchToChatMode();
         } else {
+            console.log('✓ 切换到欢迎模式');
             switchToWelcomeMode();
         }
     }
 
     // Store function in global scope for access in renderResults
     window.updateInterfaceMode = updateInterfaceMode;
+    window.openFile = openFile;
+    window.togglePanel = togglePanel;
 
     el('#theme-toggle').onclick = toggleTheme;
 
@@ -993,7 +1031,8 @@ function bindUI() {
     }
 
     el('#new-task').onclick = () => {
-        const id = Math.random().toString(36).slice(2, 9);
+        // OpenCode 要求 session ID 必须以 "ses" 开头
+        const id = 'ses_' + Math.random().toString(36).slice(2, 9);
         state.sessions.unshift({ id, prompt: '', response: '', phases: [], actions: [], currentPhase: null, deliverables: [], uploadedFiles: [] });
         state.activeId = id;
         renderAll();
@@ -1110,26 +1149,33 @@ function bindUI() {
         const input = el('#prompt'); if (!input.value.trim()) return;
         const p = input.value.trim();
         let s = state.sessions.find(x => x.id === state.activeId);
-        
-        // Default phases for immediate feedback
-        const defaultPhases = [
-            {number: 1, title: "Analyzing Request", status: "active", events: []},
-            {number: 2, title: "Executing Task", status: "pending", events: []},
-            {number: 3, title: "Summarizing Results", status: "pending", events: []}
-        ];
+
+        // 不再使用硬编码的默认阶段，改为等待后端的 phases_init 事件
+        const emptyPhases = [];
 
         if (!s) {
-            const id = Math.random().toString(36).slice(2, 9);
-            s = { id, prompt: p, response: '', phases: defaultPhases, orphanEvents: [], actions: [], currentPhase: null };
+            // OpenCode 要求 session ID 必须以 "ses" 开头
+            const id = 'ses_' + Math.random().toString(36).slice(2, 9);
+            s = { id, prompt: p, response: '', phases: emptyPhases, orphanEvents: [], actions: [], currentPhase: null };
             state.sessions.unshift(s);
             state.activeId = id;
+            console.log('🆕 [DEBUG] Created new session with empty phases:', s.phases);
         } else {
-            s.prompt = p;
-            s.response = '';
-            s.phases = defaultPhases;
+            // 追问模式：保留对话历史，不重置之前的内容
+            // 将新问题追加到现有对话中
+            const previousPrompt = s.prompt ? s.prompt + '\n\n---\n\n' : '';
+            s.prompt = previousPrompt + p;
+
+            // 不清空 response，让用户能看到之前的回答
+            // 注意：不在此时添加分隔符，等新回答开始生成时（answer_chunk事件）再添加
+            // 这样可以避免空的新回答卡片
+
+            // 重置 phases 和 actions 以准备新的执行
+            s.phases = emptyPhases;
             s.orphanEvents = [];
             s.actions = [];
             s.currentPhase = null;
+            console.log('💬 [DEBUG] Continuing session, appending new question');
         }
         
         // Immediate feedback
@@ -1143,7 +1189,9 @@ function bindUI() {
         saveState();
 
         const connectSSE = () => {
-            const es = new EventSource(`/opencode/run_sse?prompt=${encodeURIComponent(p)}&sid=${state.activeId}`);
+            // 传递完整的 prompt（包含历史对话）
+            // 由于不使用 --session 参数，需要完整上下文
+            const es = new EventSource(`/opencode/run_sse?prompt=${encodeURIComponent(s.prompt)}&sid=${state.activeId}`);
 
             // Store active SSE connection
             state.activeSSE = es;
@@ -1189,11 +1237,65 @@ function bindUI() {
                 }
                 
                 if (data.type === 'phases_init') {
-                    // Only overwrite if we don't have phases or if it's a fresh start
-                    // If resuming, we might want to keep existing phases but update status
-                    if (!s.phases || s.phases.length === 0) {
-                        s.phases = (data.phases || []).map(p => ({ ...p, events: [] }));
+                    // DEBUG: Log phases_init event
+                    console.log('📋 [DEBUG] Received phases_init event:', data);
+                    console.log('📋 [DEBUG] Current phases before update:', s.phases);
+
+                    // Dynamic phases from todowrite have phase_1, phase_2, etc.
+                    const newPhases = (data.phases || []).map(p => {
+                        // Preserve existing events if phase already exists
+                        const existingPhase = s.phases?.find(sp => sp.id === p.id);
+                        return {
+                            ...p,
+                            events: existingPhase?.events || []
+                        };
+                    });
+
+                    // 合并策略：追加新阶段，更新现有阶段，不删除任何阶段
+                    const phaseMap = new Map();
+
+                    // 先添加现有阶段到 Map
+                    s.phases?.forEach(p => phaseMap.set(p.id, p));
+
+                    // 然后更新/添加新阶段
+                    newPhases.forEach(p => {
+                        const existing = phaseMap.get(p.id);
+                        if (existing) {
+                            // 更新现有阶段的属性（保留 events 和 status，不覆盖已完成状态）
+                            // 只有当新状态不是pending时才更新status（避免覆盖completed状态）
+                            if (p.status !== 'pending' || existing.status === 'pending') {
+                                existing.status = p.status;
+                            }
+                            if (p.title) existing.title = p.title;
+                            if (p.number !== undefined) existing.number = p.number;
+                            if (p.description) existing.description = p.description;
+                        } else {
+                            // 添加新阶段
+                            phaseMap.set(p.id, p);
+                        }
+                    });
+
+                    // 转换回数组，按 number 排序
+                    s.phases = Array.from(phaseMap.values()).sort((a, b) => (a.number || 0) - (b.number || 0));
+                    console.log('📋 [DEBUG] Merged phases (append new, update existing):', s.phases);
+
+                    // 改进的阶段处理逻辑：
+                    // 1. 如果有实际的执行阶段（phase_1, phase_2等），自动隐藏 phase_planning
+                    // 2. 或者将 phase_planning 标记为 completed
+                    const hasDynamicPhases = s.phases.some(p => p.id?.startsWith('phase_') && p.id !== 'phase_planning' && p.id !== 'phase_summary');
+                    const planningPhase = s.phases.find(p => p.id === 'phase_planning');
+
+                    if (hasDynamicPhases && planningPhase) {
+                        // 如果有实际执行阶段，隐藏占位符的planning阶段
+                        // 通过过滤掉 phase_planning 来实现
+                        s.phases = s.phases.filter(p => p.id !== 'phase_planning');
+                        console.log('📋 [DEBUG] Hidden phase_planning (dynamic phases detected)');
+                    } else if (planningPhase && planningPhase.status === 'active') {
+                        // 如果没有实际阶段，保留planning但标记为completed
+                        planningPhase.status = 'completed';
+                        console.log('📋 [DEBUG] Auto-marked phase_planning as completed (no dynamic phases)');
                     }
+
                     s.currentPhase = data.phases.find(p => p.status === 'active')?.id || null;
                 } else if (data.type === 'actions_init') {
                 s.actions = data.actions || [];
@@ -1272,11 +1374,104 @@ function bindUI() {
                     s.orphanEvents.push(event);
                 }
             } else if (data.type === 'answer_chunk') {
+                // 检查是否需要添加新回答的分隔符
+                // 通过比较 prompt 和 response 中的分隔符数量
+                const promptSeparatorCount = (s.prompt.match(/\n\n---\n\n/g) || []).length;
+                const responseSeparatorCount = (s.response.match(/\n\n---\n\n\*\*新的回答：\*\*\n\n/g) || []).length;
+
+                // 如果 prompt 中的问题数 > response 中的回答数，说明需要添加新分隔符
+                if (promptSeparatorCount > responseSeparatorCount) {
+                    // 这是新回答的第一个 chunk，先添加分隔符
+                    s.response += '\n\n---\n\n**新的回答：**\n\n';
+                }
+
                 s.response += data.text;
             } else if (data.type === 'file_update') {
-                if (data.sid === state.activeId) renderFiles();
+                if (data.sid === state.activeId) {
+                    renderFiles();
+                    // 同时获取文件列表并填充到 deliverables 中
+                    fetch(`/opencode/list_session_files?sid=${s.id}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.files && data.files.length > 0) {
+                                s.deliverables = data.files.map(f => ({
+                                    name: f.name,
+                                    path: f.path,
+                                    type: f.name.split('.').pop()?.toLowerCase() || 'unknown'
+                                }));
+                                // 重新渲染任务面板以显示文件卡片
+                                renderResults();
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Failed to fetch deliverables:', err);
+                        });
+                }
             } else if (data.type === 'deliverables') {
                 s.deliverables = data.items || [];
+            } else if (data.type === 'preview_start') {
+                // ================================================================
+                // 实时代码预览 - 预览开始
+                // ================================================================
+                console.log('🎬 Preview start event received:', data);
+                console.log('  - window.codePreviewOverlay:', !!window.codePreviewOverlay);
+                console.log('  - window.previewConfig:', !!window.previewConfig);
+                console.log('  - action type:', data.action);
+
+                if (window.previewConfig) {
+                    const isEnabled = window.previewConfig.isEventEnabled(data.action);
+                    console.log('  - event enabled:', isEnabled);
+                    console.log('  - enabled_events:', window.previewConfig.config.enabled_events);
+                }
+
+                if (window.codePreviewOverlay && window.previewConfig) {
+                    // 检查是否启用了该事件类型的预览
+                    if (window.previewConfig.isEventEnabled(data.action)) {
+                        console.log('✅ Showing preview overlay for:', data.file_path);
+                        window.codePreviewOverlay.setStepId(data.step_id);
+                        window.codePreviewOverlay.show(
+                            data.file_path.split('/').pop(),
+                            data.action
+                        );
+                    } else {
+                        console.log('⚠️ Preview disabled for action:', data.action);
+                    }
+                } else {
+                    console.error('❌ Missing required components:', {
+                        codePreviewOverlay: !!window.codePreviewOverlay,
+                        previewConfig: !!window.previewConfig
+                    });
+                }
+            } else if (data.type === 'preview_delta') {
+                // ================================================================
+                // 实时代码预览 - 增量更新（打字机效果）
+                // ================================================================
+                if (window.codePreviewOverlay && window.previewConfig?.enableTypewriter) {
+                    window.codePreviewOverlay.appendDelta(data.delta);
+                }
+            } else if (data.type === 'preview_end') {
+                // ================================================================
+                // 实时代码预览 - 预览结束
+                // ================================================================
+                if (window.codePreviewOverlay) {
+                    window.codePreviewOverlay.setStatus('完成');
+                }
+            } else if (data.type === 'timeline_update') {
+                // ================================================================
+                // 时间轴更新
+                // ================================================================
+                console.log('Timeline update:', data.step);
+                if (window.timelineProgress && data.step) {
+                    // 添加步骤到时间轴
+                    window.timelineProgress.addStep(data.step);
+                    window.timelineProgress.setActiveStep(data.step.step_id);
+
+                    // 自动显示时间轴容器（当有数据时）
+                    const timelineContainer = document.getElementById('timeline-progress-container');
+                    if (timelineContainer) {
+                        timelineContainer.classList.remove('hidden');
+                    }
+                }
             } else if (data.type === 'status' && data.value === 'done') {
                 es.close();
                 state.activeSSE = null;
@@ -1358,7 +1553,11 @@ function init() {
     if (state.activeId) {
         const s = state.sessions.find(x => x.id === state.activeId);
         // Only resume if it's not completed and has a prompt
-        if (s && s.prompt && (!s.phases || s.phases.length < 3 || s.phases[2].status !== 'completed')) {
+        // 检查是否有阶段，且最后一个阶段不是 completed（如果有动态阶段的话）
+        const isNotCompleted = !s.phases || s.phases.length === 0 ||
+            (s.phases.length > 0 && s.phases[s.phases.length - 1].status !== 'completed');
+
+        if (s && s.prompt && isNotCompleted) {
             console.log('Resuming session:', state.activeId);
             // Simulate run button click but skip prompt check
             // Actually, we can just call the SSE logic directly or click the button if input is populated.
@@ -1381,3 +1580,4 @@ if (document.readyState === 'loading') {
 } else {
     init();
 }
+// Version 7 - 1770561617

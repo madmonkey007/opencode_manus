@@ -110,6 +110,12 @@ def enhance_prompt(user_prompt: str) -> str:
 - HTML: 包含完整的文档结构和语义化标签
 - CSS: 包含响应式设计、配色方案和布局
 - JavaScript: 包含完整的交互逻辑和功能实现
+
+【关键限制】
+1. 必须直接使用 Write 工具创建完整的 HTML 文件
+2. 禁止使用 task 工具或其他代理工具
+3. 所有代码必须写入单个文件（如 index.html）
+4. 不要创建子会话或后台任务
 """)
 
     # 代码编辑任务的增强
@@ -149,7 +155,9 @@ os.makedirs(WORKSPACE_BASE, exist_ok=True)
 # 注册新架构 API Router（阶段 2）
 # ====================================================================
 if api_router:
+    logger.info(f"Including api_router with {len(api_router.routes)} routes")
     app.include_router(api_router)
+    logger.info(f"After include_router, total routes: {len(app.routes)}")
     logger.info("New API router registered at /opencode")
 else:
     logger.warning("New API router not available, using legacy API only")
@@ -280,23 +288,29 @@ class SessionManager:
             # ====================================================================
             # 智能提示词增强：在执行前根据用户意图添加技术指导
             # ====================================================================
+            logger.info(f"[DEBUG] Received prompt: '{prompt}'")
+            logger.info(f"[DEBUG] Prompt length: {len(prompt)}")
+
             enhanced_prompt = enhance_prompt(prompt)
             logger.info(f"Original prompt: {prompt[:100]}...")
             logger.info(f"Enhanced prompt length: {len(enhanced_prompt)} chars")
+            logger.info(f"[DEBUG] Enhanced prompt: '{enhanced_prompt[:200]}'")
 
-            # Use script to fake a TTY, forcing unbuffered output
-            # We must quote the prompt safely
-            safe_prompt = shlex.quote(enhanced_prompt)
+            # 不使用 script 命令，直接构建命令数组
+            # 这样可以避免 shell 引号解析问题
             # Ensure PATH includes bun location
             path_env = "/root/.bun/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
-            
-            # Construct the inner command
-            # 添加 --thinking 参数以显示 AI 思考过程
-            # 不传递 --session，让 OpenCode 自己创建（避免 "session not found" 错误）
-            inner_cmd = f"opencode run --model new-api/gemini-3-flash-preview --format json --thinking {safe_prompt}"
-            
-            # Wrap with script
-            cmd = ["script", "-q", "-c", inner_cmd, "/dev/null"]
+
+            # 构建命令数组，最后一个参数是 prompt
+            # 不使用 --session 参数，每次调用都是独立的
+            # 会话上下文管理由前端通过传递完整 prompt 来实现
+            cmd = [
+                "opencode", "run",
+                "--model", "new-api/gemini-3-flash-preview",
+                "--format", "json",
+                enhanced_prompt
+            ]
+            logger.info(f"[DEBUG] Final command: {' '.join(cmd[:8])}... [prompt length: {len(enhanced_prompt)}]")
             
             env = {**os.environ}
             env["PATH"] = path_env
@@ -622,18 +636,19 @@ async def process_log_line(text: str, sid: str = None):
 
                 reasoning_tokens = tokens.get("reasoning", 0)
 
+                # 禁用简单的token计数思考事件，用户需要更有意义的思考内容
                 # 如果有 reasoning tokens，生成一个思考事件
-                if reasoning_tokens > 0:
-                    thought_content = f"AI 进行了 {reasoning_tokens} 个 tokens 的推理思考"
-                    yield format_sse({
-                        "type": "tool_event",
-                        "data": {
-                            "type": "thought",
-                            "content": thought_content,
-                            "reasoning_tokens": reasoning_tokens
-                        }
-                    })
-                    logger.info(f"Generated synthetic thought event: {reasoning_tokens} reasoning tokens")
+                # if reasoning_tokens > 0:
+                #     thought_content = f"AI 进行了 {reasoning_tokens} 个 tokens 的推理思考"
+                #     yield format_sse({
+                #         "type": "tool_event",
+                #         "data": {
+                #             "type": "thought",
+                #             "content": thought_content,
+                #             "reasoning_tokens": reasoning_tokens
+                #         }
+                #     })
+                #     logger.info(f"Generated synthetic thought event: {reasoning_tokens} reasoning tokens")
 
             elif event_type == "tool_use":
                 part = event.get("part", {})
@@ -826,7 +841,3 @@ async def get_step_info(step_id: str):
         "step_id": step_id,
         "message": "Step info retrieval not fully implemented"
     }
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
