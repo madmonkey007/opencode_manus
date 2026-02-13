@@ -1,9 +1,10 @@
 # OpenCode 项目文档
 
 **项目名称**: OpenCode Web Interface
-**版本**: v2.0.0 (架构迁移完成)
-**最后更新**: 2026-02-10
-**当前阶段**: ✅ 项目完成（所有 7 个阶段已完成）
+**版本**: v2.2.0 (官方 Web API 架构适配完成)
+**最后更新**: 2026-02-13
+**当前阶段**: ✅ 官方 Web API 集成与打字机效果修复
+
 **Git 标签**: `opencode-v2-complete`
 
 ---
@@ -67,6 +68,8 @@
 | 5 | 文件预览优化 | ✅ 完成 | `phase5-preview-complete` |
 | 6 | 测试和文档 | ✅ 完成 | `phase6-complete` |
 | 7 | 最终总结和交付 | ✅ 完成 | `opencode-v2-complete` |
+| 9 | 官方 Web API 架构适配 | ✅ 完成 | `opencode-v2.2-web-api` |
+
 
 ### 核心成就
 
@@ -580,7 +583,48 @@ location /opencode {
 
 ---
 
-## 🔧 阶段8: Web界面集成优化 (2026-02-11)
+## 🚀 阶段 9: 官方 Web API 架构适配与体验增强 (2026-02-13)
+
+### 📋 更新概述
+
+本阶段将 `frontend` 分支的官方 Web API 架构完整适配到 `fixbug` 分支，并解决了打字机效果不显示、历史记录点击无反应、刷新页面触发二次请求等核心体验问题。
+
+### ✅ 完成的修复
+
+#### 1. 打字机效果 (Typewriter Effect) 深度适配
+- **后端**: `app/opencode_client.py` 现已支持 `preview_delta` 事件流，并在发送每个字符时加入 5ms 延迟，为前端提供平滑的打字机素材。
+- **前端适配**: 在 `static/opencode-new-api-patch.js` 中注入 `window.previewConfig` 全局配置，开启增量渲染引擎。
+- **UI 组件**: 确保 `code-preview-overlay.js` 正确挂载，实时同步工具调用（如写代码、读文件）的中间过程。
+
+#### 2. 历史记录深度加载与同步
+- **按需同步**: 重构 `static/opencode.js` 中的 `renderSidebar`。点击历史记录时，不再只是切换 ID，而是调用 `apiClient.getMessages(sid)` 从后端拉取完整的历史 Part 并重绘界面。
+- **自动初始化**: 在 `loadState` 中增加后端会话同步逻辑，确保本地列表与数据库保持一致。
+
+#### 3. 彻底防御刷新导致的二次请求与语法修复 ✅
+- **逻辑重构**: 彻底重构了 `init()` 恢复逻辑，现在刷新页面仅建立 SSE 订阅而不触点击事件，从根本上解决了刷新导致 Query 拼接和重复运行的问题。
+- **语法健壮性**: 修复了 `answer_chunk` 分隔符计算逻辑中因多行字符串导致的 `SyntaxError`，改用更健壮的 `split()` 统计方法，并使用 Python 脚本强制修复了转义字符引起的脚本崩溃。
+
+#### 4. Docker 环境深度修复与优化 ✅
+- **脚本格式**: 修复了 `start.sh` 和 `start_app.sh` 的 CRLF 换行符问题，确保在 Linux 容器内正常执行。
+- **启动路径**: 更新了 `supervisord.conf` 以使用 `/app/opencode/app/start_app.sh` 正确启动主程序，并按需禁用了 `oh-my-opencode` 的同步安装以提高启动速度和稳定性。
+- **端口隔离**: 将宿主机端口迁移至 `8089/6082`，确保 `frontend` 分支能与其它分支容器平稳并存。
+
+### 📁 阶段 9 修改文件清单
+- `app/main.py`: 注册 `api_router`，修复多行 f-string 语法错误。
+- `app/opencode_client.py`: 实现后端流式打字机支持。
+- `static/opencode.js`: 重构历史记录加载逻辑，移除刷新自动点击逻辑。
+- `static/opencode-new-api-patch.js`: 注入预览配置，开启打字机开关。
+- `static/index.html`: 挂载新版 JS 补丁与端口适配。
+- `docker-compose.yml`: 更新宿主机映射端口。
+
+### 🎯 验证清单
+- [x] 点击左侧历史记录能完整恢复对话内容。
+- [x] 调用工具时显示逐字符弹出的打字机效果。
+- [x] 刷新页面不会触发二次 AI 请求。
+- [x] Docker 容器在 `8089` 端口平稳运行。
+
+---
+
 
 ### 📋 更新概述
 

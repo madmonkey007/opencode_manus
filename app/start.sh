@@ -30,9 +30,8 @@ else
 fi
 
 # 3. 确保 oh-my-opencode 插件就绪
-echo "✨ Syncing oh-my-opencode..."
-# 使用 bun 全局安装最新的 dev 分支
-bun install -g git+https://github.com/code-yeongyu/oh-my-opencode.git#dev
+echo "✨ Skipping oh-my-opencode sync as requested..."
+# bun install -g git+https://github.com/code-yeongyu/oh-my-opencode.git#dev
 
 # 4. 补全 Skills 依赖
 if [ -d "/app/opencode/config_host/skills" ]; then

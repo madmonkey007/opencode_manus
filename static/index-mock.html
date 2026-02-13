@@ -7,34 +7,7 @@
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
-    <script>
-        // Marked 库加载配置：先尝试 CDN，失败则使用备用方案
-        window.markedLoaded = false;
-        window.markedFallback = function() {
-            if (!window.markedLoaded) {
-                console.warn('Marked library failed to load from CDN, using fallback');
-                // 提供简单的 markdown 解析 fallback
-                window.marked = {
-                    parse: function(text) {
-                        return text
-                            .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-                            .replace(/`([^`]+)`/g, '<code>$1</code>')
-                            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-                            .replace(/\n/g, '<br>');
-                    }
-                };
-                window.markedLoaded = true;
-            }
-        };
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" onerror="window.markedFallback()"></script>
-    <script>
-        // 检测 marked 是否加载成功
-        if (typeof marked !== 'undefined') {
-            window.markedLoaded = true;
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -535,23 +508,6 @@
             color: #d4d4d4;
         }
 
-        /* Syntax highlighting colors (basic) */
-        .code-block-content .keyword {
-            color: #569cd6;
-        }
-
-        .code-block-content .string {
-            color: #ce9178;
-        }
-
-        .code-block-content .comment {
-            color: #6a9955;
-        }
-
-        .code-block-content .function {
-            color: #dcdcaa;
-        }
-
         /* Prose styles for markdown content */
         .prose {
             color: #374151;
@@ -876,11 +832,10 @@
         
         <div class="flex-1 relative overflow-hidden bg-white dark:bg-background-dark transition-theme">
             <!-- Preview Tab (UVN Projection) -->
-            <div id="tab-preview" class="tab-pane h-full flex flex-col">
+            <div id="tab-preview" class="tab-pane h-full">
                 <!-- noVNC iframe -->
-                <iframe id="uvn-frame" src="http://localhost:6082/vnc.html?autoconnect=true&resize=scale" class="w-full flex-1 border-none"></iframe>
-
-
+                <iframe id="uvn-frame" src="http://localhost:6082/vnc.html?autoconnect=true&resize=scale" class="w-full h-full border-none"></iframe>
+                
                 <!-- Overlay for Status -->
                 <div class="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-surface-dark/90 p-3 rounded-xl border border-border-light dark:border-border-dark shadow-xl flex items-center justify-between z-50 backdrop-blur-sm transition-theme">
                     <div class="flex items-center gap-3">
@@ -891,11 +846,6 @@
                         </div>
                     </div>
                     <div id="vm-detail-status" class="text-[12px] text-gray-500 dark:text-gray-400 font-medium">Playwright in Docker</div>
-                </div>
-
-                <!-- 时间轴进度条容器 -->
-                <div id="timeline-progress-container" class="hidden absolute bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-700 p-3 z-40">
-                    <div id="timeline-progress"></div>
                 </div>
             </div>
 
@@ -930,69 +880,40 @@
 
     <!-- 核心功能组件 -->
     <script src="/static/tool-icons.js?v=7"></script>
-    <script src="/static/preview-config.js?v=2"></script>
-    <script src="/static/code-preview-enhanced.js?v=1"></script>
-    <script src="/static/timeline-progress.js?v=2"></script>
-    <script src="/static/enhanced-task-panel.js?v=16"></script>
+    <script src="/static/enhanced-task-panel.js?v=7"></script>
     <script src="/static/right-panel-manager.js?v=7"></script>
     <script src="/static/files-manager.js?v=7"></script>
-    <!-- 新架构 API 客户端和事件适配器 -->
-    <script src="/static/api-client.js?v=1"></script>
-    <script src="/static/event-adapter.js?v=1"></script>
-    <!-- 新 API 扩展（Monkey patch submitTask）- 暂时禁用，因为找不到 submitTask 函数 -->
-    <!-- <script src="/static/opencode-new-api-patch.js?v=1"></script> -->
-    <!-- Mock 数据：仅对 demo session 启用，真实 session 使用 API -->
-    <!-- <script src="/static/mock-data.js?v=7"></script> -->
-    <!-- <script src="/static/enable-mock.js?v=8"></script> -->
-    <script src="/static/opencode.js?v=22"></script>
+    <script src="/static/mock-data.js?v=7"></script>
+    <script src="/static/enable-mock.js?v=7"></script>
 
-    <!-- 初始化时间轴和预览组件 -->
+    <!-- Mock 初始化脚本 -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // 初始化时间轴组件
-            if (document.getElementById('timeline-progress')) {
-                window.initTimelineProgress('#timeline-progress');
+        // 初始化 Mock 数据到 window.state
+        window.addEventListener('load', function() {
+            console.log('[Mock] 初始化 Mock 数据');
 
-                // 设置点击事件: 查看历史内容
-                if (window.timelineProgress) {
-                    window.timelineProgress.onStepClick(async (stepId) => {
-                        console.log('Timeline step clicked:', stepId);
+            // 等待一小段时间确保 opencode.js 已经初始化
+            setTimeout(function() {
+                // 确保 MOCK_DATA 和 window.state 可用
+                if (typeof MOCK_DATA !== 'undefined' && window.state) {
+                    console.log('[Mock] 加载 Mock 数据到 state');
 
-                        // 获取步骤信息
-                        try {
-                            const res = await fetch(`/opencode/get_step_info?step_id=${stepId}`);
-                            const stepInfo = await res.json();
+                    // 加载 sessions
+                    window.state.sessions = MOCK_DATA.sessions || [];
+                    window.state.activeId = MOCK_DATA.activeId || null;
 
-                            console.log('Step info:', stepInfo);
-
-                            // 如果是文件操作，显示历史内容
-                            if (stepInfo.file_path && window.rightPanelManager) {
-                                await window.rightPanelManager.showHistoryFile(
-                                    state.activeId,
-                                    stepInfo.file_path,
-                                    stepId
-                                );
-                            }
-                        } catch (e) {
-                            console.error('Failed to get step info:', e);
-                        }
-                    });
-                }
-            }
-
-            // 当切换到预览标签时显示时间轴
-            const previewTabBtn = document.querySelector('[data-tab="preview"]');
-            const timelineContainer = document.getElementById('timeline-progress-container');
-
-            if (previewTabBtn && timelineContainer) {
-                previewTabBtn.addEventListener('click', () => {
-                    // 检查是否有时间轴数据
-                    if (window.timelineProgress && window.timelineProgress.timeline.length > 0) {
-                        timelineContainer.classList.remove('hidden');
+                    // 渲染界面
+                    if (typeof renderAll === 'function') {
+                        renderAll();
+                        console.log('[Mock] ✓ Mock 数据加载完成');
                     }
-                });
-            }
+                } else {
+                    console.error('[Mock] MOCK_DATA 或 window.state 未定义');
+                }
+            }, 100);
         });
     </script>
+
+    <script src="/static/opencode.js?v=7"></script>
 </body>
 </html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>API 测试</title>
+</head>
+<body>
+    <h1>OpenCode API 测试</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            results.innerHTML += `<p style="color: ${color}">[${type.toUpperCase()}] ${message}</p>`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        async function testAPI() {
+            log('开始测试...', 'info');
+
+            // 1. 测试创建会话
+            log('测试 1: 创建会话', 'info');
+            try {
+                const response = await fetch('/opencode/session?title=API测试', {
+                    method: 'POST'
+                });
+                log(`响应状态: ${response.status}`, 'info');
+
+                if (response.ok) {
+                    const session = await response.json();
+                    log(`会话创建成功: ${session.id}`, 'success');
+                    log(`会话详情: ${JSON.stringify(session, null, 2)}`, 'info');
+
+                    // 2. 测试获取会话
+                    log('测试 2: 获取会话', 'info');
+                    const getResponse = await fetch(`/opencode/session/${session.id}`);
+                    log(`响应状态: ${getResponse.status}`, 'info');
+
+                    if (getResponse.ok) {
+                        const sessionData = await getResponse.json();
+                        log(`获取会话成功: ${sessionData.id}`, 'success');
+                    } else {
+                        const error = await getResponse.text();
+                        log(`获取会话失败: ${error}`, 'error');
+                    }
+
+                    // 3. 测试列出会话
+                    log('测试 3: 列出会话', 'info');
+                    const listResponse = await fetch('/opencode/sessions');
+                    log(`响应状态: ${listResponse.status}`, 'info');
+
+                    if (listResponse.ok) {
+                        const data = await listResponse.json();
+                        log(`列出会话成功: ${data.sessions.length} 个会话`, 'success');
+                    } else {
+                        const error = await listResponse.text();
+                        log(`列出会话失败: ${error}`, 'error');
+                    }
+
+                } else {
+                    const error = await response.text();
+                    log(`创建会话失败: ${error}`, 'error');
+                }
+            } catch (error) {
+                log(`请求异常: ${error.message}`, 'error');
+                console.error(error);
+            }
+
+            log('测试完成', 'info');
+        }
+
+        // 页面加载后自动运行测试
+        window.addEventListener('DOMContentLoaded', testAPI);
+    </script>
+</body>
+</html>

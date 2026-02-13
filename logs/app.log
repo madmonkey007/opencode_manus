@@ -220,3 +220,188 @@ INFO:     172.19.0.1:40756 - "GET /static/enhanced-task-panel.js HTTP/1.1" 200 O
 INFO:     172.19.0.1:53946 - "GET /opencode/list_session_files?sid=qku8lp3 HTTP/1.1" 200 OK
 INFO:     172.19.0.1:53958 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E7%B2%BE%E7%BE%8E%E7%9A%84%E5%8A%A8%E6%80%81%E7%BD%91%E9%A1%B5%E6%97%B6%E9%92%9F%EF%BC%8C%E4%BF%9D%E5%AD%98%E4%B8%BA%20my_clock.html%20%E5%B9%B6%E5%B1%95%E7%A4%BA%E3%80%82&sid=qku8lp3 HTTP/1.1" 200 OK
 INFO:     172.19.0.1:33614 - "GET /opencode/list_session_files?sid=qku8lp3 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35602 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35618 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35602 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35634 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35650 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35666 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35652 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35602 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35634 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35618 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35650 - "GET /static/mock-data.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35666 - "GET /static/enable-mock.js?v=8 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35652 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35652 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:47796 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F&sid=ses_gix27nt HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47804 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:49424 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49424 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:49440 - "GET /static/api-client.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:49464 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:49448 - "GET /static/enable-mock.js?v=8 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:49456 - "GET /static/mock-data.js?v=7 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:49470 - "GET /static/opencode.js?v=22 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:49424 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:49424 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%0A%0A---%0A%0A%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F&sid=ses_gix27nt HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35280 - "GET /opencode/run_sse?prompt=%5BMock%5D%20Mock%20data%20enabled%0Aopencode.js%3Fv%3D22%3A67%20%F0%9F%94%84%20renderAll%20%E8%A2%AB%E8%B0%83%E7%94%A8%0Aopencode.js%3Fv%3D22%3A68%20%20%20-%20sessions%20%E6%95%B0%E9%87%8F%3A%200%0Aopencode.js%3Fv%3D22%3A69%20%20%20-%20activeId%3A%20null%0Aopencode.js%3Fv%3D22%3A710%20%5BupdateInterfaceMode%5D%20%E8%B0%83%E8%AF%95%E4%BF%A1%E6%81%AF%3A%0Aopencode.js%3Fv%3D22%3A711%20%20%20-%20activeId%3A%20null%0Aopencode.js%3Fv%3D22%3A712%20%20%20-%20sessions%20%E6%95%B0%E9%87%8F%3A%200%0Aopencode.js%3Fv%3D22%3A713%20%20%20-%20activeSession%3A%20undefined%0Aopencode.js%3Fv%3D22%3A722%20%20%20-%20hasMessages%3A%20undefined%0Aopencode.js%3Fv%3D22%3A723%20%20%20-%20prompt%3A%20undefined%0Aopencode.js%3Fv%3D22%3A724%20%20%20-%20response%3A%20undefined%0Aopencode.js%3Fv%3D22%3A730%20%E2%9C%93%20%E5%88%87%E6%8D%A2%E5%88%B0%E6%AC%A2%E8%BF%8E%E6%A8%A1%E5%BC%8F%0Avnc.html%3Fautoconnect%3Dtrue%26resize%3Dscale%3A316%20%5BIntervention%5D%20Slow%20network%20is%20detected.%20See%20https%3A%2F%2Fwww.chromestatus.com%2Ffeature%2F5636954674692096%20for%20more%20details.%20Fallback%20font%20will%20be%20used%20while%20loading%3A%20http%3A%2F%2Flocalhost%3A6081%2Fapp%2Fstyles%2FOrbitron700.woff%0A%3A8089%2Ffavicon.ico%3A1%20%20Failed%20to%20load%20resource%3A%20the%20server%20responded%20with%20a%20status%20of%20404%20(Not%20Found)%0A%3A6081%2Fpackage.json%3A1%20%20Failed%20to%20load%20resource%3A%20net%3A%3AERR_CONNECTION_REFUSED%0Aui.js%3A75%20Couldn%27t%20fetch%20package.json%3A%20TypeError%3A%20Failed%20to%20fetch%0A(anonymous)%20%40%20ui.js%3A75%0Awebsock.js%3A231%20WebSocket%20connection%20to%20%27ws%3A%2F%2Flocalhost%3A6081%2Fwebsockify%27%20failed%3A%20%0Aopen%20%40%20websock.js%3A231%0Arfb.js%3A604%20WebSocket%20on-error%20event%0A_socketError%20%40%20rfb.js%3A604%0Arfb.js%3A828%20Failed%20when%20connecting%3A%20Connection%20closed%20(code%3A%201006)%0A_fail%20%40%20rfb.js%3A828%0Avnc.html%3Fautoconnect%3Dtrue%26resize%3Dscale%3A1%20The%20resource%20http%3A%2F%2Flocalhost%3A6081%2Fapp%2Fimages%2Finfo.svg%20was%20preloaded%20using%20link%20preload%20but%20not%20used%20within%20a%20few%20seconds%20from%20the%20window%27s%20load%20event.%20Please%20make%20sure%20it%20has%20an%20appropriate%20%60as%60%20value%20and%20it%20is%20preloaded%20intentionally.%0Avnc.html%3Fautoconnect%3Dtrue%26resize%3Dscale%3A1%20The%20resource%20http%3A%2F%2Flocalhost%3A6081%2Fapp%2Fimages%2Fwarning.svg%20was%20preloaded%20using%20link%20preload%20but%20not%20used%20within%20a%20few%20seconds%20from%20the%20window%27s%20load%20event.%20Please%20make%20sure%20it%20has%20an%20appropriate%20%60as%60%20value%20and%20it%20is%20preloaded%20intentionally.%0Aopencode.js%3Fv%3D22%3A1162%20%F0%9F%86%95%20%5BDEBUG%5D%20Created%20new%20session%20with%20empty%20phases%3A%20Array(0)%0Aopencode.js%3Fv%3D22%3A67%20%F0%9F%94%84%20renderAll%20%E8%A2%AB%E8%B0%83%E7%94%A8%0Aopencode.js%3Fv%3D22%3A68%20%20%20-%20sessions%20%E6%95%B0%E9%87%8F%3A%201%0Aopencode.js%3Fv%3D22%3A69%20%20%20-%20activeId%3A%20ses_gix27nt%0Aenable-mock.js%3Fv%3D8%3A24%20%5BMock%5D%20Intercepting%20fetch%3A%20%2Fopencode%2Flist_session_files%3Fsid%3Dses_gix27nt%0Aopencode.js%3Fv%3D22%3A710%20%5BupdateInterfaceMode%5D%20%E8%B0%83%E8%AF%95%E4%BF%A1%E6%81%AF%3A%0Aopencode.js%3Fv%3D22%3A711%20%20%20-%20activeId%3A%20ses_gix27nt%0Aopencode.js%3Fv%3D22%3A712%20%20%20-%20sessions%20%E6%95%B0%E9%87%8F%3A%201%0Aopencode.js%3Fv%3D22%3A713%20%20%20-%20activeSession%3A%20Object%0Aopencode.js%3Fv%3D22%3A722%20%20%20-%20hasMessages%3A%20%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%0Aopencode.js%3Fv%3D22%3A723%20%20%20-%20prompt%3A%20%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%0Aopencode.js%3Fv%3D22%3A724%20%20%20-%20response%3A%20%0Aopencode.js%3Fv%3D22%3A727%20%E2%9C%93%20%E5%88%87%E6%8D%A2%E5%88%B0%E8%81%8A%E5%A4%A9%E6%A8%A1%E5%BC%8F%0Aopencode.js%3Fv%3D22%3A1231%20SSE%20Message%3A%20%7B%22type%22%3A%20%22phases_init%22%2C%20%22phases%22%3A%20%5B%7B%22id%22%3A%20%22phase_planning%22%2C%20%22number%22%3A%200%2C%20%22title%22%3A%20%22%5Cud83d%5Cudccb%20%5Cu6b63%5Cu5728%5Cu5236%5Cu5b9a%5Cu6267%5Cu884c%5Cu8ba1%5Cu5212...%22%2C%20%22status%22%3A%20%22active%22%7D%5D%7D%0Aopencode.js%3Fv%3D22%3A1241%20%F0%9F%93%8B%20%5BDEBUG%5D%20Received%20phases_init%20event%3A%20Object%0Aopencode.js%3Fv%3D22%3A1242%20%F0%9F%93%8B%20%5BDEBUG%5D%20Current%20phases%20before%20update%3A%20Array(0)%0Aopencode.js%3Fv%3D22%3A1280%20%F0%9F%93%8B%20%5BDEBUG%5D%20Merged%20phases%20(append%20new%2C%20update%20existing)%3A%20Array(1)%0Aopencode.js%3Fv%3D22%3A1296%20%F0%9F%93%8B%20%5BDEBUG%5D%20Auto-marked%20phase_planning%20as%20completed%20(no%20dynamic%20phases)%0Aopencode.js%3Fv%3D22%3A1231%20SSE%20Message%3A%20%7B%22type%22%3A%20%22answer_chunk%22%2C%20%22text%22%3A%20%22Session%20started%3A%20ses_gix27nt%20%22%7D%0Avnc.html%3Fautoconnect%3Dtrue%26resize%3Dscale%3A1%20The%20resource%20http%3A%2F%2Flocalhost%3A6081%2Fapp%2Fimages%2Finfo.svg%20was%20preloaded%20using%20link%20preload%20but%20not%20used%20within%20a%20few%20seconds%20from%20the%20window%27s%20load%20event.%20Please%20make%20sure%20it%20has%20an%20appropriate%20%60as%60%20value%20and%20it%20is%20preloaded%20intentionally.%0Avnc.html%3Fautoconnect%3Dtrue%26resize%3Dscale%3A1%20The%20resource%20http%3A%2F%2Flocalhost%3A6081%2Fapp%2Fimages%2Fwarning.svg%20was%20preloaded%20using%20link%20preload%20but%20not%20used%20within%20a%20few%20seconds%20from%20the%20window%27s%20load%20event.%20Please%20make%20sure%20it%20has%20an%20appropriate%20%60as%60%20value%20and%20it%20is%20preloaded%20intentionally.%0Aopencode.js%3Fv%3D22%3A1231%20SSE%20Message%3A%20%7B%22type%22%3A%20%22ping%22%2C%20%22timestamp%22%3A%20%225182.999894157%22%7D%0Aopencode.js%3Fv%3D22%3A1231%20SSE%20Message%3A%20%7B%22type%22%3A%20%22ping%22%2C%20%22timestamp%22%3A%20%225198.035044817%22%7D&sid=ses_fbuw3lx HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39444 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F&sid=ses_lvyxr6o HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53974 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53974 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54004 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53980 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53988 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54016 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54032 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54016 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53974 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53988 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53980 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54004 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54004 - "GET /opencode/list_session_files?sid=ses_lvyxr6o HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54004 - "GET /opencode/list_session_files?sid=ses_lvyxr6o HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54004 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%0A%0A---%0A%0A%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F&sid=ses_lvyxr6o HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58494 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58494 - "GET /opencode/list_session_files?sid=ses_lvyxr6o HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58494 - "GET /opencode/list_session_files?sid=ses_xqb7qel HTTP/1.1" 200 OK
+INFO:     172.19.0.1:46704 - "GET /opencode/list_session_files?sid=ses_xqb7qel HTTP/1.1" 200 OK
+INFO:     172.19.0.1:46720 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E8%AE%BE%E8%AE%A1%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F&sid=ses_xqb7qel HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53412 - "GET /opencode/list_session_files?sid=ses_xqb7qel HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56628 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56628 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:56634 - "GET /static/api-client.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:56640 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56642 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:48362 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:46460 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:46460 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:46462 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33020 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33020 - "GET /static/opencode.js?v=22 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:33020 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33020 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33020 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33020 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33020 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33020 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33020 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:59710 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59710 - "GET /static/opencode.js?v=22 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:59714 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:39614 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39614 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39626 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39628 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39630 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39640 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39614 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39626 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39628 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39630 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39640 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39626 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:39640 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:34470 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34470 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34484 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34492 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34504 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34498 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34484 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34470 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34492 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34498 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34504 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34470 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:34498 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:50918 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50918 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50934 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50938 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50960 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50946 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50934 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50938 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50918 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50960 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50946 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50938 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:50960 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:59330 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59330 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59338 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41244 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41252 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41244 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41292 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41268 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:41244 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41284 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41244 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41252 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41292 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41268 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:43678 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43678 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43680 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43686 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43702 - "GET /static/enhanced-task-panel.js?v=16 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43706 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43678 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43680 - "GET /static/files-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43686 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43702 - "GET /static/event-adapter.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43678 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:43706 - "GET /static/opencode.js?v=22 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43706 - "GET /favicon.ico HTTP/1.1" 404 Not Found

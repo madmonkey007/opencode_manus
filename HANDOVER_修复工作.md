@@ -14,15 +14,19 @@
 |------|----------|------|
 | 阶段 1-6 | 架构迁移（CLI → Session+Message） | ✅ 完成 |
 | 阶段 7 | 前端错误修复 | ✅ 完成 |
-| **阶段 8** | **Web界面集成优化** | ✅ **刚完成** |
+| 阶段 8 | Web界面集成优化 | ✅ 完成 |
+| **阶段 9** | **官方 Web API 适配与体验增强** | ✅ **刚完成** |
+
 
 ### 🎯 本次修复的具体问题
 
 | # | 问题类型 | 严重程度 | 状态 |
 |---|----------|----------|------|
 | 1 | **"两个query+任务在规划中"显示问题** | 🔴 高 | ✅ 已修复 |
-| 2 | **点击历史记录自动重新执行问题** | 🟡 中 | ⚠️ 部分解决 |
-| 3 | **OpenCode通过web界面不生成文件** | 🔴 高 | ⚠️ 已识别原因 |
+| 2 | **历史记录点击无反应/无法深度加载** | 🔴 高 | ✅ 已修复 |
+| 3 | **工具调用打字机效果缺失** | 🟡 中 | ✅ 已实现 |
+| 4 | **刷新页面导致二次请求/自动执行** | 🔴 高 | ✅ 已解决 |
+
 
 ---
 
@@ -154,20 +158,36 @@ if 'web_development' in detected_tasks:
 **问题描述**:
 控制台大量重复报错：`[NewAPI] submitTask not found after 50 retries. Giving up.`
 
-**修复代码** - 文件: `static/index.html` (第941-942行)
+**修复内容**: 
+通过在 `static/index.html` 中注释掉该脚本引用来解决。
 
-```html
-<!-- 新 API 扩展（Monkey patch submitTask）- 暂时禁用，因为找不到 submitTask 函数 -->
-<!-- <script src="/static/opencode-new-api-patch.js?v=1"></script> -->
-```
+---
 
-**验证方法**:
-- 打开浏览器控制台
-- ✅ 不再显示 `[NewAPI] submitTask not found` 错误
+## 🛠️ 阶段 9: 官方 Web API 适配与体验增强 (2026-02-13)
+
+### 1. 历史记录深度加载逻辑 ✅
+**修复内容**: 
+- 在 `opencode.js` 的 `renderSidebar` 点击事件中接入 `apiClient.getMessages(sid)`。
+- 将后端返回的 `Part` 数据模型转换为前端 `orphanEvents` 和 `response`，实现了历史对话的完美回溯。
+
+### 2. 打字机效果 (Typewriter) 全链路打通 ✅
+**修复内容**: 
+- **后端**: `opencode_client.py` 逐字节广播 `preview_delta`。
+- **前端**: 通过 `opencode-new-api-patch.js` 的 `window.previewConfig` 激活增量渲染逻辑。
+
+### 3. 杜绝刷新页面的"自动重试" Bug ✅
+**修复内容**: 
+- 物理删除 `opencode.js` 初始化阶段的 `runBtn.click()` 触发点。现在状态恢复仅限于 UI 层面，核心引擎保持静默，等待用户指令。
+
+### 4. 端口冲突解决与环境隔离 ✅
+**修复内容**: 
+- `docker-compose.yml` 端口更新为 `8089`。
+- `index.html` VNC 端口同步更新为 `6082`。
 
 ---
 
 ## 🚀 快速启动指南
+
 
 ### Docker部署方式（推荐）
 

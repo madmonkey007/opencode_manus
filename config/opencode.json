@@ -12,13 +12,14 @@
     "opencode-supermemory",
     "@tarquinen/opencode-dcp@1.2.7",
     "@franlol/opencode-md-table-formatter@0.0.3",
-    "oh-my-opencode@3.3.1"
+    "oh-my-opencode@3.5.3"
   ],
   "provider": {
     "google-ai-key1": {
       "npm": "@ai-sdk/google",
       "options": {
-        "apiKey": "AIzaSyB8_-uVvWr-XNvuut9nedO_-tNs5K_gEG8"
+        "apiKey": "AIzaSyB8_-uVvWr-XNvuut9nedO_-tNs5K_gEG8",
+        "timeout": 300000
       },
       "models": {
         "gemini-3-flash-preview": {
@@ -72,7 +73,8 @@
       "name": "GLM Coding Lite",
       "options": {
         "apiKey": "14684e2d78734901a100a057f6f284f6.H6GABhETTOEJ3nrB",
-        "baseURL": "https://open.bigmodel.cn/api/paas/v4"
+        "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+        "timeout": 300000
       },
       "models": {
         "glm-4-7": {
@@ -266,7 +268,8 @@
       "name": "New-API",
       "options": {
         "apiKey": "L8gI61ssTVTTFhG0kIvKwPlluZIYwtXZEfQzgLEtKhKX7Zvu",
-        "baseURL": "http://10.141.103.6:3030/v1"
+        "baseURL": "http://10.141.103.6:3030/v1",
+        "timeout": 300000
       },
       "models": {
         "gemini-3-pro-preview": {
@@ -428,7 +431,8 @@
         "include": [
           "reasoning.encrypted_content"
         ],
-        "store": false
+        "store": false,
+        "timeout": 300000
       }
     }
   },
@@ -543,25 +547,18 @@
     },
     "plan": {
       "permission": {
-        "edit": "deny",
-        "write": "deny",
+        "edit": "ask",
+        "write": "ask",
         "bash": {
-          "*": "deny"
+          "*": "ask"
         },
-        "task": "allow",
-        "worktree_*": "allow"
+        "doom_loop": "allow"
       }
     },
     "build": {
-      "prompt": "You are a **build orchestrator**. You coordinate implementation through delegation - you do NOT implement directly.\\\\\\\\n\\\\\\\\n## Your Role\\\\\\\\n- Delegate implementation to `coder`\\\\\\\\n- Delegate documentation to `scribe`\\\\\\\\n- Delegate codebase analysis to `explore`\\\\\\\\n- Delegate external research to `researcher`\\\\\\\\n- Interpret results and decide next steps\\\\\\\\n\\\\\\\\n## Critical Constraint\\\\\\\\nYou CANNOT edit files or run commands directly. For ALL implementation and verification, delegate to `coder`.",
       "permission": {
-        "edit": "deny",
-        "write": "deny",
-        "bash": {
-          "*": "deny"
-        },
-        "task": "allow",
-        "worktree_*": "allow"
+        "*": "allow",
+        "doom_loop": "allow"
       }
     },
     "explore": {

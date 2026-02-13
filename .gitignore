@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.bun/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Logs
+logs/
+*.log
+nohup.out
+
+# Project Specific
+workspace/
+backups/
+kernel/
+screenshots/
+.serena/
+nul
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

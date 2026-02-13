@@ -4,8 +4,8 @@ services:
     image: opencode:latest
     container_name: opencode-container
     ports:
-      - "8088:8000"  # Web UI
-      - "6081:6080"  # UVN Preview
+      - "8089:8000"  # Web UI
+      - "6082:6080"  # UVN Preview
     environment:
       - DISPLAY=:0
       - PYTHONUNBUFFERED=1
