@@ -342,6 +342,14 @@
 
     function processEvent(s, adapted) {
         if (adapted.type === 'answer_chunk') {
+            // 支持多轮对话分隔符
+            const pSep = '\n\n---\n\n';
+            const rSep = '\n\n---\n\n**新的回答：**\n\n';
+            const pCount = (s.prompt || '').split(pSep).length - 1;
+            const rCount = (s.response || '').split(rSep).length - 1;
+            if (pCount > rCount) {
+                s.response += rSep;
+            }
             s.response += adapted.text;
         } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
             // 标记所有 Phase 为完成

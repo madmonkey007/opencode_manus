@@ -6,24 +6,50 @@
 // 渲染增强的任务面板
 function renderEnhancedTaskPanel(session) {
     const container = document.createElement('div');
-    container.className = 'enhanced-task-panel space-y-4';
+    container.className = 'enhanced-task-panel space-y-6';
 
-    // 1. 用户输入卡片
-    if (session.prompt) {
-        const userCard = createUserPromptCard(session.prompt);
-        container.appendChild(userCard);
-    }
+    const pSep = '\n\n---\n\n';
+    const rSep = '\n\n---\n\n**新的回答：**\n\n';
 
-    // 2. 任务阶段卡片（每个阶段内部嵌套显示执行动作）
-    if (session.phases && session.phases.length > 0) {
-        const phasesCard = createPhasesCard(session.phases, session.currentPhase);
-        container.appendChild(phasesCard);
-    }
+    // 分割多轮对话
+    const prompts = (session.prompt || '').split(pSep);
+    const responses = (session.response || '').split(rSep);
 
-    // 3. 任务交付总结（底部）
-    if (session.response || session.deliverables) {
-        const summaryCard = createDeliverableCard(session);
-        container.appendChild(summaryCard);
+    const turnsCount = Math.max(prompts.length, responses.length);
+
+    for (let i = 0; i < turnsCount; i++) {
+        const turnContainer = document.createElement('div');
+        turnContainer.className = `conversation-turn space-y-4 ${i < turnsCount - 1 ? 'border-b border-gray-100 dark:border-zinc-800 pb-8' : ''}`;
+
+        // 1. 该轮的用户输入
+        if (prompts[i]) {
+            const userCard = createUserPromptCard(prompts[i]);
+            turnContainer.appendChild(userCard);
+        }
+
+        // 2. 任务阶段卡片 (仅在最后一轮，且有阶段信息时显示)
+        // 或者是如果我们需要显示历史阶段，这里需要更复杂的逻辑。
+        // 目前系统在每一轮开始时会清空 phases，所以只在最后一轮显示是合理的。
+        if (i === turnsCount - 1 && session.phases && session.phases.length > 0) {
+            const phasesCard = createPhasesCard(session.phases, session.currentPhase);
+            turnContainer.appendChild(phasesCard);
+        }
+
+        // 3. 该轮的回答
+        if (responses[i] !== undefined && responses[i] !== null) {
+            // 只有当有内容或者是最后一轮时才渲染回答卡片
+            if (responses[i].trim() || i === turnsCount - 1) {
+                const summaryCard = createDeliverableCard({
+                    ...session,
+                    response: responses[i],
+                    // 交付物通常也只关联到最后一轮执行
+                    deliverables: (i === turnsCount - 1) ? session.deliverables : null
+                });
+                turnContainer.appendChild(summaryCard);
+            }
+        }
+
+        container.appendChild(turnContainer);
     }
 
     return container;

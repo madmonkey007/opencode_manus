@@ -313,10 +313,14 @@ function renderResults() {
     }
 
     if (s.prompt) {
-        const m = document.createElement('div');
-        m.className = 'message-bubble user-bubble animate-fade-in self-end mb-6 text-sm shadow-md';
-        m.textContent = s.prompt;
-        convo.appendChild(m);
+        const pSep = '\n\n---\n\n';
+        const prompts = s.prompt.split(pSep);
+        prompts.forEach(p => {
+            const m = document.createElement('div');
+            m.className = 'message-bubble user-bubble animate-fade-in self-end mb-6 text-sm shadow-md';
+            m.textContent = p;
+            convo.appendChild(m);
+        });
     }
 
     const renderEvent = (ev) => {
@@ -400,10 +404,14 @@ function renderResults() {
     convo.appendChild(timelineContainer);
 
     if (s.response) {
-        const r = document.createElement('div');
-        r.className = 'message-bubble assistant-bubble animate-fade-in max-w-[90%] text-sm leading-relaxed mt-6 prose dark:prose-invert';
-        r.innerHTML = marked.parse(s.response);
-        convo.appendChild(r);
+        const rSep = '\n\n---\n\n**新的回答：**\n\n';
+        const responses = s.response.split(rSep);
+        responses.forEach(resp => {
+            const r = document.createElement('div');
+            r.className = 'message-bubble assistant-bubble animate-fade-in max-w-[90%] text-sm leading-relaxed mt-6 prose dark:prose-invert';
+            r.innerHTML = marked.parse(resp);
+            convo.appendChild(r);
+        });
     }
 
     const area = el('#chat-scroll-area');
