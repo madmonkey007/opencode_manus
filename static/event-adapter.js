@@ -119,6 +119,8 @@ class EventAdapter {
     static adaptPartEvent(part, session) {
         const partType = part.type;
 
+        const isThought = partType === 'thought';
+
         // TEXT 类型
         if (partType === 'text') {
             return {
@@ -152,13 +154,18 @@ class EventAdapter {
             // 映射工具类型
             const toolType = this.mapToolType(toolName);
 
+            // 提取元数据中的标题
+            const metadata = part.metadata || {};
+            const title = metadata.title || (isThought ? 'Thinking' : `Using ${toolName}`);
+
             return {
                 type: 'action',
                 data: {
                     tool: toolType,
                     tool_name: toolName,
+                    title: title,
                     status: status,
-                    input: content.input || {},
+                    input: metadata.input || content.input || {},
                     output: state.output || '',
                     timestamp: part.time?.start || Date.now()
                 },
@@ -168,9 +175,12 @@ class EventAdapter {
 
         // STEP-START 类型
         if (partType === 'step-start') {
+            const metadata = part.metadata || {};
             return {
                 type: 'phase_start',
                 phase_id: part.id,
+                title: metadata.title || part.content?.text || 'Executing',
+                description: metadata.description || '',
                 message_id: part.message_id
             };
         }
@@ -329,8 +339,8 @@ class EventAdapter {
     static isFilePreviewEvent(event) {
         return event &&
             (event.type === 'preview_start' ||
-             event.type === 'preview_delta' ||
-             event.type === 'preview_end');
+                event.type === 'preview_delta' ||
+                event.type === 'preview_end');
     }
 
     /**

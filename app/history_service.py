@@ -2,6 +2,7 @@
 OpenCode History Tracking Service
 实时预览与历史追踪核心服务
 """
+
 import sqlite3
 import json
 import hashlib
@@ -17,7 +18,9 @@ logger = logging.getLogger("opencode.history")
 class HistoryService:
     """历史追踪服务 - 管理日志捕获和历史内容聚合"""
 
-    def __init__(self, db_path: str = "workspace/history.db", workspace_base: str = "workspace"):
+    def __init__(
+        self, db_path: str = "workspace/history.db", workspace_base: str = "workspace"
+    ):
         """
         初始化历史服务
 
@@ -37,10 +40,10 @@ class HistoryService:
             os.makedirs(db_dir, exist_ok=True)
 
         # 读取 schema 文件
-        schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
 
         if os.path.exists(schema_path):
-            with open(schema_path, 'r', encoding='utf-8') as f:
+            with open(schema_path, "r", encoding="utf-8") as f:
                 schema_sql = f.read()
         else:
             # 如果 schema 文件不存在，使用内联定义
@@ -108,11 +111,7 @@ class HistoryService:
             conn.close()
 
     async def capture_tool_use(
-        self,
-        session_id: str,
-        tool_name: str,
-        tool_input: Dict[str, Any],
-        step_id: str
+        self, session_id: str, tool_name: str, tool_input: Dict[str, Any], step_id: str
     ) -> Dict[str, Any]:
         """
         捕获工具使用事件
@@ -127,8 +126,8 @@ class HistoryService:
             捕获结果字典 {step_id, action_type, file_path, timestamp}
         """
         action_type = self._map_tool_to_action(tool_name)
-        file_path = tool_input.get('file_path') or tool_input.get('path')
-        command = tool_input.get('command', '')
+        file_path = tool_input.get("file_path") or tool_input.get("path")
+        command = tool_input.get("command", "")
 
         # 生成简短描述
         brief = self._generate_brief(action_type, file_path, command)
@@ -138,13 +137,24 @@ class HistoryService:
 
         try:
             # 插入步骤记录
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO steps (step_id, session_id, sequence_number, action_type, file_path, command, brief)
                 VALUES (?, ?,
                     (SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM steps WHERE session_id = ?),
                     ?, ?, ?, ?
                 )
-            """, (step_id, session_id, session_id, action_type, file_path, command, brief))
+            """,
+                (
+                    step_id,
+                    session_id,
+                    session_id,
+                    action_type,
+                    file_path,
+                    command,
+                    brief,
+                ),
+            )
 
             conn.commit()
             logger.info(f"Captured tool use: {tool_name} -> {action_type}")
@@ -153,7 +163,7 @@ class HistoryService:
                 "step_id": step_id,
                 "action_type": action_type,
                 "file_path": file_path,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"Failed to capture tool use: {e}")
@@ -163,11 +173,7 @@ class HistoryService:
             conn.close()
 
     async def capture_file_change(
-        self,
-        step_id: str,
-        file_path: str,
-        content: str,
-        operation_type: str
+        self, step_id: str, file_path: str, content: str, operation_type: str
     ):
         """
         捕获文件内容变更
@@ -185,11 +191,14 @@ class HistoryService:
 
         try:
             # 插入文件快照
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO file_snapshots
                 (step_id, file_path, content_hash, content_size, operation_type)
                 VALUES (?, ?, ?, ?, ?)
-            """, (step_id, file_path, content_hash, len(content), operation_type))
+            """,
+                (step_id, file_path, content_hash, len(content), operation_type),
+            )
 
             conn.commit()
             logger.info(f"Captured file change: {file_path} ({operation_type})")
@@ -204,11 +213,7 @@ class HistoryService:
             conn.close()
 
     async def capture_delta(
-        self,
-        step_id: str,
-        delta_type: str,
-        position: int,
-        content: str
+        self, step_id: str, delta_type: str, position: int, content: str
     ):
         """
         捕获实时增量（用于打字机效果）
@@ -223,10 +228,13 @@ class HistoryService:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO live_deltas (step_id, delta_type, position, content)
                 VALUES (?, ?, ?, ?)
-            """, (step_id, delta_type, position, content))
+            """,
+                (step_id, delta_type, position, content),
+            )
 
             conn.commit()
         except Exception as e:
@@ -237,10 +245,7 @@ class HistoryService:
             conn.close()
 
     async def get_file_at_step(
-        self,
-        session_id: str,
-        file_path: str,
-        target_step_id: str
+        self, session_id: str, file_path: str, target_step_id: str
     ) -> Optional[str]:
         """
         获取指定步骤时刻的文件内容（历史内容聚合）
@@ -258,7 +263,8 @@ class HistoryService:
 
         try:
             # 查询目标步骤之前的最新快照
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT fs.step_id, fs.content_hash, fs.operation_type
                 FROM file_snapshots fs
                 JOIN steps s ON fs.step_id = s.step_id
@@ -267,21 +273,29 @@ class HistoryService:
                   AND s.step_id <= ?
                 ORDER BY s.sequence_number DESC
                 LIMIT 1
-            """, (session_id, file_path, target_step_id))
+            """,
+                (session_id, file_path, target_step_id),
+            )
 
             snapshot = cursor.fetchone()
 
             if not snapshot:
-                logger.warning(f"No snapshot found for {file_path} before step {target_step_id}")
+                logger.warning(
+                    f"No snapshot found for {file_path} before step {target_step_id}"
+                )
                 return None
 
             last_step_id, content_hash, operation_type = snapshot
 
             # 从 JSON 文件加载完整内容
-            content = await self._load_content_from_json(session_id, file_path, content_hash)
+            content = await self._load_content_from_json(
+                session_id, file_path, content_hash
+            )
 
             if content is None:
-                logger.warning(f"Failed to load content for {file_path} with hash {content_hash}")
+                logger.warning(
+                    f"Failed to load content for {file_path} with hash {content_hash}"
+                )
                 return None
 
             return content
@@ -305,13 +319,16 @@ class HistoryService:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT step_id, sequence_number, action_type,
                        file_path, timestamp, brief
                 FROM steps
                 WHERE session_id = ?
                 ORDER BY sequence_number ASC
-            """, (session_id,))
+            """,
+                (session_id,),
+            )
 
             steps = cursor.fetchall()
 
@@ -322,7 +339,7 @@ class HistoryService:
                     "action": row[2],
                     "path": row[3],
                     "timestamp": row[4],
-                    "brief": row[5]
+                    "brief": row[5],
                 }
                 for row in steps
             ]
@@ -335,50 +352,100 @@ class HistoryService:
     def _map_tool_to_action(self, tool_name: str) -> str:
         """映射工具名称到操作类型"""
         tool_map = {
-            'write': 'write',
-            'edit': 'edit',
-            'file_editor': 'edit',
-            'bash': 'bash',
-            'terminal': 'bash',
-            'read': 'read',
-            'grep': 'grep'
+            "write": "write",
+            "edit": "edit",
+            "file_editor": "edit",
+            "bash": "bash",
+            "terminal": "bash",
+            "read": "read",
+            "grep": "grep",
         }
-        return tool_map.get(tool_name.lower(), 'unknown')
+        return tool_map.get(tool_name.lower(), "unknown")
 
     def _generate_brief(self, action_type: str, file_path: str, command: str) -> str:
         """生成简短描述"""
-        if action_type == 'write':
+        if action_type == "write":
             return f"创建 {file_path.split('/')[-1] if file_path else '文件'}"
-        elif action_type == 'edit':
+        elif action_type == "edit":
             return f"编辑 {file_path.split('/')[-1] if file_path else '文件'}"
-        elif action_type == 'bash':
-            return f"执行: {command[:30]}..." if len(command) > 30 else f"执行: {command}"
-        elif action_type == 'read':
+        elif action_type == "bash":
+            return (
+                f"执行: {command[:30]}..." if len(command) > 30 else f"执行: {command}"
+            )
+        elif action_type == "read":
             return f"读取 {file_path.split('/')[-1] if file_path else '文件'}"
-        elif action_type == 'grep':
+        elif action_type == "grep":
             return f"搜索"
         else:
             return f"{action_type}"
 
-    async def _save_content_to_json(self, step_id: str, file_path: str, content_hash: str, content: str):
+    async def _save_content_to_json(
+        self, step_id: str, file_path: str, content_hash: str, content: str
+    ):
         """
         保存完整内容到 JSON 文件
 
         文件路径: workspace/{session_id}/.history/file_{content_hash}.json
         """
-        # 这里简化实现，实际需要根据 session_id 确定路径
-        # 暂时跳过文件系统操作
-        pass
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
 
-    async def _load_content_from_json(self, session_id: str, file_path: str, content_hash: str) -> Optional[str]:
+        try:
+            # 获取 session_id
+            cursor.execute("SELECT session_id FROM steps WHERE step_id = ?", (step_id,))
+            row = cursor.fetchone()
+            if not row:
+                logger.error(f"Failed to find session_id for step_id: {step_id}")
+                return
+
+            session_id = row[0]
+
+            # 构造存储目录
+            history_dir = self.workspace_base / session_id / ".history"
+            os.makedirs(history_dir, exist_ok=True)
+
+            # 保存到 JSON
+            save_path = history_dir / f"file_{content_hash}.json"
+            data = {
+                "step_id": step_id,
+                "file_path": file_path,
+                "content_hash": content_hash,
+                "content": content,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+            logger.info(f"Saved content snapshot to {save_path}")
+        except Exception as e:
+            logger.error(f"Failed to save content to JSON: {e}")
+        finally:
+            conn.close()
+
+    async def _load_content_from_json(
+        self, session_id: str, file_path: str, content_hash: str
+    ) -> Optional[str]:
         """
         从 JSON 文件加载内容
 
         文件路径: workspace/{session_id}/.history/file_{content_hash}.json
         """
-        # 这里简化实现，实际需要从文件系统读取
-        # 暂时返回 None
-        return None
+        save_path = (
+            self.workspace_base / session_id / ".history" / f"file_{content_hash}.json"
+        )
+
+        try:
+            if not os.path.exists(save_path):
+                logger.warning(f"Content snapshot not found: {save_path}")
+                return None
+
+            with open(save_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("content")
+        except Exception as e:
+            logger.error(f"Failed to load content from JSON: {e}")
+            return None
 
 
 # 全局历史服务实例

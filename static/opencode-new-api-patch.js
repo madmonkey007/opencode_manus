@@ -1,364 +1,421 @@
 /**
- * OpenCode.js 新 API 扩展
- *
- * 通过 Monkey Patching 的方式修改 submitTask 函数
- * 支持新的 Session + Message API，同时保持向后兼容
+ * OpenCode.js 新 API 扩展 (V2.8)
+ * 修复 404 错误：强制丢弃前端生成的旧版伪造 Session ID
+ * 完整功能修复：找回丢失的 executeSubmission, prepareSession 等核心函数
  */
 
-(function() {
+(function () {
     'use strict';
 
-    // 配置：是否启用新 API
     const ENABLE_NEW_API = true;
-    const USE_NEW_API_FOR_NEW_SESSIONS = true;
 
-    // 保存原始函数
-    let originalSubmitTask = null;
-    let newAPISessions = new Set(); // 使用新 API 的 session IDs
+    function init() {
+        console.log('[NewAPI] Initializing V2.8 Patch (Advanced UI Mode)...');
 
-    /**
-     * 检查新 API 是否可用
-     */
-    function isNewAPIAvailable() {
-        return typeof window.apiClient !== 'undefined' &&
-               typeof window.EventAdapter !== 'undefined';
+        // 1. 全局点击捕获拦截
+        window.addEventListener('click', handleGlobalClick, true);
+
+        // 2. 劫持全局 connectSSE
+        const originalConnectSSE = window.connectSSE;
+        if (typeof window.connectSSE === 'function' && !window.connectSSE._isPatched) {
+            const patchedConnectSSE = function (s) {
+                if (!s) return;
+                // 仅对真实受控的 Session 进行劫持
+                if (s.id && s.id.startsWith('ses_') && s.id.length === 12) {
+                    console.log('[NewAPI] Hijacking connectSSE for real session:', s.id);
+                    return handleNewAPIConnection(s);
+                }
+                if (originalConnectSSE) return originalConnectSSE.apply(this, arguments);
+            };
+            patchedConnectSSE._isPatched = true;
+            window.connectSSE = patchedConnectSSE;
+        }
+
+        // 3. 拦截回车键
+        window.addEventListener('keydown', handleGlobalKeydown, true);
+
+        // 4. 注入样式和 Mode Selector
+        injectAdvancedUI();
+
+        console.log('[NewAPI] V2.8 Advanced UI active');
     }
 
     /**
-     * 检查 session 是否在后端存在
+     * 注入高级 UI 元素 (Plan/Build Mode + CSS)
      */
-    async function sessionExistsOnBackend(sessionId) {
-        if (!isNewAPIAvailable()) return false;
+    function injectAdvancedUI() {
+        if (document.getElementById('opencode-patch-styles')) return;
 
-        try {
-            return await window.apiClient.sessionExists(sessionId);
-        } catch (e) {
-            console.warn('[NewAPI] Failed to check session existence:', e);
-            return false;
+        const styles = document.createElement('style');
+        styles.id = 'opencode-patch-styles';
+        styles.textContent = `
+            .mode-selector {
+                display: flex;
+                gap: 8px;
+                margin-left: 8px;
+                padding: 4px;
+                background: rgba(0,0,0,0.03);
+                border-radius: 20px;
+                border: 1px solid rgba(0,0,0,0.05);
+            }
+            .dark .mode-selector {
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+            .mode-btn {
+                padding: 4px 12px;
+                border-radius: 16px;
+                font-size: 11px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                color: #666;
+            }
+            .dark .mode-btn { color: #aaa; }
+            .mode-btn.active {
+                background: #000;
+                color: #fff;
+            }
+            .dark .mode-btn.active {
+                background: #fff;
+                color: #000;
+            }
+            #stopStream {
+                border: 2px solid #ff4d4f !important;
+                background: transparent !important;
+                color: #ff4d4f !important;
+            }
+            #stopStream:hover {
+                background: #ff4d4f !important;
+                color: #fff !important;
+            }
+        `;
+        document.head.appendChild(styles);
+
+        // 注入模式选择器到输入框下方按钮栏
+        const target = document.querySelector('#bottom-input-container .flex.items-center.gap-1');
+        if (target) {
+            const selector = document.createElement('div');
+            selector.className = 'mode-selector';
+            selector.innerHTML = `
+                <div class="mode-btn active" data-mode="plan">Plan</div>
+                <div class="mode-btn" data-mode="build">Build</div>
+            `;
+            target.appendChild(selector);
+
+            selector.addEventListener('click', (e) => {
+                const btn = e.target.closest('.mode-btn');
+                if (!btn) return;
+                selector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                window._currentMode = btn.dataset.mode;
+            });
+        }
+        window._currentMode = 'plan';
+    }
+
+    /**
+     * 全局点击处理器 (捕获阶段)
+     */
+    function handleGlobalClick(e) {
+        // 增加对停止按钮的捕获
+        const stopTarget = e.target.closest('#stopStream');
+        if (stopTarget) {
+            console.log('[NewAPI] Global Intercept: Stop clicked');
+            e.stopPropagation();
+            e.preventDefault();
+            if (window.state.activeSSE) {
+                window.state.activeSSE.close();
+                window.state.activeSSE = null;
+            }
+            document.getElementById('stopStream')?.classList.add('hidden');
+            document.getElementById('runStream')?.classList.remove('hidden');
+            return;
+        }
+
+        const target = e.target.closest('#runStream, #runStream-welcome');
+        if (!target) return;
+
+        console.log(`[NewAPI] Global Intercept: ${target.id} clicked`);
+        e.stopPropagation();
+        e.preventDefault();
+
+        executeSubmission(target);
+    }
+
+    /**
+     * 全局按键处理器
+     */
+    function handleGlobalKeydown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.id === 'prompt' || activeEl.id === 'prompt-welcome')) {
+                console.log(`[NewAPI] Global Intercept: Enter on ${activeEl.id}`);
+                e.stopPropagation();
+                e.preventDefault();
+
+                const btnId = activeEl.id === 'prompt-welcome' ? 'runStream-welcome' : 'runStream';
+                const btn = document.getElementById(btnId);
+                if (btn) executeSubmission(btn);
+            }
         }
     }
 
     /**
-     * 新 API: 创建会话并发送第一条消息
+     * 执行提交逻辑
      */
-    async function submitWithNewAPI(prompt, sessionId) {
-        console.log('[NewAPI] Creating session and sending message...');
+    async function executeSubmission(btn) {
+        if (!ENABLE_NEW_API || !window.apiClient) {
+            console.warn('[NewAPI] API Client not ready');
+            return;
+        }
+
+        const isWelcome = btn.id === 'runStream-welcome';
+        const primaryInput = document.getElementById(isWelcome ? 'prompt-welcome' : 'prompt');
+        const secondaryInput = document.getElementById(isWelcome ? 'prompt' : 'prompt-welcome');
+
+        const promptValue = (primaryInput?.value || secondaryInput?.value || '').trim();
+        if (!promptValue) return;
+
+        console.log('[NewAPI] Processing submission...', { isWelcome, promptLength: promptValue.length });
 
         try {
-            // 1. 创建会话
-            const apiSession = await window.apiClient.createSession(
-                prompt.substring(0, 100) || 'New Session'
-            );
-            console.log('[NewAPI] Session created:', apiSession);
-
-            // 2. 更新前端 session 对象
-            const s = window.state.sessions.find(x => x.id === sessionId);
-            if (s) {
-                s.id = apiSession.id; // 更新为后端返回的 ID
-                s.apiSession = apiSession;
-                s.version = apiSession.version;
-                s.status = apiSession.status;
-                window.state.activeId = apiSession.id;
+            // 设置按钮状态
+            const runBtn = document.getElementById('runStream');
+            if (runBtn) {
+                runBtn.disabled = true;
+                runBtn.innerHTML = '<span class="material-symbols-outlined animate-spin">refresh</span>';
             }
 
-            // 3. 订阅 SSE 事件流
-            subscribeToNewAPIEvents(apiSession.id, sessionId);
+            // 1. 准备 Session
+            let s = await prepareSession(promptValue, isWelcome);
+            console.log('[NewAPI] Session focused:', s.id);
 
-            // 4. 发送消息
-            const response = await window.apiClient.sendTextMessage(
-                apiSession.id,
-                prompt
-            );
-            console.log('[NewAPI] Message sent:', response);
+            // 2. 强力切换 UI 模式
+            forceChatMode();
 
-            // 标记此 session 使用新 API
-            newAPISessions.add(apiSession.id);
+            // 3. 确保状态机指向当前 session
+            window.state.activeId = s.id;
+            if (typeof window.renderAll === 'function') window.renderAll();
 
-            return response;
-        } catch (e) {
-            console.error('[NewAPI] Failed to submit task:', e);
-            throw e;
-        }
-    }
+            // 4. 连接并下发指令
+            await handleNewAPIConnection(s, true);
 
-    /**
-     * 新 API: 向现有会话发送消息
-     */
-    async function continueWithNewAPI(prompt, sessionId) {
-        console.log('[NewAPI] Sending message to existing session...');
+            // 5. 清理
+            if (primaryInput) primaryInput.value = '';
+            if (secondaryInput) secondaryInput.value = '';
 
-        try {
-            // 1. 订阅 SSE 事件流（如果未订阅）
-            if (!window.state.activeSSE) {
-                subscribeToNewAPIEvents(sessionId, sessionId);
+            // 恢复按钮状态
+            if (runBtn) {
+                runBtn.disabled = false;
+                runBtn.innerHTML = '<span class="material-symbols-outlined !text-white dark:!text-black">arrow_upward</span>';
             }
 
-            // 2. 发送消息
-            const response = await window.apiClient.sendTextMessage(
-                sessionId,
-                prompt
-            );
-            console.log('[NewAPI] Message sent:', response);
-
-            return response;
-        } catch (e) {
-            console.error('[NewAPI] Failed to continue task:', e);
-            throw e;
+        } catch (err) {
+            console.error('[NewAPI] Submission sequence failed:', err);
+            alert('服务器响应异常: ' + (err.message || 'Error occurred'));
+            const runBtn = document.getElementById('runStream');
+            if (runBtn) {
+                runBtn.disabled = false;
+                runBtn.innerHTML = '<span class="material-symbols-outlined !text-white dark:!text-black">arrow_upward</span>';
+            }
         }
     }
 
     /**
-     * 订阅新 API 的 SSE 事件流
+     * 获取或创建 Session
      */
-    function subscribeToNewAPIEvents(apiSessionId, frontendSessionId) {
-        console.log('[NewAPI] Subscribing to events for session:', apiSessionId);
+    async function prepareSession(prompt, forceNew = false) {
+        const state = window.state;
+        let s = state.sessions.find(x => x.id === state.activeId);
 
-        const eventSource = window.apiClient.subscribeToEvents(
-            apiSessionId,
+        // 识别逻辑：11位为伪造，12位为后端真实
+        const isFakeId = s && s.id && s.id.startsWith('ses_') && s.id.length === 11;
+
+        if (forceNew || !state.activeId || !s || !s.id.startsWith('ses_') || isFakeId) {
+            console.log('[NewAPI] Target session is missing or invalid, creating fresh one...');
+
+            const backendSession = await window.apiClient.createSession(prompt.substring(0, 30));
+            console.log('[NewAPI] Backend created session:', backendSession.id);
+
+            s = {
+                id: backendSession.id,
+                title: backendSession.title,
+                prompt: prompt,
+                response: '',
+                phases: [],
+                orphanEvents: [],
+                actions: [],
+                currentPhase: null
+            };
+
+            state.sessions.unshift(s);
+            state.activeId = s.id;
+        } else {
+            console.log('[NewAPI] Reusing verified session:', s.id);
+            s.prompt = (s.prompt ? s.prompt + '\n\n---\n\n' : '') + prompt;
+            s.phases = [];
+            s.currentPhase = null;
+        }
+
+        syncState(state);
+        return s;
+    }
+
+    function syncState(state) {
+        localStorage.setItem('opencode_state', JSON.stringify({
+            activeId: state.activeId,
+            sessions: state.sessions.map(s => ({
+                id: s.id, title: s.title, prompt: s.prompt, response: s.response, phases: s.phases
+            }))
+        }));
+        if (typeof window.renderSidebar === 'function') window.renderSidebar();
+    }
+
+    function forceChatMode() {
+        const welcome = document.getElementById('welcome-interface');
+        const chat = document.getElementById('chat-messages');
+        if (welcome) welcome.classList.add('hidden');
+        if (chat) chat.classList.remove('hidden');
+
+        const bottomInputArea = document.getElementById('chat-bottom-input') || document.querySelector('.bottom-input-area');
+        if (bottomInputArea) bottomInputArea.classList.remove('hidden');
+
+        if (window.updateInterfaceMode) window.updateInterfaceMode();
+    }
+
+    async function handleNewAPIConnection(s, isNewSubmission = false) {
+        console.log('[NewAPI] Establishing SSE for:', s.id);
+
+        if (window.state.activeSSE) {
+            console.log('[NewAPI] Closing existing SSE');
+            window.state.activeSSE.close();
+        }
+
+        // 显示停止按钮，隐藏发送按钮
+        const stopBtn = document.getElementById('stopStream');
+        const runBtn = document.getElementById('runStream');
+        if (stopBtn) stopBtn.classList.remove('hidden');
+        if (runBtn) runBtn.classList.add('hidden');
+
+        window.state.activeSSE = window.apiClient.subscribeToEvents(
+            s.id,
             (newEvent) => {
-                handleNewAPIEvent(newEvent, frontendSessionId);
+                const adapted = window.EventAdapter?.adaptEvent(newEvent, s);
+                if (!adapted) return;
+
+                processEvent(s, adapted);
+
+                // 实时渲染
+                if (typeof window.renderResults === 'function' && window.state.activeId === s.id) {
+                    window.renderResults();
+                }
+
+                // 检查是否完成
+                if (adapted.type === 'status' && (adapted.value === 'done' || adapted.value === 'completed')) {
+                    if (stopBtn) stopBtn.classList.add('hidden');
+                    if (runBtn) runBtn.classList.remove('hidden');
+                }
             },
-            (error) => {
-                console.warn('[NewAPI] SSE error:', error);
-                // SSE 错误处理由 EventSource 自动重连
+            (err) => {
+                console.error('[NewAPI] SSE Stream Error:', err);
+                if (stopBtn) stopBtn.classList.add('hidden');
+                if (runBtn) runBtn.classList.remove('hidden');
             }
         );
 
-        // 保存到 state
-        window.state.activeSSE = eventSource;
-    }
-
-    /**
-     * 处理新 API 的事件
-     */
-    function handleNewAPIEvent(newEvent, frontendSessionId) {
-        console.log('[NewAPI] Event received:', newEvent.type);
-
-        const s = window.state.sessions.find(x => x.id === frontendSessionId);
-        if (!s) {
-            console.warn('[NewAPI] Session not found:', frontendSessionId);
-            return;
+        if (isNewSubmission) {
+            const currentPrompt = s.prompt.split('\n\n---\n\n').pop();
+            console.log('[NewAPI] Sending user message to backend (Mode:', window._currentMode, ')');
+            await window.apiClient.sendTextMessage(s.id, currentPrompt, { mode: window._currentMode });
         }
 
-        // 使用 EventAdapter 转换事件
-        const adaptedEvent = window.EventAdapter.adaptEvent(newEvent, s);
-
-        if (!adaptedEvent) {
-            // 事件被过滤（如 ping）
-            return;
+        // 重新同步 UI 状态
+        if (window.state.activeId !== s.id) {
+            window.state.activeId = s.id;
         }
 
-        // 处理特殊事件类型
-        if (adaptedEvent.type === 'preview_start') {
-            // 文件预览开始
-            const previewOverlay = window.enhancedCodePreview || window.codePreviewOverlay;
-            if (previewOverlay && window.previewConfig?.isEventEnabled(adaptedEvent.action)) {
-                previewOverlay.setStepId(adaptedEvent.step_id);
-                previewOverlay.setFilePath(adaptedEvent.file_path);
-                previewOverlay.show(
-                    adaptedEvent.file_path.split('/').pop(),
-                    adaptedEvent.action
-                );
-            }
-        } else if (adaptedEvent.type === 'preview_delta') {
-            // 文件预览增量（打字机效果）
-            const previewOverlay = window.enhancedCodePreview || window.codePreviewOverlay;
-            if (previewOverlay && window.previewConfig?.enableTypewriter) {
-                previewOverlay.appendDelta(adaptedEvent.delta);
-            }
-        } else if (adaptedEvent.type === 'preview_end') {
-            // 文件预览结束
-            const previewOverlay = window.enhancedCodePreview || window.codePreviewOverlay;
-            if (previewOverlay) {
-                previewOverlay.setStatus('完成');
-            }
-        } else if (adaptedEvent.type === 'timeline_update') {
-            // 时间轴更新
-            if (window.timelineProgress && adaptedEvent.step) {
-                window.timelineProgress.addStep(adaptedEvent.step);
-                window.timelineProgress.setActiveStep(adaptedEvent.step.step_id);
-
-                const timelineContainer = document.getElementById('timeline-progress-container');
-                if (timelineContainer) {
-                    timelineContainer.classList.remove('hidden');
-                }
-            }
-        } else if (adaptedEvent.type === 'message_updated') {
-            // 消息更新（可忽略，主要用于状态跟踪）
-            console.log('[NewAPI] Message updated:', adaptedEvent.message_id);
-        } else if (adaptedEvent.type === 'action') {
-            // 工具事件
-            if (!s.actions) s.actions = [];
-            s.actions.push(adaptedEvent.data);
-
-            // 添加到 orphanEvents
-            if (!s.orphanEvents) s.orphanEvents = [];
-            s.orphanEvents.push(adaptedEvent);
-        } else if (adaptedEvent.type === 'answer_chunk') {
-            // 文本内容
-            s.response += adaptedEvent.text;
-        } else if (adaptedEvent.type === 'thought') {
-            // 思考内容
-            if (!s.orphanEvents) s.orphanEvents = [];
-            s.orphanEvents.push(adaptedEvent);
-        } else if (adaptedEvent.type === 'error') {
-            // 错误
-            console.error('[NewAPI] Error event:', adaptedEvent.message);
-            if (!s.orphanEvents) s.orphanEvents = [];
-            s.orphanEvents.push({
-                type: 'error',
-                content: adaptedEvent.message
-            });
-        }
-
-        // 重新渲染
-        if (typeof window.renderResults === 'function') {
-            window.renderResults();
-        }
         if (typeof window.renderAll === 'function') {
             window.renderAll();
         }
     }
 
-    /**
-     * 修改后的 submitTask 函数
-     */
-    async function newSubmitTask() {
-        // UI 元素
-        const stopBtn = el('#stop-btn');
-        const rs = el('#right-send-btn');
-        const input = el('#prompt');
-        if (!input.value.trim()) return;
-
-        const p = input.value.trim();
-        let s = window.state.sessions.find(x => x.id === window.state.activeId);
-
-        // 清空输入框
-        input.value = '';
-
-        // 决定使用哪个 API
-        let useNewAPI = false;
-
-        if (ENABLE_NEW_API && isNewAPIAvailable()) {
-            if (!s) {
-                // 新会话：检查配置
-                useNewAPI = USE_NEW_API_FOR_NEW_SESSIONS;
-            } else if (newAPISessions.has(s.id)) {
-                // 已知使用新 API 的会话
-                useNewAPI = true;
-            } else if (s.id.startsWith('ses_')) {
-                // ses_ 开头的 ID：检查后端是否存在
-                const exists = await sessionExistsOnBackend(s.id);
-                useNewAPI = exists;
+    function processEvent(s, adapted) {
+        if (adapted.type === 'answer_chunk') {
+            s.response += adapted.text;
+        } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
+            // 标记所有 Phase 为完成
+            if (s.phases) {
+                s.phases.forEach(p => p.status = 'completed');
             }
-        }
+            document.getElementById('stopStream')?.classList.add('hidden');
+            document.getElementById('runStream')?.classList.remove('hidden');
+        } else if (adapted.type === 'phase_start') {
+            // 停用当前活跃 Phase
+            if (s.currentPhase) {
+                const prevPhase = s.phases.find(p => p.id === s.currentPhase);
+                if (prevPhase) prevPhase.status = 'completed';
+            }
 
-        if (useNewAPI) {
-            console.log('[NewAPI] Using new Session + Message API');
-
-            // UI 更新
-            if (stopBtn) stopBtn.classList.remove('hidden');
-            if (rs) rs.classList.add('hidden');
-
-            // 创建或获取 session
-            const emptyPhases = [];
-            let sessionId = window.state.activeId;
-
-            if (!s) {
-                sessionId = window.apiClient.generateSessionId();
-                s = {
-                    id: sessionId,
-                    prompt: p,
-                    response: '',
-                    phases: emptyPhases,
-                    orphanEvents: [],
-                    actions: [],
-                    currentPhase: null
+            let phase = s.phases.find(p => p.id === adapted.phase_id);
+            if (!phase) {
+                phase = {
+                    id: adapted.phase_id,
+                    title: adapted.title || '正在执行',
+                    description: adapted.description || '',
+                    status: 'active',
+                    events: []
                 };
-                window.state.sessions.unshift(s);
-                window.state.activeId = sessionId;
+                s.phases.push(phase);
             } else {
-                // 追问模式
-                const previousPrompt = s.prompt ? s.prompt + '\n\n---\n\n' : '';
-                s.prompt = previousPrompt + p;
-                s.phases = emptyPhases;
-                s.orphanEvents = [];
-                s.actions = [];
-                s.currentPhase = null;
+                phase.status = 'active';
+                // 如果后端提供了更具体的标题，更新它
+                if (adapted.title && adapted.title !== 'Executing') {
+                    phase.title = adapted.title;
+                }
+            }
+            s.currentPhase = phase.id;
+        } else if (adapted.type === 'phase_finish') {
+            const phase = s.phases.find(p => p.id === adapted.phase_id);
+            if (phase) phase.status = 'completed';
+        } else if (adapted.type === 'action' || adapted.type === 'thought' || adapted.type === 'error') {
+            // 处理 action/thought/error
+            if (!s.phases || s.phases.length === 0) {
+                s.phases = [{ id: 'phase_executing', title: '🚀 任务执行中', status: 'active', events: [] }];
+                s.currentPhase = 'phase_executing';
             }
 
-            // 初始化提示
-            s.orphanEvents.push({
-                type: "thought",
-                content: "正在初始化引擎，请稍候..."
-            });
+            const targetPhase = s.phases.find(p => p.id === s.currentPhase) || s.phases[s.phases.length - 1];
+            if (targetPhase) {
+                if (!targetPhase.events) targetPhase.events = [];
 
-            if (typeof window.renderAll === 'function') {
-                window.renderAll();
-            }
-            if (typeof window.saveState === 'function') {
-                window.saveState();
-            }
+                // 幂等处理：防止重复添加相同 Part ID 的事件
+                const eventId = adapted.id || (adapted.data && (adapted.data.id || adapted.data.call_id)) || adapted.message_id;
 
-            try {
-                // 使用新 API 提交
-                if (newAPISessions.has(s.id) || await sessionExistsOnBackend(s.id)) {
-                    await continueWithNewAPI(p, s.id);
+                let existingEventIndex = -1;
+                if (eventId) {
+                    existingEventIndex = targetPhase.events.findIndex(e => {
+                        const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;
+                        return eId === eventId;
+                    });
+                }
+
+                if (existingEventIndex > -1) {
+                    // 更新现有事件
+                    const existing = targetPhase.events[existingEventIndex];
+                    if (adapted.type === 'action' && existing.type === 'action') {
+                        existing.data = { ...existing.data, ...adapted.data };
+                    } else {
+                        targetPhase.events[existingEventIndex] = adapted;
+                    }
                 } else {
-                    await submitWithNewAPI(p, sessionId);
+                    // 只有在新事件时才追加
+                    targetPhase.events.push(adapted);
                 }
-
-                // 更新 UI
-                if (typeof window.renderAll === 'function') {
-                    window.renderAll();
-                }
-            } catch (e) {
-                console.error('[NewAPI] Failed, falling back to legacy API:', e);
-
-                // 回退到旧 API
-                if (stopBtn) stopBtn.classList.add('hidden');
-                if (rs) rs.classList.remove('hidden');
-
-                // 调用原始函数
-                if (originalSubmitTask) {
-                    originalSubmitTask.call(window);
-                }
-            }
-        } else {
-            // 使用旧 API
-            console.log('[LegacyAPI] Using legacy CLI API');
-            if (originalSubmitTask) {
-                originalSubmitTask.call(window);
             }
         }
     }
 
-    /**
-     * 初始化：Monkey patch submitTask
-     */
-    function init() {
-        if (typeof window.submitTask !== 'function') {
-            console.warn('[NewAPI] submitTask not found, waiting for DOM loaded...');
-            setTimeout(init, 100);
-            return;
-        }
-
-        // 保存原始函数
-        originalSubmitTask = window.submitTask;
-
-        // 替换为新函数
-        window.submitTask = newSubmitTask;
-
-        console.log('[NewAPI] submitTask has been patched to support new API');
-        console.log('[NewAPI] ENABLE_NEW_API:', ENABLE_NEW_API);
-        console.log('[NewAPI] USE_NEW_API_FOR_NEW_SESSIONS:', USE_NEW_API_FOR_NEW_SESSIONS);
-    }
-
-    // DOM 加载完成后初始化
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+    init();
 
 })();

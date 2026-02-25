@@ -4,31 +4,59 @@ OpenCode 新架构 API 端点
 基于官方 Web API 的 Session + Message 架构
 提供真正的多轮对话支持
 """
+
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from typing import List, Optional
+from fastapi.encoders import jsonable_encoder
+from typing import List, Optional, Dict, Any
 import asyncio
 import json
 import logging
 import os
 import time
 from datetime import datetime
+import sys
+
+# 将当前目录添加到 sys.path 以确保导入正常
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 # 导入数据模型
 try:
     from .models import (
-        Session, SessionStatus,
-        Message, MessageRole, MessageWithParts,
-        SendMessageRequest, SendMessageResponse,
-        SessionEvent
+        Session,
+        SessionStatus,
+        Message,
+        MessageRole,
+        MessageWithParts,
+        SendMessageRequest,
+        SendMessageResponse,
+        SessionEvent,
+        Part,
+        PartType,
+        PartTime,
+        PartContent,
+        generate_part_id,
+        generate_message_id,
     )
     from .managers import SessionManager
 except ImportError:
     from models import (
-        Session, SessionStatus,
-        Message, MessageRole, MessageWithParts,
-        SendMessageRequest, SendMessageResponse,
-        SessionEvent
+        Session,
+        SessionStatus,
+        Message,
+        MessageRole,
+        MessageWithParts,
+        SendMessageRequest,
+        SendMessageResponse,
+        SessionEvent,
+        Part,
+        PartType,
+        PartTime,
+        PartContent,
+        generate_part_id,
+        generate_message_id,
     )
     from managers import SessionManager
 
@@ -51,11 +79,9 @@ router = APIRouter(prefix="/opencode", tags=["opencode"])
 # Session Management Endpoints
 # ====================================================================
 
+
 @router.post("/session", response_model=Session)
-async def create_session(
-    title: str = "New Session",
-    version: str = "1.0.0"
-):
+async def create_session(title: str = "New Session", version: str = "1.0.0"):
     """
     创建新会话
 
@@ -72,7 +98,9 @@ async def create_session(
         return session
     except Exception as e:
         logger.error(f"Error creating session: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create session: {str(e)}"
+        )
 
 
 @router.get("/session/{session_id}", response_model=Session)
@@ -115,9 +143,7 @@ async def delete_session(session_id: str):
 
 
 @router.get("/sessions", response_model=List[Session])
-async def list_sessions(
-    status: Optional[SessionStatus] = None
-):
+async def list_sessions(status: Optional[SessionStatus] = None):
     """
     列出所有会话
 
@@ -134,6 +160,7 @@ async def list_sessions(
 # ====================================================================
 # Message Management Endpoints
 # ====================================================================
+
 
 @router.get("/session/{session_id}/messages")
 async def get_messages(session_id: str):
@@ -157,106 +184,121 @@ async def get_messages(session_id: str):
     return {
         "session_id": session_id,
         "messages": [msg.dict() for msg in messages],
-        "count": len(messages)
+        "count": len(messages),
     }
 
 
 @router.post("/session/{session_id}/message", response_model=SendMessageResponse)
 async def send_message(
-    session_id: str,
-    request: SendMessageRequest,
-    background_tasks: BackgroundTasks
+    session_id: str, request: SendMessageRequest, background_tasks: BackgroundTasks
 ):
     """
     发送新消息到会话
-
-    Args:
-        session_id: 会话ID
-        request: 发送消息请求
-        background_tasks: FastAPI 后台任务
-
-    Returns:
-        创建的助手消息（初始为空）
-
-    流程：
-        1. 创建 user message
-        2. 创建 assistant message（初始为空）
-        3. 后台执行 OpenCode CLI
-        4. 通过 SSE 推送更新
     """
-    # 验证会话存在
-    session = await session_manager.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+    try:
+        # 验证会话存在
+        session = await session_manager.get_session(session_id)
+        if not session:
+            logger.warning(f"Session not found: {session_id}")
+            raise HTTPException(
+                status_code=404, detail=f"Session not found: {session_id}"
+            )
 
-    # 1. 创建 user message
-    user_message_id = request.message_id
-    user_text = request.parts[0].text if request.parts else ""
+        # 1. 创建 user message
+        user_message_id = request.message_id
+        user_text = (request.parts[0].text if request.parts else "").strip()
 
-    user_message = Message(
-        id=user_message_id,
-        session_id=session_id,
-        role=MessageRole.USER,
-        time={
-            "created": int(time.time())
-        }
-    )
-    await session_manager.add_message(user_message)
+        # 请求验证
+        if not user_text:
+            logger.warning(f"Empty message text in request for session: {session_id}")
+            raise HTTPException(status_code=400, detail="Message text cannot be empty")
 
-    # 添加 user text part
-    from .models import generate_part_id, Part, PartType, PartTime, PartContent
-    user_part_id = generate_part_id()
-    user_part = Part(
-        id=user_part_id,
-        session_id=session_id,
-        message_id=user_message_id,
-        type=PartType.TEXT,
-        content=PartContent(text=user_text),
-        time=PartTime(start=int(time.time()))
-    )
-    await session_manager.add_part(session_id, user_message_id, user_part)
+        user_message = Message(
+            id=user_message_id,
+            session_id=session_id,
+            role=MessageRole.USER,
+            time={"created": int(time.time())},
+        )
+        await session_manager.add_message(user_message)
 
-    logger.info(f"Added user message: {user_message_id} to session: {session_id}")
+        # 添加 user text part
+        user_part_id = generate_part_id()
+        logger.info(f"Adding user message part: {user_part_id}")
+        user_part = Part(
+            id=user_part_id,
+            session_id=session_id,
+            message_id=user_message_id,
+            type=PartType.TEXT,
+            content=PartContent(text=user_text),
+            time=PartTime(start=int(time.time())),
+        )
+        await session_manager.add_part(session_id, user_message_id, user_part)
 
-    # 2. 创建 assistant message（初始为空）
-    from .models import generate_message_id
-    assistant_message_id = generate_message_id()
-    assistant_message = Message(
-        id=assistant_message_id,
-        session_id=session_id,
-        role=MessageRole.ASSISTANT,
-        time={
-            "created": int(time.time())
-        }
-    )
-    await session_manager.add_message(assistant_message)
+        logger.info(f"Added user message: {user_message_id} to session: {session_id}")
 
-    logger.info(f"Created assistant message: {assistant_message_id} for session: {session_id}")
+        # 2. 创建 assistant message（初始为空）
+        assistant_message_id = generate_message_id()
+        assistant_message = Message(
+            id=assistant_message_id,
+            session_id=session_id,
+            role=MessageRole.ASSISTANT,
+            time={"created": int(time.time())},
+        )
+        await session_manager.add_message(assistant_message)
 
-    # 3. 发送消息更新事件（通过 SSE 广播）
-    await broadcast_message_update(session_id, assistant_message)
+        logger.info(
+            f"Created assistant message: {assistant_message_id} for session: {session_id}"
+        )
 
-    # 4. 后台执行 OpenCode CLI 任务
-    workspace_base = os.path.abspath(os.path.join(os.path.dirname(__file__), "../workspace"))
-    background_tasks.add_task(
-        execute_opencode_message,
-        session_id,
-        assistant_message_id,
-        user_text,
-        workspace_base
-    )
+        # 3. 发送消息更新事件（通过 SSE 广播）
+        await broadcast_message_update(session_id, assistant_message)
 
-    return SendMessageResponse(
-        id=assistant_message_id,
-        session_id=session_id,
-        role=MessageRole.ASSISTANT,
-        time={"created": int(time.time())}
-    )
+        # 4. 后台执行 OpenCode CLI 任务
+        from .opencode_client import execute_opencode_message
+
+        workspace_base = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "../workspace")
+        )
+        # 验证并创建工作区
+        if not os.path.exists(workspace_base):
+            logger.info(f"Creating workspace directory: {workspace_base}")
+            os.makedirs(workspace_base, exist_ok=True)
+
+        # 增强提示词
+        from .prompt_enhancer import enhance_prompt
+
+        try:
+            enhanced_user_text = enhance_prompt(user_text)
+        except Exception as pe:
+            logger.error(f"Prompt enhancement failed, falling back to original: {pe}")
+            enhanced_user_text = user_text
+
+        background_tasks.add_task(
+            execute_opencode_message,
+            session_id,
+            assistant_message_id,
+            enhanced_user_text,
+            workspace_base,
+            request.mode,  # Pass the execution mode (plan/build)
+        )
+
+        return SendMessageResponse(
+            id=assistant_message_id,
+            session_id=session_id,
+            role=MessageRole.ASSISTANT,
+            time={"created": int(time.time())},
+        )
+    except Exception as e:
+        logger.error(f"Error in send_message: {str(e)}", exc_info=True)
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ====================================================================
 # SSE Event Stream Endpoints
 # ====================================================================
+
 
 class EventStreamManager:
     """管理 SSE 事件流广播"""
@@ -272,24 +314,32 @@ class EventStreamManager:
 
         queue = asyncio.Queue()
         self.listeners[session_id].add(queue)
-        logger.info(f"New listener for session: {session_id} (total: {len(self.listeners[session_id])})")
+        logger.info(
+            f"New listener for session: {session_id} (total: {len(self.listeners[session_id])})"
+        )
         return queue
 
     async def unsubscribe(self, session_id: str, queue: asyncio.Queue):
         """取消订阅"""
         if session_id in self.listeners:
             self.listeners[session_id].discard(queue)
-            logger.info(f"Listener left session: {session_id} (remaining: {len(self.listeners[session_id])})")
+            logger.info(
+                f"Listener left session: {session_id} (remaining: {len(self.listeners[session_id])})"
+            )
 
     async def broadcast(self, session_id: str, event: dict):
         """向会话的所有监听者广播事件"""
         if session_id not in self.listeners:
             return
 
-        event_json = json.dumps(event, ensure_ascii=False)
+        # 使用 jsonable_encoder 处理 Enum 和 Pydantic 模型
+        encoded_event = jsonable_encoder(event)
+        event_json = json.dumps(encoded_event, ensure_ascii=False)
         sse_data = f"data: {event_json}\n\n"
 
-        logger.debug(f"Broadcasting to {len(self.listeners[session_id])} listeners: {event.get('type')}")
+        logger.debug(
+            f"Broadcasting to {len(self.listeners[session_id])} listeners: {event.get('type')}"
+        )
 
         for queue in list(self.listeners[session_id]):
             try:
@@ -340,23 +390,29 @@ async def events(session_id: str):
         queue = await event_stream_manager.subscribe(session_id)
         listener_count = event_stream_manager.get_listener_count(session_id)
 
-        logger.info(f"SSE connection established for session: {session_id} (listeners: {listener_count})")
+        logger.info(
+            f"SSE connection established for session: {session_id} (listeners: {listener_count})"
+        )
 
         try:
             # 发送连接成功消息
-            yield format_sse({
-                "type": "connection.established",
-                "session_id": session_id,
-                "timestamp": int(time.time())
-            })
+            yield format_sse(
+                {
+                    "type": "connection.established",
+                    "session_id": session_id,
+                    "timestamp": int(time.time()),
+                }
+            )
 
             # 发送初始状态（当前会话的消息）
             messages = await session_manager.get_messages(session_id)
-            yield format_sse({
-                "type": "session.state",
-                "session_id": session_id,
-                "message_count": len(messages)
-            })
+            yield format_sse(
+                {
+                    "type": "session.state",
+                    "session_id": session_id,
+                    "message_count": len(messages),
+                }
+            )
 
             # 持续发送事件
             last_activity = time.time()
@@ -370,16 +426,20 @@ async def events(session_id: str):
 
                 except asyncio.TimeoutError:
                     # 发送心跳
-                    yield format_sse({
-                        "type": "ping",
-                        "timestamp": int(time.time()),
-                        "session_id": session_id
-                    })
+                    yield format_sse(
+                        {
+                            "type": "ping",
+                            "timestamp": int(time.time()),
+                            "session_id": session_id,
+                        }
+                    )
 
                     # 检查会话是否还存在
                     session = await session_manager.get_session(session_id)
                     if not session or session.status == SessionStatus.ARCHIVED:
-                        logger.info(f"Session {session_id} no longer active, closing SSE")
+                        logger.info(
+                            f"Session {session_id} no longer active, closing SSE"
+                        )
                         break
 
         except GeneratorExit:
@@ -395,8 +455,8 @@ async def events(session_id: str):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
@@ -404,13 +464,14 @@ async def events(session_id: str):
 # Utility Endpoints
 # ====================================================================
 
+
 @router.get("/health")
 async def health_check():
     """健康检查端点"""
     return {
         "status": "healthy",
         "timestamp": int(time.time()),
-        "sessions": len(session_manager.sessions)
+        "sessions": len(session_manager.sessions),
     }
 
 
@@ -426,21 +487,19 @@ async def get_info():
                 "create": "POST /opencode/session",
                 "get": "GET /opencode/session/{id}",
                 "delete": "DELETE /opencode/session/{id}",
-                "list": "GET /opencode/sessions"
+                "list": "GET /opencode/sessions",
             },
             "message": {
                 "get_messages": "GET /opencode/session/{id}/messages",
-                "send": "POST /opencode/session/{id}/message"
+                "send": "POST /opencode/session/{id}/message",
             },
-            "events": {
-                "stream": "GET /opencode/events?session_id={id}"
-            },
+            "events": {"stream": "GET /opencode/events?session_id={id}"},
             "history": {
                 "get_file_history": "GET /opencode/get_file_history",
-                "get_file_at_step": "GET /opencode/get_file_at_step"
-            }
+                "get_file_at_step": "GET /opencode/get_file_at_step",
+            },
         },
-        "documentation": "/docs"
+        "documentation": "/docs",
     }
 
 
@@ -466,7 +525,7 @@ async def get_file_history(session_id: str, file_path: str):
                 "action": step.action,
                 "path": step.path,
                 "timestamp": step.timestamp,
-                "operation": step.operation
+                "operation": step.operation,
             }
             for step in timeline
             if step.path == file_path
@@ -475,11 +534,13 @@ async def get_file_history(session_id: str, file_path: str):
         return {
             "file_path": file_path,
             "history": file_history,
-            "count": len(file_history)
+            "count": len(file_history),
         }
     except Exception as e:
         logger.error(f"Error getting file history: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get file history: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get file history: {str(e)}"
+        )
 
 
 @router.get("/get_file_at_step")
@@ -501,41 +562,37 @@ async def get_file_at_step(session_id: str, file_path: str, step_id: str):
         if content is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"File not found at step: {file_path} @ {step_id}"
+                detail=f"File not found at step: {file_path} @ {step_id}",
             )
 
-        return {
-            "file_path": file_path,
-            "step_id": step_id,
-            "content": content
-        }
+        return {"file_path": file_path, "step_id": step_id, "content": content}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting file at step: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get file at step: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get file at step: {str(e)}"
+        )
 
 
 # ====================================================================
 # Helper Functions
 # ====================================================================
 
+
 async def broadcast_message_update(session_id: str, message: Message):
     """广播消息更新事件"""
-    await event_stream_manager.broadcast(session_id, {
-        "type": "message.updated",
-        "properties": {
-            "info": message.dict()
-        }
-    })
+    await event_stream_manager.broadcast(
+        session_id, {"type": "message.updated", "properties": {"info": message.dict()}}
+    )
 
 
 async def broadcast_part_update(session_id: str, part):
     """广播部分更新事件"""
-    await event_stream_manager.broadcast(session_id, {
-        "type": "message.part.updated",
-        "properties": {
-            "part": part.dict(),
-            "session_id": session_id
-        }
-    })
+    await event_stream_manager.broadcast(
+        session_id,
+        {
+            "type": "message.part.updated",
+            "properties": {"part": part.dict(), "session_id": session_id},
+        },
+    )

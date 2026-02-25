@@ -41,8 +41,8 @@ function createUserPromptCard(prompt) {
 // 创建阶段卡片（逐级展开）
 function createPhasesCard(phases, currentPhaseId) {
     const card = document.createElement('div');
-    card.className = 'bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-sm overflow-hidden';
-    
+    card.className = 'overflow-hidden'; // 去掉背景、边框和阴影
+
     const header = document.createElement('div');
     header.className = 'px-4 py-3 border-b border-border-light dark:border-border-dark bg-gray-50 dark:bg-zinc-800/50 flex items-center justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors';
     header.innerHTML = `
@@ -53,9 +53,9 @@ function createPhasesCard(phases, currentPhaseId) {
         </div>
         <span class="material-symbols-outlined text-gray-400 expand-icon transition-transform duration-200">expand_more</span>
     `;
-    
+
     const body = document.createElement('div');
-    body.className = 'phases-body p-4 space-y-3 relative';
+    body.className = 'phases-body py-2 space-y-3 relative'; // 移除 p-4 减少外部边距
 
     // 先创建所有 phase
     const phaseItems = [];
@@ -71,22 +71,14 @@ function createPhasesCard(phases, currentPhaseId) {
     if (phases.length > 1) {
         const timelineLine = document.createElement('div');
         timelineLine.className = 'absolute bg-gray-300 dark:bg-gray-600 opacity-50';
-        // 40px = 16px (body padding-left) + 12px (header padding-left) + 12px (图标半径)
-        // 36px = 16px (body padding-top) + 12px (header padding-top) + 8px (图标中心偏移)
-        timelineLine.style.cssText = 'left: 40px; width: 2px; top: 36px; bottom: 36px; z-index: 0;';
+        // 24px = 12px (header padding-left) + 12px (图标半径)
+        // 32px = 8px (body padding-top) + 12px (header padding-top) + 12px (图标中心偏移)
+        timelineLine.style.cssText = 'left: 24px; width: 2px; top: 32px; bottom: 32px; z-index: 0;';
         body.appendChild(timelineLine);
     }
-    
-    // 默认展开
-    header.onclick = () => {
-        const isHidden = body.classList.contains('hidden');
-        body.classList.toggle('hidden');
-        header.querySelector('.expand-icon').style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-    };
-    
-    card.appendChild(header);
+
     card.appendChild(body);
-    
+
     return card;
 }
 
@@ -135,7 +127,7 @@ function createPhaseItem(phase, index, currentPhaseId, isLast) {
                 </div>
                 ${phase.description ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${escapeHtml(phase.description)}</div>` : ''}
             </div>
-            ${isActive ? '<span class="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full font-medium">进行中</span>' : ''}
+            ${isActive && !isDone ? '<span class="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full font-medium">进行中</span>' : ''}
             ${isDone ? '<span class="text-xs px-2 py-0.5 bg-green-500 text-white rounded-full font-medium">已完成</span>' : ''}
             ${eventCount > 0 ? '<span class="material-symbols-outlined text-gray-400 expand-icon transition-transform duration-200 text-[18px]">expand_more</span>' : ''}
         </div>
@@ -188,63 +180,59 @@ function createEventItem(event, index) {
 
     // 判断事件类型
     const isThought = event.type === 'thought';
-    const isTool = event.type === 'tool';
+    const isTool = event.type === 'tool' || event.type === 'action';
     const isError = event.type === 'error';
 
-    let iconHtml, title, content;
+    let iconHtml, title, content, detailsHtml = '';
     let statusClass = 'text-gray-400';
     let statusIcon = 'schedule';
-    let isExpandable = false; // 是否可以展开
+    let isExpandable = false;
 
     if (isThought) {
-        // 思考类型 - 使用 thought SVG
         iconHtml = TOOL_ICONS['thought'];
         title = '思考过程';
-        content = event.content || '';
-        isExpandable = true; // 思考类型可展开
+        content = event.content || (typeof event.data === 'string' ? event.data : '');
+        isExpandable = true;
     } else if (isError) {
-        // 错误类型
         iconHtml = '<span class="material-symbols-outlined text-[14px]">error</span>';
         title = '执行错误';
-        content = event.content || '发生了未知错误';
+        content = event.content || event.message || '发生了未知错误';
         statusIcon = 'error';
         statusClass = 'text-red-500';
     } else if (isTool) {
-        // 工具类型（read, write, execute, bash, grep 等）
-        const toolType = event.tool || event.type || 'file_editor';
+        const data = event.data || {};
+        const toolName = data.tool_name || event.tool || 'file_editor';
+        const toolType = data.tool || toolName;
 
-        // 使用 getToolIcon 获取 SVG 图标
         if (typeof getToolIcon === 'function') {
-            const toolConfig = getToolIcon(toolType);
-            iconHtml = toolConfig.icon;
+            iconHtml = getToolIcon(toolType).icon;
         } else {
             iconHtml = TOOL_ICONS['file_editor'];
         }
 
-        title = toolType;
-        content = event.content || event.brief || `${toolType} 操作`;
-    } else {
-        // 其他类型，尝试直接用 type 作为工具名
-        const toolType = event.type || 'file_editor';
+        title = data.title || toolName;
 
-        if (typeof getToolIcon === 'function') {
-            const toolConfig = getToolIcon(toolType);
-            iconHtml = toolConfig.icon;
-        } else {
-            iconHtml = TOOL_ICONS['file_editor'];
+        // 提取输入输出详情
+        const rawInput = data.input || {};
+        const inputIsNotEmpty = Object.keys(rawInput).length > 0;
+        const input = inputIsNotEmpty ? JSON.stringify(rawInput, null, 2) : '';
+        const output = data.output || '';
+
+        content = input ? `Input: ${input.substring(0, 100)}${input.length > 100 ? '...' : ''}` : (output || `${toolName} 操作`);
+
+        if (input || output) {
+            isExpandable = true;
+            detailsHtml = `
+                <div class="mt-2 p-2 bg-gray-50 dark:bg-black/20 rounded border border-gray-100 dark:border-white/5 font-mono text-[10px] overflow-auto max-h-60">
+                    ${inputIsNotEmpty ? `<div class="text-blue-500 mb-1">Incoming Input:</div><pre class="whitespace-pre-wrap mb-2">${escapeHtml(input)}</pre>` : ''}
+                    ${output ? `<div class="text-green-500 mb-1">Command Output:</div><pre class="whitespace-pre-wrap">${escapeHtml(output)}</pre>` : ''}
+                </div>
+            `;
         }
-
-        title = toolType;
-        content = event.content || event.brief || `${toolType} 操作`;
     }
 
-    // 基础样式 - 添加灰色边框
+    // 基础样式
     item.className = 'event-item bg-white dark:bg-zinc-900/30 rounded-lg p-2.5 transition-colors border border-gray-200 dark:border-gray-700';
-
-    // 判断内容是否超过2行（估算：每行约40个字符）
-    const contentLines = (content || '').split('\n').length;
-    const contentLength = (content || '').length;
-    const isLongContent = contentLines > 2 || contentLength > 80;
 
     item.innerHTML = `
         <div class="flex items-start gap-2">
@@ -254,11 +242,11 @@ function createEventItem(event, index) {
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200">${title}</span>
-                    ${event.timestamp ? `<span class="text-[10px] text-gray-400 font-mono">${event.timestamp.split(' ')[1] || event.timestamp}</span>` : ''}
                 </div>
-                <div class="thought-content text-xs text-gray-500 dark:text-gray-400 ${isThought && isLongContent ? 'line-clamp-2' : ''}">${escapeHtml(content || '')}</div>
+                <div class="event-content text-xs text-gray-500 dark:text-gray-400 ${isExpandable ? 'line-clamp-2' : ''}">${escapeHtml(content || '')}</div>
+                <div class="event-details hidden">${detailsHtml || escapeHtml(content || '')}</div>
             </div>
-            ${isThought && isLongContent ? `
+            ${isExpandable ? `
                 <div class="flex-shrink-0 expand-icon-wrapper cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
                     <span class="material-symbols-outlined text-gray-400 expand-icon transition-transform duration-200 text-[16px]">expand_more</span>
                 </div>
@@ -266,22 +254,22 @@ function createEventItem(event, index) {
         </div>
     `;
 
-    // 只有思考类型且内容较长时可以展开
-    if (isThought && isLongContent) {
+    if (isExpandable) {
+        const expandWrapper = item.querySelector('.expand-icon-wrapper');
         const expandIcon = item.querySelector('.expand-icon');
-        const thoughtContent = item.querySelector('.thought-content');
+        const eventContent = item.querySelector('.event-content');
+        const eventDetails = item.querySelector('.event-details');
 
-        expandIcon.parentElement.onclick = (e) => {
+        expandWrapper.onclick = (e) => {
             e.stopPropagation();
-            const isExpanded = thoughtContent.classList.contains('line-clamp-2');
-
-            if (isExpanded) {
-                // 展开
-                thoughtContent.classList.remove('line-clamp-2');
+            const isHidden = eventDetails.classList.contains('hidden');
+            if (isHidden) {
+                eventDetails.classList.remove('hidden');
+                eventContent.classList.add('hidden');
                 expandIcon.style.transform = 'rotate(180deg)';
             } else {
-                // 收起
-                thoughtContent.classList.add('line-clamp-2');
+                eventDetails.classList.add('hidden');
+                eventContent.classList.remove('hidden');
                 expandIcon.style.transform = 'rotate(0deg)';
             }
         };
@@ -352,7 +340,7 @@ function createActionItem(action, index) {
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200">${title}</span>
-                    <span class="text-[10px] text-gray-400 font-mono">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span>
+                    <span class="text-[10px] text-gray-400 font-mono">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                 </div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 font-mono bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-border-light dark:border-border-dark break-all line-clamp-3">${escapeHtml(content || '')}</div>
             </div>
@@ -394,11 +382,11 @@ function createDeliverableCard(session) {
                 </h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="file-cards-${session.id}">
                     ${displayFiles.map((file, idx) => {
-                        const fileName = typeof file === 'string' ? file : (file.name || file.path || 'unknown');
-                        const fileExt = fileName.split('.').pop()?.toLowerCase() || '';
-                        const iconAndColor = getFileIconAndColor(fileExt);
+        const fileName = typeof file === 'string' ? file : (file.name || file.path || 'unknown');
+        const fileExt = fileName.split('.').pop()?.toLowerCase() || '';
+        const iconAndColor = getFileIconAndColor(fileExt);
 
-                        return `
+        return `
                             <div class="file-card flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer rounded-xl group"
                                  data-file-name="${escapeHtml(fileName)}">
                                 <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
@@ -409,7 +397,7 @@ function createDeliverableCard(session) {
                                 </div>
                             </div>
                         `;
-                    }).join('')}
+    }).join('')}
                     ${showMoreFiles ? `
                         <div class="view-all-files flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer rounded-xl group md:col-span-2 md:max-w-sm">
                             <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">

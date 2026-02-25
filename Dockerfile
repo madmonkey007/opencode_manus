@@ -23,13 +23,16 @@ RUN curl -fsSL https://bun.sh/install | bash \
 # 4. 全局安装 OpenCode-AI 官方内核
 RUN npm install -g opencode-ai
 
-# 5. 配置 noVNC 环境
-RUN ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html
+# 5. 配置 noVNC 环境 (确保 vnc.html 存在，兼容不同发行版的 noVNC)
+RUN if [ ! -f /usr/share/novnc/vnc.html ] && [ -f /usr/share/novnc/vnc_lite.html ]; then \
+    ln -s /usr/share/novnc/vnc_lite.html /usr/share/novnc/vnc.html; \
+    fi && \
+    ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html
 
-# 6. 安装 Python 环境
-RUN pip install --no-cache-dir uv
+# 6. 安装 Python 环境 (使用镜像源以加速)
+RUN pip install --no-cache-dir uv -i https://pypi.tuna.tsinghua.edu.cn/simple
 COPY requirements.txt .
-RUN uv pip install --system -r requirements.txt
+RUN uv pip install --system -r requirements.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 7. 预安装 Playwright 浏览器及其内核
 RUN playwright install chromium
