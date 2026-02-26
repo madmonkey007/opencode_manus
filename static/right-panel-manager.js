@@ -57,6 +57,11 @@ class RightPanelManager {
     }
 
     show() {
+        // 展开面板：移除宽度限制
+        this.panel.classList.remove('w-0');
+        this.panel.classList.add('w-[45%]');
+
+        // 确保面板可见
         if (this.panel.classList.contains('hidden')) {
             this.panel.classList.remove('hidden');
         }
@@ -66,14 +71,43 @@ class RightPanelManager {
         this.panel.classList.add('hidden');
     }
 
+    // 清空面板内容（用于切换会话时）
+    clear() {
+        this.currentMode = null;
+        this.currentFilename = null;
+
+        // 隐藏所有内容容器
+        if (this.fileEditorContainer) {
+            this.fileEditorContainer.classList.add('hidden');
+        }
+        if (this.webPreviewContainer) {
+            this.webPreviewContainer.classList.add('hidden');
+        }
+
+        const iframe = document.getElementById('uvn-frame');
+        if (iframe) iframe.style.display = 'none';
+
+        // 清空文件编辑器内容
+        const contentDiv = document.getElementById('file-editor-content');
+        if (contentDiv) {
+            contentDiv.innerHTML = `
+                <div class="text-gray-400 dark:text-gray-500 text-center py-8 text-sm">
+                    等待文件操作...
+                </div>
+            `;
+        }
+
+        console.log('[RightPanel] Panel cleared');
+    }
+
     switchTab(tabName) {
         // Update tab buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
             if (btn.dataset.tab === tabName) {
-                btn.classList.add('active-tab');
+                btn.classList.add('active');
                 btn.classList.remove('text-gray-500', 'dark:text-gray-400');
             } else {
-                btn.classList.remove('active-tab');
+                btn.classList.remove('active');
                 btn.classList.add('text-gray-500', 'dark:text-gray-400');
             }
         });

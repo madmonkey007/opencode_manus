@@ -37,6 +37,48 @@
         // 4. 注入样式和 Mode Selector
         injectAdvancedUI();
 
+        // 5. 劫持 updateInterfaceMode 以在切换模式时清空面板
+        // 使用定时器延迟劫持，因为 opencode.js 在此脚本之后加载
+        let hijackAttempts = 0;
+        let lastActiveId = null; // 跟踪上一次的会话ID
+        const hijackInterval = setInterval(() => {
+            hijackAttempts++;
+            if (typeof window.updateInterfaceMode === 'function' && !window.updateInterfaceMode._isPanelHijacked) {
+                clearInterval(hijackInterval);
+                const originalUpdateInterfaceMode = window.updateInterfaceMode;
+                window.updateInterfaceMode = function() {
+                    // 调用原函数
+                    const result = originalUpdateInterfaceMode.apply(this, arguments);
+
+                    // 只在会话真正切换时才清空面板
+                    const state = window.state;
+                    if (state && state.activeId) {
+                        // 检查会话是否切换
+                        if (lastActiveId && lastActiveId !== state.activeId) {
+                            const activeSession = state.sessions.find(x => x.id === state.activeId);
+                            // 只有切换到空白会话（没有prompt和response）时才清空
+                            if (activeSession && !activeSession.prompt && !activeSession.response) {
+                                if (window.rightPanelManager) {
+                                    window.rightPanelManager.clear();
+                                    console.log('[NewAPI] Cleared panel for new empty session (switched from', lastActiveId, 'to', state.activeId + ')');
+                                }
+                            }
+                        }
+                        // 更新跟踪的会话ID
+                        lastActiveId = state.activeId;
+                    }
+
+                    return result;
+                };
+                window.updateInterfaceMode._isPanelHijacked = true;
+                console.log('[NewAPI] Successfully hijacked updateInterfaceMode for panel clearing');
+            } else if (hijackAttempts > 50) {
+                // 10秒后停止尝试（50 * 200ms）
+                clearInterval(hijackInterval);
+                console.warn('[NewAPI] Failed to hijack updateInterfaceMode after 50 attempts');
+            }
+        }, 200);
+
         console.log('[NewAPI] V2.8 Advanced UI active');
     }
 
@@ -401,14 +443,16 @@
         }
 
         if (adapted.type === 'file_preview_delta') {
-            console.log('[NewAPI] File preview delta:', adapted.delta?.substring(0, 50) + '...');
+            // delta 是对象格式: {type: "insert", position: i, content: char}
+            const deltaContent = adapted.delta?.content || '';
+            console.log('[NewAPI] File preview delta:', deltaContent.substring(0, Math.min(50, deltaContent.length)) + (deltaContent.length > 50 ? '...' : ''));
 
             // 使用打字机效果追加内容
             if (window.rightPanelManager && typeof window.rightPanelManager.typeAppendContent === 'function') {
-                window.rightPanelManager.typeAppendContent(adapted.delta);
+                window.rightPanelManager.typeAppendContent(deltaContent);
             } else if (window.rightPanelManager && typeof window.rightPanelManager.appendFileContent === 'function') {
                 // 降级：直接追加（无打字机效果）
-                window.rightPanelManager.appendFileContent(adapted.delta);
+                window.rightPanelManager.appendFileContent(deltaContent);
             }
             return;
         }

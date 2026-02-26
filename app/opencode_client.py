@@ -518,6 +518,12 @@ class OpenCodeClient:
         input_data = part.get("input", {})
         output = state.get("output", "")
 
+        # 调试：打印完整的 part 结构
+        logger.info(f"[_handle_tool_use_event] tool={tool_name}, part.keys={list(part.keys())}")
+        if tool_name in ["write", "edit", "file_editor"]:
+            logger.info(f"[_handle_tool_use_event] input_data type={type(input_data)}, input_data={input_data}")
+            logger.info(f"[_handle_tool_use_event] state keys={list(state.keys())}, state={state}")
+
         # 特殊处理 todowrite：转换为阶段初始化事件
         if tool_name == "todowrite":
             todos = input_data.get("todos", [])
@@ -583,8 +589,10 @@ class OpenCodeClient:
         # 文件操作：生成预览事件（write/edit）
         # 注意：预览事件发送不依赖 history_service，始终发送
         if tool_name in ["write", "edit", "file_editor"]:
+            # 从 state.input 获取实际的文件路径和内容
+            state_input = state.get("input", {})
             await self._handle_file_operation(
-                session_id, message_id, tool_name, input_data, status
+                session_id, message_id, tool_name, state_input, status
             )
 
         # Bash/Grep 工具：生成终端输出预览
@@ -614,14 +622,21 @@ class OpenCodeClient:
             session_id: 会话ID
             message_id: 消息ID
             tool_name: 工具名称
-            input_data: 输入参数
+            input_data: 输入参数（来自 part.input，可能为空）
             status: 状态
         """
         try:
-            file_path = input_data.get("file_path") or input_data.get("path", "")
+            logger.info(f"[PREVIEW] _handle_file_operation called: tool={tool_name}, session={session_id}")
+            # 从 input_data 提取（兼容旧格式）
+            file_path = input_data.get("file_path") or input_data.get("path") or input_data.get("filePath", "")
             content = input_data.get("content", "")
 
+            # 如果 input_data 为空，尝试从 state 对象中获取
+            # 注意：需要从调用者传入 state 对象
+            logger.info(f"[PREVIEW] Extracted from input_data: file_path={file_path}, content_length={len(content)}")
+
             if not file_path:
+                logger.warning("[PREVIEW] No file_path found in input_data, skipping preview")
                 return
 
             step_id = generate_step_id()

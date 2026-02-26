@@ -1693,3 +1693,200 @@ INFO:     172.19.0.1:42894 - "GET /opencode/list_session_files?sid=ses_7049b441 
 INFO:     172.19.0.1:42894 - "GET /opencode/list_session_files?sid=ses_d57e42fa HTTP/1.1" 200 OK
 INFO:     172.19.0.1:42894 - "GET /opencode/list_session_files?sid=ses_846564cc HTTP/1.1" 200 OK
 INFO:     172.19.0.1:42894 - "GET /opencode/list_session_files?sid=ses_0db94937 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47056 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47056 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:47056 - "GET /opencode/list_session_files?sid=ses_3023f934 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43786 - "GET /opencode/list_session_files?sid=ses_vehv6i5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59856 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%20test2.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9Ahello HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59856 - "GET /opencode/list_session_files?sid=ses_b43bea59 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59870 - "POST /opencode/session/ses_b43bea59/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59870 - "GET /opencode/list_session_files?sid=ses_b43bea59 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59856 - "GET /opencode/events?session_id=ses_b43bea59 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48596 - "GET /opencode/events?session_id=ses_b43bea59 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:44854 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44854 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44850 - "GET /static/preview-config.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44868 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44882 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44886 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44878 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44854 - "GET /static/api-client.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44850 - "GET /static/event-adapter.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44882 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44868 - "GET /static/opencode-new-api-patch.js?v=4 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:44882 - "GET /opencode/list_session_files?sid=ses_5d2dd205 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37556 - "GET /opencode/list_session_files?sid=ses_5d2dd205 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37560 - "POST /opencode/session/ses_5d2dd205/message HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:37560 - "GET /opencode/events?session_id=ses_5d2dd205 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33610 - "GET /opencode/session HTTP/1.1" 405 Method Not Allowed
+INFO:     172.19.0.1:53258 - "POST /opencode/session?title=Test HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59110 - "POST /opencode/session/ses_23208b42/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33972 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33978 - "GET /opencode/list_session_files?sid=ses_21innnc HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39874 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%20typewriter-test.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9A HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39874 - "GET /opencode/list_session_files?sid=ses_758272a1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39874 - "GET /opencode/events?session_id=ses_758272a1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39888 - "POST /opencode/session/ses_758272a1/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39888 - "GET /opencode/list_session_files?sid=ses_758272a1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44678 - "GET /opencode/events?session_id=ses_758272a1 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33078 - "GET /static/opencode.js?v=23 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:33078 - "GET /opencode/list_session_files?sid=ses_758272a1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33078 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20typewriter-test.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9AHello%20World!%20Typewriter%20test!&sid=ses_758272a1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33088 - "GET /opencode/list_session_files?sid=ses_758272a1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57442 - "POST /opencode/session/ses_758272a1/message HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:57442 - "GET /opencode/events?session_id=ses_758272a1 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:37412 - "GET /opencode/list_session_files?sid=ses_7ita2ym HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35064 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%20debug-test.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9ATesti HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35064 - "GET /opencode/list_session_files?sid=ses_e37ffc45 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35074 - "POST /opencode/session/ses_e37ffc45/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35074 - "GET /opencode/list_session_files?sid=ses_e37ffc45 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35088 - "GET /opencode/events?session_id=ses_e37ffc45 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32934 - "GET /opencode/events?session_id=ses_e37ffc45 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:35172 - "GET /static/opencode.js?v=23 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:35172 - "GET /opencode/list_session_files?sid=ses_e37ffc45 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35172 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20debug-test.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9ATesting%20file%20path%20extraction!&sid=ses_e37ffc45 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35180 - "GET /opencode/list_session_files?sid=ses_v5vw9sm HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57196 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%20final-test.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9AABC HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57196 - "GET /opencode/list_session_files?sid=ses_4bd8ef17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57208 - "POST /opencode/session/ses_4bd8ef17/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57208 - "GET /opencode/list_session_files?sid=ses_4bd8ef17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57196 - "GET /opencode/events?session_id=ses_4bd8ef17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58614 - "GET /opencode/events?session_id=ses_4bd8ef17 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58468 - "GET /opencode/list_session_files?sid=ses_4bd8ef17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58468 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20final-test.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9AABC&sid=ses_4bd8ef17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58482 - "GET /opencode/list_session_files?sid=ses_rannakj HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39906 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%20typewriter-success.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39906 - "GET /opencode/list_session_files?sid=ses_c39fb853 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39916 - "POST /opencode/session/ses_c39fb853/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39916 - "GET /opencode/list_session_files?sid=ses_c39fb853 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39906 - "GET /opencode/events?session_id=ses_c39fb853 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45724 - "GET /?t=123456 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45724 - "GET /static/opencode.js?v=23 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:45724 - "GET /opencode/list_session_files?sid=ses_c39fb853 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45724 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20typewriter-success.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9AHello!%20This%20is%20a%20test!&sid=ses_c39fb853 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43846 - "GET /opencode/list_session_files?sid=ses_c39fb853 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43846 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20typewriter-success.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9AHello!%20This%20is%20a%20test!&sid=ses_c39fb853 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39168 - "GET /opencode/list_session_files?sid=ses_3d0gxay HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60116 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%20test-final.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9ATypew HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60116 - "GET /opencode/list_session_files?sid=ses_3c33e06f HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60116 - "POST /opencode/session/ses_3c33e06f/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60116 - "GET /opencode/events?session_id=ses_3c33e06f HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60122 - "GET /opencode/list_session_files?sid=ses_3c33e06f HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51534 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51534 - "GET /static/opencode-new-api-patch.js?v=5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51534 - "GET /opencode/list_session_files?sid=ses_3c33e06f HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51534 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20test-final.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9ATypewriter%20effect%20is%20working!&sid=ses_3c33e06f HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58390 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58390 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58406 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58402 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58416 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58440 - "GET /static/right-panel-manager.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58424 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58390 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58406 - "GET /static/event-adapter.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58416 - "GET /static/opencode-new-api-patch.js?v=5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58402 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58416 - "GET /opencode/list_session_files?sid=ses_3c33e06f HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58416 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20test-final.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9ATypewriter%20effect%20is%20working!&sid=ses_3c33e06f HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39502 - "GET /opencode/list_session_files?sid=ses_icp0aq6 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55536 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%20SUCCESS.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9ADONE! HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55536 - "GET /opencode/list_session_files?sid=ses_d44d06f7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55552 - "POST /opencode/session/ses_d44d06f7/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55536 - "GET /opencode/list_session_files?sid=ses_d44d06f7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55552 - "GET /opencode/events?session_id=ses_d44d06f7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48096 - "GET /opencode/list_session_files?sid=ses_4nvsswf HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37086 - "POST /opencode/session?title=%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC%EF%BC%8C%E7%BA%BF%E6%9D%A1%E5%9C%86%E6%B6%A6%EF%BC%8C%E5%8C%85%E8%B1%AA%E6%96%AF%E9%A3%8E%E6%A0%BC HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37086 - "GET /opencode/list_session_files?sid=ses_78425d78 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37096 - "POST /opencode/session/ses_78425d78/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37096 - "GET /opencode/list_session_files?sid=ses_78425d78 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37086 - "GET /opencode/events?session_id=ses_78425d78 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57028 - "GET /opencode/list_session_files?sid=ses_78425d78 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50108 - "GET /opencode/list_session_files?sid=ses_9tusfi2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50122 - "POST /opencode/session?title=%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC%EF%BC%8C%E7%BA%BF%E6%9D%A1%E5%9C%86%E6%B6%A6%EF%BC%8C%E5%8C%85%E8%B1%AA%E6%96%AF%E9%A3%8E%E6%A0%BC HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50122 - "GET /opencode/list_session_files?sid=ses_0bfb1f62 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50128 - "POST /opencode/session/ses_0bfb1f62/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50122 - "GET /opencode/list_session_files?sid=ses_0bfb1f62 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:50128 - "GET /opencode/events?session_id=ses_0bfb1f62 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59748 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33500 - "GET /static/opencode.js?v=23 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:33510 - "GET /static/opencode-new-api-patch.js?v=6 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33510 - "GET /opencode/list_session_files?sid=ses_0bfb1f62 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33510 - "GET /opencode/run_sse?prompt=%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC%EF%BC%8C%E7%BA%BF%E6%9D%A1%E5%9C%86%E6%B6%A6%EF%BC%8C%E5%8C%85%E8%B1%AA%E6%96%AF%E9%A3%8E%E6%A0%BC&sid=ses_0bfb1f62 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32916 - "GET /opencode/list_session_files?sid=ses_bpelg1p HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53184 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%20test-panel.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9ATesti HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40358 - "GET /?reload=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40358 - "GET /static/right-panel-manager.js?v=8 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35494 - "GET /static/opencode-new-api-patch.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35508 - "GET /static/opencode.js?v=23 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:35494 - "GET /opencode/list_session_files?sid=ses_0bfb1f62 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35494 - "GET /opencode/run_sse?prompt=%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC%EF%BC%8C%E7%BA%BF%E6%9D%A1%E5%9C%86%E6%B6%A6%EF%BC%8C%E5%8C%85%E8%B1%AA%E6%96%AF%E9%A3%8E%E6%A0%BC&sid=ses_0bfb1f62 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43340 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43340 - "GET /static/right-panel-manager.js?v=8 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41362 - "GET /static/opencode-new-api-patch.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41374 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:41390 - "GET /static/event-adapter.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:41402 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41402 - "GET /opencode/list_session_files?sid=ses_b43bea59 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41402 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20test2.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9Ahello&sid=ses_b43bea59 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55158 - "GET /?t=1739574827 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55158 - "GET /opencode/list_session_files?sid=ses_b43bea59 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55158 - "GET /opencode/run_sse?prompt=%E5%88%9B%E5%BB%BA%20test2.txt%20%E6%96%87%E4%BB%B6%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9Ahello&sid=ses_b43bea59 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42704 - "GET /opencode/list_session_files?sid=ses_2rfapd2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40538 - "POST /opencode/session?title=%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B5%8B%E8%AF%95%E6%96%87%E4%BB%B6%20panel-test.txt%EF%BC%8C%E5%86%85%E5%AE%B9%E6%98%AF%EF%BC%9A%E6%B5%8B%E8%AF%95 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40538 - "GET /opencode/list_session_files?sid=ses_1d9a3c32 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40552 - "POST /opencode/session/ses_1d9a3c32/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40552 - "GET /opencode/events?session_id=ses_1d9a3c32 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40538 - "GET /opencode/list_session_files?sid=ses_1d9a3c32 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45914 - "GET /opencode/list_session_files?sid=ses_9i3k1uw HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37150 - "POST /opencode/session?title=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37150 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37162 - "POST /opencode/session/ses_e5f4fff5/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37162 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:37150 - "GET /opencode/events?session_id=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59778 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59778 - "GET /opencode/get_file_content?path=ses_e5f4fff5%2Findex.html HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59778 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53328 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53328 - "GET /opencode/get_file_content?path=ses_e5f4fff5%2Findex.html HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53328 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35712 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40726 - "GET /opencode/events?session_id=ses_e5f4fff5 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53968 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53974 - "GET /?t=1739574900 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53974 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53986 - "GET /static/opencode-new-api-patch.js?v=8 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53992 - "GET /static/opencode.js?v=23 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:53986 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53986 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC&sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53974 - "GET /opencode/list_session_files?sid=ses_611amxv HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39940 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39954 - "GET /?t=1739575000 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39954 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:39956 - "GET /static/opencode-new-api-patch.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39956 - "GET /opencode/list_session_files?sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39956 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC&sid=ses_e5f4fff5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39954 - "GET /opencode/list_session_files?sid=ses_etr0r24 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39472 - "POST /opencode/session?title=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39472 - "GET /opencode/list_session_files?sid=ses_502f3cad HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39482 - "POST /opencode/session/ses_502f3cad/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39482 - "GET /opencode/events?session_id=ses_502f3cad HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39472 - "GET /opencode/list_session_files?sid=ses_502f3cad HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45342 - "GET /?t=1739575100 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33678 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:33686 - "GET /static/opencode-new-api-patch.js?v=9 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:33686 - "GET /opencode/list_session_files?sid=ses_502f3cad HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33686 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC&sid=ses_502f3cad HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40198 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40200 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40200 - "GET /opencode/list_session_files?sid=ses_502f3cad HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40200 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC&sid=ses_502f3cad HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56882 - "GET /opencode/list_session_files?sid=ses_502f3cad HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34584 - "GET /opencode/list_session_files?sid=ses_9pem28p HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34584 - "GET /opencode/list_session_files?sid=ses_9pem28p HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34584 - "GET /opencode/list_session_files?sid=ses_9pem28p HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34584 - "POST /opencode/session?title=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BD%91%E9%A1%B5%E7%89%88%E9%97%B9%E9%92%9F%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E9%A3%8E%E6%A0%BC HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34584 - "GET /opencode/list_session_files?sid=ses_afee917b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57084 - "POST /opencode/session/ses_afee917b/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34584 - "GET /opencode/events?session_id=ses_afee917b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57084 - "GET /opencode/list_session_files?sid=ses_afee917b HTTP/1.1" 200 OK

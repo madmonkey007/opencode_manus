@@ -681,6 +681,9 @@ async def process_log_line(text: str, sid: str = None):
 
                 # 跳过 todowrite，因为已经在上面处理过了
                 if tool_name != "todowrite":
+                    # 调试：打印工具名称
+                    logger.info(f"[DEBUG] tool_use event: tool_name={tool_name}, sid={sid}")
+
                     # ================================================================
                     # 历史追踪：捕获工具使用
                     # ================================================================
