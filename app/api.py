@@ -81,12 +81,13 @@ router = APIRouter(prefix="/opencode", tags=["opencode"])
 
 
 @router.post("/session", response_model=Session)
-async def create_session(title: str = "New Session", version: str = "1.0.0"):
+async def create_session(title: str = "New Session", mode: str = "auto", version: str = "1.0.0"):
     """
     创建新会话
 
     Args:
         title: 会话标题
+        mode: 初始模式 (plan/build/auto)
         version: API 版本
 
     Returns:
@@ -94,8 +95,11 @@ async def create_session(title: str = "New Session", version: str = "1.0.0"):
     """
     try:
         session = await session_manager.create_session(title=title, version=version)
-        logger.info(f"Created session: {session.id}")
+        # 将模式存储在会话元数据中
+        session.metadata["mode"] = mode
+        logger.info(f"Created session: {session.id} with mode: {mode}")
         return session
+
     except Exception as e:
         logger.error(f"Error creating session: {e}")
         raise HTTPException(
@@ -206,7 +210,12 @@ async def send_message(
 
         # 1. 创建 user message
         user_message_id = request.message_id
-        user_text = (request.parts[0].text if request.parts else "").strip()
+        user_text = ""
+        if request.parts:
+            first_part = request.parts[0]
+            user_text = (first_part.text if hasattr(first_part, "text") else "") or ""
+        user_text = user_text.strip()
+
 
         # 请求验证
         if not user_text:
@@ -217,8 +226,9 @@ async def send_message(
             id=user_message_id,
             session_id=session_id,
             role=MessageRole.USER,
-            time={"created": int(time.time())},
+            time=MessageTime(created=int(time.time())),
         )
+
         await session_manager.add_message(user_message)
 
         # 添加 user text part
@@ -242,8 +252,9 @@ async def send_message(
             id=assistant_message_id,
             session_id=session_id,
             role=MessageRole.ASSISTANT,
-            time={"created": int(time.time())},
+            time=MessageTime(created=int(time.time())),
         )
+
         await session_manager.add_message(assistant_message)
 
         logger.info(
@@ -273,21 +284,28 @@ async def send_message(
             logger.error(f"Prompt enhancement failed, falling back to original: {pe}")
             enhanced_user_text = user_text
 
+        # 确定运行模式：请求指定优先（非 auto），其次是 Session 预设，最后默认为 auto
+        session_mode = session.metadata.get("mode") if hasattr(session, "metadata") and session.metadata else "auto"
+        run_mode = request.mode if request.mode != "auto" else (session_mode or "auto")
+        logger.info(f"Sending message to {session_id} in mode: {run_mode}")
+
         background_tasks.add_task(
             execute_opencode_message,
             session_id,
             assistant_message_id,
             enhanced_user_text,
             workspace_base,
-            request.mode,  # Pass the execution mode (plan/build)
+            run_mode,
         )
+
 
         return SendMessageResponse(
             id=assistant_message_id,
             session_id=session_id,
             role=MessageRole.ASSISTANT,
-            time={"created": int(time.time())},
+            time=MessageTime(created=int(time.time())),
         )
+
     except Exception as e:
         logger.error(f"Error in send_message: {str(e)}", exc_info=True)
         if isinstance(e, HTTPException):

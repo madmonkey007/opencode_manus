@@ -19,16 +19,18 @@ class OpenCodeAPIClient {
     /**
      * 创建新会话
      * @param {string} title - 会话标题
+     * @param {string} mode - 运行模式 (plan, build, auto)
      * @returns {Promise<Session>}
      */
-    async createSession(title = 'New Session') {
-        const url = `${this.baseURL}/opencode/session?title=${encodeURIComponent(title)}`;
+    async createSession(title = 'New Session', mode = 'auto') {
+        const url = `${this.baseURL}/opencode/session?title=${encodeURIComponent(title)}&mode=${encodeURIComponent(mode)}`;
         const response = await fetch(url, { method: 'POST' });
         if (!response.ok) {
             throw new Error(`Failed to create session: ${response.status}`);
         }
         return await response.json();
     }
+
 
     /**
      * 获取会话信息
