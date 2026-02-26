@@ -99,28 +99,52 @@ function saveState() {
     }
 }
 
-function loadState() {
-    try {
-        const saved = localStorage.getItem('opencode_state');
-        if (saved) {
+async function loadState() {
+    const saved = localStorage.getItem('opencode_state');
+    if (saved) {
+        try {
             const parsed = JSON.parse(saved);
-            if (parsed.sessions && Array.isArray(parsed.sessions)) {
-                state.sessions = parsed.sessions.map(s => ({
-                    ...s,
-                    // Ensure these arrays exist
-                    actions: [],
-                    orphanEvents: [],
-                    uploadedFiles: s.uploadedFiles || []
-                }));
-            }
-            if (parsed.activeId) {
-                state.activeId = parsed.activeId;
-            }
+            state.sessions = parsed.sessions || [];
+            state.activeId = parsed.activeId || null;
+        } catch (e) {
+            console.error('Failed to parse saved state:', e);
         }
-    } catch (e) {
-        console.warn('Failed to load state from localStorage', e);
     }
+    
+    // 从后端同步 Session 列表
+    if (typeof apiClient !== 'undefined') {
+        try {
+            const backendSessions = await apiClient.listSessions();
+            if (backendSessions && backendSessions.length > 0) {
+                const merged = [...state.sessions];
+                backendSessions.forEach(bs => {
+                    const existing = merged.find(s => s.id === bs.id);
+                    if (existing) {
+                        existing.title = bs.title;
+                        existing.status = bs.status;
+                    } else {
+                        merged.push({
+                            id: bs.id,
+                            title: bs.title,
+                            status: bs.status,
+                            prompt: bs.title,
+                            response: '',
+                            phases: [],
+                            actions: [],
+                            orphanEvents: []
+                        });
+                    }
+                });
+                state.sessions = merged;
+            }
+        } catch (e) {
+            console.warn('[Sync] Failed to sync sessions from backend:', e);
+        }
+    }
+    
+    renderAll();
 }
+
 
 function renderSidebar() {
     const list = el('#session-list'); if (!list) return;
@@ -138,16 +162,59 @@ function renderSidebar() {
                 <span class="material-symbols-outlined text-[16px]">delete</span>
             </button>
         `;
-        item.onclick = () => {
+        item.onclick = async () => {
             console.log('[点击历史记录] session:', s);
-            console.log('  - id:', s.id);
-            console.log('  - prompt:', s.prompt);
-            console.log('  - response:', s.response);
-            console.log('  - phases:', s.phases);
             state.activeId = s.id;
+
+            // 如果是新 API Session 且本地数据不完整（刷新后），从后端深度加载
+            if (s.id.startsWith('ses_') && (!s.response || s.phases.length === 0)) {
+                console.log('[History] Deep loading session content for:', s.id);
+                try {
+                    const data = await apiClient.getMessages(s.id);
+                    if (data && data.messages) {
+                        // 转换后端消息格式到前端 state 格式
+                        s.response = '';
+                        s.phases = [];
+                        s.orphanEvents = [];
+                        s.actions = [];
+                        
+                        data.messages.forEach(msg => {
+                            if (msg.role === 'user') {
+                                // 更新 Prompt（如果有的话）
+                                const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
+                                if (userText) s.prompt = userText;
+                            } else {
+                                msg.parts?.forEach(part => {
+                                    if (part.type === 'text') {
+                                        s.response += (part.content?.text || part.text || '');
+                                    } else if (part.type === 'tool' || part.type === 'action') {
+                                        const toolContent = part.content || part;
+                                        const toolEv = {
+                                            type: 'action',
+                                            id: part.id,
+                                            data: {
+                                                tool_name: toolContent.tool || toolContent.tool_name,
+                                                input: toolContent.input || toolContent.state?.input,
+                                                output: toolContent.output || toolContent.state?.output,
+                                                status: toolContent.status || toolContent.state?.status
+                                            }
+                                        };
+                                        s.orphanEvents.push(toolEv);
+                                        s.actions.push(toolEv);
+                                    }
+                                });
+                            }
+                        });
+                        console.log('[History] Deep load complete for:', s.id);
+                    }
+                } catch (e) {
+                    console.warn('[History] Failed to fetch session messages:', e);
+                }
+            }
 
             // 清空右侧面板内容，避免显示旧会话的内容
             if (window.rightPanelManager) {
+
                 // 重置预览状态
                 window.rightPanelManager.currentMode = null;
                 window.rightPanelManager.currentFilename = null;
