@@ -60,8 +60,10 @@ class Session(BaseModel):
     version: str = Field(default="1.0.0", description="API版本")
     time: SessionTime = Field(default_factory=SessionTime, description="时间戳")
     status: SessionStatus = Field(default=SessionStatus.ACTIVE, description="会话状态")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="会话元数据")
 
     class Config:
+
         json_encoders = {
             int: int,
         }

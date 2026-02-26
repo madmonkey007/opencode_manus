@@ -84,11 +84,13 @@ function saveState() {
             sessions: state.sessions.map(s => ({
                 id: s.id,
                 prompt: s.prompt,
-                phases: s.phases,
-                // We don't save full logs/events to keep localStorage light, 
-                // but we need enough to resume. 
-                // Actually, since we can refetch logs from backend, we might only need ID.
-                // But for immediate UI feedback, saving phases is good.
+                // 仅保存阶段元数据，不保存具体的 events 详情以节省 localStorage 空间
+                phases: (s.phases || []).map(p => ({
+                    id: p.id,
+                    title: p.title,
+                    status: p.status,
+                    number: p.number
+                })),
                 response: s.response || '',
                 deliverables: s.deliverables || []
             }))
@@ -98,6 +100,7 @@ function saveState() {
         console.warn('Failed to save state to localStorage', e);
     }
 }
+
 
 async function loadState() {
     const saved = localStorage.getItem('opencode_state');

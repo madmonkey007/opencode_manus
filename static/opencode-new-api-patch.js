@@ -49,37 +49,106 @@
         const styles = document.createElement('style');
         styles.id = 'opencode-patch-styles';
         styles.textContent = `
-            .mode-selector {
-                display: flex;
-                gap: 8px;
+            .mode-selector-container {
+                position: relative;
                 margin-left: 8px;
-                padding: 4px;
-                background: rgba(0,0,0,0.03);
-                border-radius: 20px;
-                border: 1px solid rgba(0,0,0,0.05);
+                user-select: none;
             }
-            .dark .mode-selector {
-                background: rgba(255,255,255,0.05);
-                border: 1px solid rgba(255,255,255,0.1);
-            }
-            .mode-btn {
-                padding: 4px 12px;
-                border-radius: 16px;
-                font-size: 11px;
-                font-weight: 600;
+            .mode-active-display {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 12px;
+                background: rgba(0,0,0,0.04);
+                border-radius: 12px;
+                border: 1px solid rgba(0,0,0,0.08);
                 cursor: pointer;
-                transition: all 0.2s;
-                color: #666;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             }
-            .dark .mode-btn { color: #aaa; }
-            .mode-btn.active {
-                background: #000;
-                color: #fff;
+            .dark .mode-active-display {
+                background: rgba(255,255,255,0.06);
+                border: 1px solid rgba(255,255,255,0.12);
             }
-            .dark .mode-btn.active {
+            .mode-active-display:hover {
+                background: rgba(0,0,0,0.08);
+                transform: translateY(-1px);
+            }
+            .dark .mode-active-display:hover {
+                background: rgba(255,255,255,0.1);
+            }
+            .mode-active-display .mode-label {
+                font-size: 12px;
+                font-weight: 600;
+                color: #444;
+                letter-spacing: 0.01em;
+            }
+            .dark .mode-active-display .mode-label { color: #ccc; }
+            .mode-active-display .arrow {
+                font-size: 16px;
+                color: #888;
+                transition: transform 0.2s ease;
+            }
+            .mode-active-display.open .arrow {
+                transform: rotate(180deg);
+            }
+            .mode-dropdown {
+                position: absolute;
+                bottom: calc(100% + 12px);
+                left: 0;
+                min-width: 180px;
                 background: #fff;
-                color: #000;
+                border-radius: 16px;
+                box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+                border: 1px solid rgba(0,0,0,0.08);
+                overflow: hidden;
+                opacity: 0;
+                transform: scale(0.95);
+                pointer-events: none;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                z-index: 100;
             }
+            .dark .mode-dropdown {
+                background: #1f2937;
+                border: 1px solid rgba(255,255,255,0.1);
+                box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+            }
+            .mode-dropdown.show {
+                opacity: 1;
+                transform: scale(1);
+                pointer-events: auto;
+            }
+            .mode-option {
+                padding: 10px 16px;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .mode-option:hover {
+                background: rgba(0,0,0,0.04);
+            }
+            .dark .mode-option:hover {
+                background: rgba(255,255,255,0.05);
+            }
+            .mode-option.active {
+                background: rgba(59, 130, 246, 0.08);
+            }
+            .dark .mode-option.active {
+                background: rgba(59, 130, 246, 0.15);
+            }
+            .mode-option-title {
+                font-size: 13px;
+                font-weight: 600;
+                color: #111;
+            }
+            .dark .mode-option-title { color: #eee; }
+            .mode-option-desc {
+                font-size: 11px;
+                color: #777;
+            }
+            .dark .mode-option-desc { color: #999; }
+
             #stopStream {
                 border: 2px solid #000 !important;
                 background: #000 !important;
@@ -106,23 +175,76 @@
         // 注入模式选择器到输入框下方按钮栏
         const target = document.querySelector('#bottom-input-container .flex.items-center.gap-1');
         if (target) {
-            const selector = document.createElement('div');
-            selector.className = 'mode-selector';
-            selector.innerHTML = `
-                <div class="mode-btn active" data-mode="plan">Plan</div>
-                <div class="mode-btn" data-mode="build">Build</div>
+            const container = document.createElement('div');
+            container.className = 'mode-selector-container';
+            container.innerHTML = `
+                <div class="mode-active-display" id="mode-trigger">
+                    <span class="material-symbols-outlined !text-[16px]">psychology</span>
+                    <span class="mode-label" id="active-mode-name">Plan (分析)</span>
+                    <span class="material-symbols-outlined arrow">expand_more</span>
+                </div>
+                <div class="mode-dropdown" id="mode-dropdown">
+                    <div class="mode-option active" data-mode="plan">
+                        <span class="mode-option-title">Plan (分析模式)</span>
+                        <span class="mode-option-desc">仅制定计划和分析，不修改文件</span>
+                    </div>
+                    <div class="mode-option" data-mode="build">
+                        <span class="mode-option-title">Build (开发模式)</span>
+                        <span class="mode-option-desc">全自动执行，支持读写文件及运行代码</span>
+                    </div>
+                    <div class="mode-option" data-mode="auto">
+                        <span class="mode-option-title">Auto (智能模式)</span>
+                        <span class="mode-option-desc">由 OpenCode 根据任务自动选择</span>
+                    </div>
+                </div>
             `;
-            target.appendChild(selector);
+            target.appendChild(container);
 
-            selector.addEventListener('click', (e) => {
-                const btn = e.target.closest('.mode-btn');
-                if (!btn) return;
-                selector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                window._currentMode = btn.dataset.mode;
+            const trigger = container.querySelector('#mode-trigger');
+            const dropdown = container.querySelector('#mode-dropdown');
+            const activeLabel = container.querySelector('#active-mode-name');
+
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = dropdown.classList.contains('show');
+                if (isOpen) {
+                    dropdown.classList.remove('show');
+                    trigger.classList.remove('open');
+                } else {
+                    dropdown.classList.add('show');
+                    trigger.classList.add('open');
+                }
+            });
+
+            document.addEventListener('click', () => {
+                dropdown.classList.remove('show');
+                trigger.classList.remove('open');
+            });
+
+            dropdown.addEventListener('click', (e) => {
+                const option = e.target.closest('.mode-option');
+                if (!option) return;
+                
+                const mode = option.dataset.mode;
+                dropdown.querySelectorAll('.mode-option').forEach(o => o.classList.remove('active'));
+                option.classList.add('active');
+                
+                const labels = {
+                    'plan': 'Plan (分析)',
+                    'build': 'Build (开发)',
+                    'auto': 'Auto (智能)'
+                };
+                activeLabel.textContent = labels[mode];
+                window._currentMode = mode;
+                
+                dropdown.classList.remove('show');
+                trigger.classList.remove('open');
+                console.log('[NewAPI] Agent mode switched to:', mode);
             });
         }
         window._currentMode = 'plan';
+        window._turnIndex = 0; // 追踪对话轮次
+
     }
 
     /**
@@ -173,13 +295,33 @@
     }
 
     /**
-     * 执行提交逻辑
+     * 准备并切换 Session
      */
-    async function executeSubmission(btn) {
-        if (!ENABLE_NEW_API || !window.apiClient) {
-            console.warn('[NewAPI] API Client not ready');
-            return;
+    async function prepareSession(prompt, isWelcome) {
+        // 尝试从本地状态查找（如果已经点击过侧边栏切换）
+        let existing = window.state.sessions.find(s => s.id === window.state.activeId);
+        
+        // 如果是新任务，或者当前没有活跃 ID，则创建
+        if (!existing || isWelcome) {
+            const mode = window._currentMode || 'plan';
+            console.log('[NewAPI] Creating new session with mode:', mode);
+            const session = await window.apiClient.createSession(prompt, mode);
+            
+            existing = {
+                id: session.id,
+                title: session.title,
+                prompt: prompt,
+                response: '',
+                phases: [],
+                deliverables: [],
+                status: 'active',
+                mode: mode // 保存模式
+            };
+            window.state.sessions.unshift(existing);
         }
+        return existing;
+    }
+
 
         const isWelcome = btn.id === 'runStream-welcome';
         const primaryInput = document.getElementById(isWelcome ? 'prompt-welcome' : 'prompt');
@@ -191,38 +333,21 @@
         console.log('[NewAPI] Processing submission...', { isWelcome, promptLength: promptValue.length });
 
         try {
-            // 设置按钮状态
-            const runBtn = document.getElementById('runStream');
-            if (runBtn) {
-                runBtn.disabled = true;
-                runBtn.innerHTML = '<span class="material-symbols-outlined animate-spin">refresh</span>';
+            const mode = s.mode || window._currentMode || 'plan';
+            console.log(`[NewAPI] Connecting to events... (Mode: ${mode})`);
+            
+            // 1. 订阅事件
+            window.apiClient.subscribeToEvents(s.id, (data) => {
+                handleNewAPIEvent(data, s);
+            });
+
+            // 2. 发送消息
+            if (isNewTask) {
+                console.log('[NewAPI] Sending initial message...');
+                await window.apiClient.sendTextMessage(s.id, s.prompt, { mode: mode });
             }
-
-            // 1. 准备 Session
-            let s = await prepareSession(promptValue, isWelcome);
-            console.log('[NewAPI] Session focused:', s.id);
-
-            // 2. 强力切换 UI 模式
-            forceChatMode();
-
-            // 3. 确保状态机指向当前 session
-            window.state.activeId = s.id;
-            if (typeof window.renderAll === 'function') window.renderAll();
-
-            // 4. 连接并下发指令
-            await handleNewAPIConnection(s, true);
-
-            // 5. 清理
-            if (primaryInput) primaryInput.value = '';
-            if (secondaryInput) secondaryInput.value = '';
-
-            // 恢复按钮状态
-            if (runBtn) {
-                runBtn.disabled = false;
-                runBtn.innerHTML = '<span class="material-symbols-outlined !text-white dark:!text-black">arrow_upward</span>';
-            }
-
         } catch (err) {
+
             console.error('[NewAPI] Submission sequence failed:', err);
             alert('服务器响应异常: ' + (err.message || 'Error occurred'));
             const runBtn = document.getElementById('runStream');
@@ -373,10 +498,16 @@
         );
 
         if (isNewSubmission) {
-            const currentPrompt = s.prompt.split('\n\n---\n\n').pop();
-            console.log('[NewAPI] Sending user message to backend (Mode:', window._currentMode, ')');
+            window._turnIndex = (window._turnIndex || 0) + 1; // 每一轮新对话增加索引
+            const currentPrompt = s.prompt.split('
+
+---
+
+').pop();
+            console.log('[NewAPI] Sending user message to backend (Mode:', window._currentMode, ', Turn:', window._turnIndex, ')');
             await window.apiClient.sendTextMessage(s.id, currentPrompt, { mode: window._currentMode });
         }
+
 
         // 重新同步 UI 状态
         if (window.state.activeId !== s.id) {
@@ -442,10 +573,16 @@
             s.response += adapted.text;
         } else if (adapted.type === 'phases_init') {
             // 处理阶段初始化
+            const currentTurnIndex = window._turnIndex || 0;
             const newPhases = (adapted.phases || []).map(p => {
                 const existingPhase = s.phases?.find(sp => sp.id === p.id);
-                return { ...p, events: existingPhase?.events || [] };
+                return { 
+                    ...p, 
+                    events: existingPhase?.events || [],
+                    turn_index: existingPhase?.turn_index ?? currentTurnIndex // 关联到当前对话轮次
+                };
             });
+
             
             const phaseMap = new Map();
             s.phases?.forEach(p => phaseMap.set(p.id, p));
@@ -476,12 +613,19 @@
         } else if (adapted.type === 'deliverables') {
             s.deliverables = adapted.items || [];
         } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
-            // 标记所有 Phase 为完成
+            // 标记当前活跃阶段为完成，不应盲目标记所有阶段
+            const isError = adapted.value === 'error' || adapted.status === 'error';
             if (s.phases) {
-                s.phases.forEach(p => p.status = 'completed');
+                s.phases.forEach(p => {
+                    if (p.status === 'active') {
+                        p.status = isError ? 'error' : 'completed';
+                    }
+                });
             }
             document.getElementById('stopStream')?.classList.add('hidden');
             document.getElementById('runStream')?.classList.remove('hidden');
+            console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}`);
+
         } else if (adapted.type === 'phase_start') {
             // 停用当前活跃 Phase
             if (s.currentPhase) {
@@ -612,10 +756,23 @@
             if (targetPhase) {
                 if (!targetPhase.events) targetPhase.events = [];
 
-                // 幂等处理：防止重复添加相同 Part ID 的事件
                 const eventId = adapted.id || (adapted.data && (adapted.data.id || adapted.data.call_id)) || adapted.message_id;
 
+                if (!targetPhase.events) targetPhase.events = [];
+                
+                // 增加 event_id 去重检查，防止重复添加相同动作
+                const isDuplicate = eventId && targetPhase.events.some(e => {
+                    const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;
+                    return eId === eventId;
+                });
+
+                if (isDuplicate) {
+                    console.log('[NewAPI] Skipping duplicate event:', eventId);
+                    return;
+                }
+
                 let existingEventIndex = -1;
+
                 if (eventId) {
                     existingEventIndex = targetPhase.events.findIndex(e => {
                         const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;

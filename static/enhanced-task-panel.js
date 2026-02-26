@@ -27,19 +27,24 @@ function renderEnhancedTaskPanel(session) {
             turnContainer.appendChild(userCard);
         }
 
-        // 2. 任务阶段卡片
-        // 如果是最后一轮，显示当前 session 的阶段信息
-        // 如果是历史轮次且该轮次有对应的阶段快照，也可以显示（暂未实现快照逻辑）
-        if (i === turnsCount - 1 && session.phases && session.phases.length > 0) {
-            const phasesCard = createPhasesCard(session.phases, session.currentPhase);
-            turnContainer.appendChild(phasesCard);
-        } else if (i === 0 && session.phases && session.phases.length > 0 && turnsCount === 1) {
-            // 兜底逻辑：如果是第一轮（也是最后一轮），确保显示
-            const phasesCard = createPhasesCard(session.phases, session.currentPhase);
+        // 2. 任务阶段卡片 - 仅显示属于该对话轮次 (turn_index === i + 1) 的 phases
+        // 注意：turnIndex 是从 1 开始计数的（在 patch.js 中初始化为 1）
+        const turnPhases = session.phases ? session.phases.filter(p => (p.turn_index === i + 1)) : [];
+        
+        // 兜底：如果是最后一轮且没找到匹配的 turn_index，显示所有未关联的 phases
+        if (i === turnsCount - 1 && turnPhases.length === 0 && session.phases && session.phases.length > 0) {
+            const unassociatedPhases = session.phases.filter(p => !p.turn_index || p.turn_index >= i + 1);
+            if (unassociatedPhases.length > 0) {
+                const phasesCard = createPhasesCard(unassociatedPhases, session.currentPhase);
+                turnContainer.appendChild(phasesCard);
+            }
+        } else if (turnPhases.length > 0) {
+            const phasesCard = createPhasesCard(turnPhases, session.currentPhase);
             turnContainer.appendChild(phasesCard);
         }
 
         // 3. 该轮的回答
+
         if (responses[i] !== undefined && responses[i] !== null) {
             // 只有当有内容或者是最后一轮时才渲染回答卡片
             if (responses[i].trim() || i === turnsCount - 1) {
