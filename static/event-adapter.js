@@ -105,6 +105,24 @@ class EventAdapter {
             };
         }
 
+        // 阶段初始化事件 (处理后端 phases_init)
+        if (eventType === 'phases_init') {
+            return {
+                type: 'phases_init',
+                phases: newEvent.phases,
+                timestamp: newEvent.timestamp
+            };
+        }
+
+        // 交付物事件
+        if (eventType === 'deliverables') {
+            return {
+                type: 'deliverables',
+                items: newEvent.items || [],
+                timestamp: newEvent.timestamp
+            };
+        }
+
         // 未知事件类型
         console.warn('[EventAdapter] Unknown event type:', eventType, newEvent);
         return null;
@@ -133,6 +151,7 @@ class EventAdapter {
         // THOUGHT 类型
         if (partType === 'thought') {
             return {
+                id: part.id,
                 type: 'thought',
                 content: part.content?.text || '',
                 message_id: part.message_id
@@ -159,8 +178,10 @@ class EventAdapter {
             const title = metadata.title || (isThought ? 'Thinking' : `Using ${toolName}`);
 
             return {
+                id: part.id,
                 type: 'action',
                 data: {
+                    id: part.id,
                     tool: toolType,
                     tool_name: toolName,
                     title: title,
@@ -174,7 +195,7 @@ class EventAdapter {
         }
 
         // STEP-START 类型
-        if (partType === 'step-start') {
+        if (partType === 'step-start' || partType === 'step_start') {
             const metadata = part.metadata || {};
             return {
                 type: 'phase_start',
@@ -186,7 +207,7 @@ class EventAdapter {
         }
 
         // STEP-FINISH 类型
-        if (partType === 'step-finish') {
+        if (partType === 'step-finish' || partType === 'step_finish') {
             return {
                 type: 'phase_finish',
                 phase_id: part.id,

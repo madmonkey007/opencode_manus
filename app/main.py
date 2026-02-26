@@ -137,6 +137,42 @@ async def get_file_content(path: str):
         return {"content": f"Error reading file: {str(e)}", "type": "error"}
 
 
+@app.get("/opencode/read_file")
+async def read_file(session_id: str, file_path: str):
+    """
+    读取会话工作区中的文件内容
+
+    Args:
+        session_id: 会话ID
+        file_path: 文件路径（相对于会话工作区）
+    """
+    try:
+        # 构建完整路径
+        session_dir = os.path.join(WORKSPACE_BASE, session_id)
+        full_path = os.path.abspath(os.path.join(session_dir, file_path))
+
+        # 安全检查：确保文件在会话目录内
+        if not full_path.startswith(session_dir):
+            return {"status": "error", "message": "Access denied"}
+
+        if not os.path.exists(full_path):
+            return {"status": "error", "message": "File not found"}
+
+        # 读取文件内容
+        with open(full_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        return {
+            "status": "success",
+            "content": content,
+            "file_path": file_path,
+            "size": len(content)
+        }
+    except Exception as e:
+        logger.error(f"Error reading file {file_path}: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/opencode/get_log")
 async def get_log(sid: str, offset: int = 0):
     """
@@ -659,66 +695,75 @@ async def process_log_line(text: str, sid: str = None):
                                 tool_input=input_data,
                                 step_id=step_id,
                             )
+                        except Exception as e:
+                            logger.error(f"Failed to capture tool use: {e}")
 
-                            # 文件操作：发送预览事件
-                            if tool_name in ["write", "edit", "file_editor"]:
-                                file_path = input_data.get(
-                                    "file_path"
-                                ) or input_data.get("path", "")
-                                content = input_data.get("content", "")
+                    # 文件操作：发送预览事件（不依赖 history_service）
+                    if tool_name in ["write", "edit", "file_editor"]:
+                        file_path = input_data.get(
+                            "file_path"
+                        ) or input_data.get("path", "")
+                        content = input_data.get("content", "")
 
-                                logger.info(
-                                    f"[PREVIEW] Sending preview_start for {tool_name}: {file_path}"
-                                )
-                                logger.info(
-                                    f"[PREVIEW] Content length: {len(content)} chars"
-                                )
-                                logger.info(
-                                    f"[PREVIEW] Action type: {capture_result['action_type']}"
-                                )
+                        # 确定 action_type（优先使用 capture_result，否则回退到默认值）
+                        action_type = "write" if tool_name == "write" else "edit"
+                        if capture_result:
+                            action_type = capture_result.get("action_type", action_type)
 
-                                # 预览开始
+                        logger.info(
+                            f"[PREVIEW] Sending preview_start for {tool_name}: {file_path}"
+                        )
+                        logger.info(
+                            f"[PREVIEW] Content length: {len(content)} chars"
+                        )
+                        logger.info(
+                            f"[PREVIEW] Action type: {action_type}"
+                        )
+
+                        # 预览开始
+                        yield format_sse(
+                            {
+                                "type": "preview_start",
+                                "step_id": step_id,
+                                "file_path": file_path,
+                                "action": action_type,
+                            }
+                        )
+
+                        # 流式推送内容（打字机效果）
+                        if content:
+                            logger.info(
+                                f"[PREVIEW] Starting typewriter effect with {len(content)} chars"
+                            )
+                            for i, char in enumerate(content):
                                 yield format_sse(
                                     {
-                                        "type": "preview_start",
+                                        "type": "preview_delta",
                                         "step_id": step_id,
-                                        "file_path": file_path,
-                                        "action": capture_result["action_type"],
+                                        "delta": {
+                                            "type": "insert",
+                                            "position": i,
+                                            "content": char,
+                                        },
                                     }
                                 )
+                                await asyncio.sleep(0.005)  # 打字机速度
+                            logger.info(
+                                f"[PREVIEW] Typewriter effect completed"
+                            )
 
-                                # 流式推送内容（打字机效果）
-                                if content:
-                                    logger.info(
-                                        f"[PREVIEW] Starting typewriter effect with {len(content)} chars"
-                                    )
-                                    for i, char in enumerate(content):
-                                        yield format_sse(
-                                            {
-                                                "type": "preview_delta",
-                                                "step_id": step_id,
-                                                "delta": {
-                                                    "type": "insert",
-                                                    "position": i,
-                                                    "content": char,
-                                                },
-                                            }
-                                        )
-                                        await asyncio.sleep(0.005)  # 打字机速度
-                                    logger.info(
-                                        f"[PREVIEW] Typewriter effect completed"
-                                    )
+                        # 预览结束
+                        yield format_sse(
+                            {
+                                "type": "preview_end",
+                                "step_id": step_id,
+                                "file_path": file_path,
+                            }
+                        )
 
-                                # 预览结束
-                                yield format_sse(
-                                    {
-                                        "type": "preview_end",
-                                        "step_id": step_id,
-                                        "file_path": file_path,
-                                    }
-                                )
-
-                                # 保存快照
+                        # 保存快照（如果 history_service 可用）
+                        if history_service:
+                            try:
                                 await history_service.capture_file_change(
                                     step_id=step_id,
                                     file_path=file_path,
@@ -729,23 +774,22 @@ async def process_log_line(text: str, sid: str = None):
                                         else "modified"
                                     ),
                                 )
+                            except Exception as e:
+                                logger.error(f"Failed to capture file change: {e}")
 
-                            # 时间轴更新
-                            if capture_result:
-                                yield format_sse(
-                                    {
-                                        "type": "timeline_update",
-                                        "step": {
-                                            "step_id": capture_result["step_id"],
-                                            "action": capture_result["action_type"],
-                                            "path": capture_result["file_path"],
-                                            "timestamp": capture_result["timestamp"],
-                                        },
-                                    }
-                                )
-
-                        except Exception as e:
-                            logger.error(f"Failed to capture history: {e}")
+                    # 时间轴更新
+                    if capture_result:
+                        yield format_sse(
+                            {
+                                "type": "timeline_update",
+                                "step": {
+                                    "step_id": capture_result["step_id"],
+                                    "action": capture_result["action_type"],
+                                    "path": capture_result["file_path"],
+                                    "timestamp": capture_result["timestamp"],
+                                },
+                            }
+                        )
 
                     # Map to standard type
                     display_type = map_tool_to_type(tool_name)

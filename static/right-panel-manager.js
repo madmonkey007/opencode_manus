@@ -275,6 +275,61 @@ class RightPanelManager {
         }
     }
 
+    // 打字机效果追加内容
+    typeAppendContent(content) {
+        if (this.currentMode !== 'file-editor') return;
+        if (!content || content.length === 0) return;
+
+        const pre = document.getElementById('file-code-content');
+        const cursor = document.getElementById('typing-cursor');
+        if (!pre) return;
+
+        // 显示光标
+        if (cursor) cursor.style.display = 'block';
+
+        let index = 0;
+        const speed = 5; // 每个字符的延迟（毫秒）
+
+        const typeNextChar = () => {
+            if (index < content.length) {
+                const char = content[index];
+                pre.textContent += char;
+
+                // 更新统计
+                const fullContent = pre.textContent;
+                const lineCount = fullContent.split('\n').length;
+                const charCount = fullContent.length;
+
+                const lineCountEl = document.getElementById('file-line-count');
+                const charCountEl = document.getElementById('file-char-count');
+
+                if (lineCountEl) lineCountEl.textContent = `${lineCount} 行`;
+                if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
+
+                // 自动滚动到底部
+                const container = document.getElementById('file-editor-content');
+                if (container) container.scrollTop = container.scrollHeight;
+                pre.scrollTop = pre.scrollHeight;
+
+                index++;
+                setTimeout(typeNextChar, speed);
+            } else {
+                // 完成，隐藏光标
+                if (cursor) cursor.style.display = 'none';
+            }
+        };
+
+        typeNextChar();
+    }
+
+    // 设置文件状态
+    setFileStatus(status) {
+        const statusLabel = document.querySelector('.status-label');
+        if (statusLabel) {
+            statusLabel.textContent = status;
+        }
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;

@@ -83,6 +83,7 @@ class OpenCodeClient:
         session_id: str,
         assistant_message_id: str,
         user_prompt: str,
+        mode: str = "auto",
         model_id: str = "new-api/gemini-3-flash-preview",
     ):
         """
@@ -146,6 +147,17 @@ class OpenCodeClient:
                 # Fallback to current dir plus config
                 config_file = os.path.join(base_dir, "config", "opencode.json")
 
+            # 创建日志和状态目录
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            
+            # 修复 ENOENT: no such file or directory, open '.claude/transcripts/...'
+            # 这是一个已知的 Windows 环境下的 OpenCode CLI 路径问题
+            user_home = os.path.expanduser("~")
+            claude_transcripts_dir = os.path.join(user_home, ".claude", "transcripts")
+            if not os.path.exists(claude_transcripts_dir):
+                logger.info(f"Creating missing directory: {claude_transcripts_dir}")
+                os.makedirs(claude_transcripts_dir, exist_ok=True)
+
             # 构建环境变量
             env = {**os.environ}
             if not is_windows:
@@ -157,7 +169,8 @@ class OpenCodeClient:
 
             # 构建命令行
             safe_prompt = shlex.quote(user_prompt)
-            inner_cmd = f"opencode run --model {model_id} --format json --thinking {safe_prompt}"
+            agent_flag = f" --agent {mode}" if mode in ["plan", "build"] else ""
+            inner_cmd = f"opencode run --model {model_id} --format json --thinking {safe_prompt}{agent_flag}"
 
             if is_windows:
                 # Windows 不需要 script 命令且路径不同
@@ -289,53 +302,64 @@ class OpenCodeClient:
             SSE 事件字典
         """
         # MARKER: 调试日志
-        logger.debug(f"Processing line: {text[:100]}...")
+        logger.info(f"[_process_line] Processing line: {text[:100]}...")
 
         # 尝试解析为 JSON
         if text.startswith("{") and text.endswith("}"):
             try:
                 event = json.loads(text)
                 event_type = event.get("type")
+                logger.info(f"[_process_line] Parsed JSON event: type={event_type}, sessionID={event.get('sessionID')}, my session_id={session_id}")
 
                 # 处理不同类型的事件
                 if event_type == "text":
+                    logger.info(f"[_process_line] Handling text event")
                     async for e in self._handle_text_event(
                         event, session_id, message_id, context
                     ):
                         yield e
 
                 elif event_type == "tool_use":
+                    logger.info(f"[_process_line] Handling tool_use event, tool={event.get('part', {}).get('tool')}")
                     async for e in self._handle_tool_use_event(
                         event, session_id, message_id
                     ):
                         yield e
 
                 elif event_type == "thought":
+                    logger.info(f"[_process_line] Handling thought event")
                     async for e in self._handle_thought_event(
                         event, session_id, message_id
                     ):
                         yield e
 
                 elif event_type == "step_start" or event_type == "step-start":
+                    logger.info(f"[_process_line] Handling step_start event")
                     async for e in self._handle_step_start_event(
                         event, session_id, message_id, context
                     ):
                         yield e
 
                 elif event_type == "step_finish" or event_type == "step-finish":
+                    logger.info(f"[_process_line] Handling step_finish event, reason={event.get('reason')}")
                     async for e in self._handle_step_finish_event(
                         event, session_id, message_id, context
                     ):
                         yield e
 
                 elif event_type == "error":
+                    logger.info(f"[_process_line] Handling error event")
                     yield self._handle_error_event(event, session_id)
 
+                else:
+                    logger.warning(f"[_process_line] Unknown event type: {event_type}")
                 # 其他类型忽略
                 return
 
-            except json.JSONDecodeError:
-                pass  # 不是 JSON，继续处理
+            except json.JSONDecodeError as e:
+                logger.error(f"[_process_line] JSON decode error: {e}, text: {text[:100]}")
+            except Exception as e:
+                logger.error(f"[_process_line] Error processing JSON event: {e}", exc_info=True)
 
         # 处理非 JSON 行（Thought 等）
         thought_match = re.search(
@@ -385,12 +409,21 @@ class OpenCodeClient:
                 }
 
         # 过滤噪音
+        # 先检查 ANSI 颜色代码和 CLI 警告（使用原始文本）
+        if any(pattern in text for pattern in ["[0m", "[93m", "[1m", "\x1b["]):
+            logger.debug(f"[_process_line] Filtered ANSI color code line")
+            return
+
         noise_keywords = [
             "opencode run",
             "options:",
             "positionals:",
             "message  message to send",
             "run opencode with",
+            # 过滤 OpenCode CLI 的警告信息
+            "agent \"plan\" is a subagent",
+            "is a subagent, not a primary agent",
+            "falling back to default agent",
         ]
         if not any(keyword in text.lower() for keyword in noise_keywords):
             # 作为普通文本处理
@@ -485,8 +518,30 @@ class OpenCodeClient:
         input_data = part.get("input", {})
         output = state.get("output", "")
 
-        # 跳过 todowrite（已由前端处理）
+        # 特殊处理 todowrite：转换为阶段初始化事件
         if tool_name == "todowrite":
+            todos = input_data.get("todos", [])
+            if todos:
+                # 转换为 frontend phases 格式
+                phases = []
+                for i, todo in enumerate(todos):
+                    phases.append(
+                        {
+                            "id": todo.get("id", f"phase_{i}"),
+                            "title": todo.get("content", "New Phase"),
+                            "status": todo.get("status", "pending"),
+                            "number": i + 1,
+                        }
+                    )
+                # 广播 phases_init 事件
+                await self._broadcast_event(
+                    session_id,
+                    {
+                        "type": "phases_init",
+                        "phases": phases,
+                        "timestamp": int(datetime.now().timestamp()),
+                    },
+                )
             return
 
         # 创建工具部分
@@ -495,28 +550,6 @@ class OpenCodeClient:
         # 提取标题和描述（如果元数据中存在）
         metadata = part.get("metadata", {})
         title = metadata.get("title") or f"Using {tool_name}"
-
-        tool_part = Part(
-            id=tool_part_id,
-            session_id=session_id,
-            message_id=message_id,
-            type=PartType.TOOL,
-            content=PartContent(
-                tool=tool_name,
-                call_id=tool_part_id,
-                state=state,
-                text=output,  # 冗余一份到 text 以防 UI 只读 text
-            ),
-            time=PartTime(
-                start=int(datetime.now().timestamp()),
-                end=(
-                    int(datetime.now().timestamp())
-                    if status in ["completed", "error"]
-                    else None
-                ),
-            ),
-            metadata=ToolMetadata(title=title, input=input_data),
-        )
 
         # 发送工具事件
         yield {
@@ -539,8 +572,7 @@ class OpenCodeClient:
                         "status": status,
                     },
                     "time": {
-                        "start": tool_part.time.start,
-                        "end": tool_part.time.end,
+                        "start": int(datetime.now().timestamp()),
                     },
                 },
                 "session_id": session_id,
@@ -548,10 +580,23 @@ class OpenCodeClient:
             },
         }
 
-        # 文件操作：生成预览事件
-        if tool_name in ["write", "edit", "file_editor"] and self.history_service:
+        # 文件操作：生成预览事件（write/edit）
+        # 注意：预览事件发送不依赖 history_service，始终发送
+        if tool_name in ["write", "edit", "file_editor"]:
             await self._handle_file_operation(
                 session_id, message_id, tool_name, input_data, status
+            )
+
+        # Bash/Grep 工具：生成终端输出预览
+        if tool_name in ["bash", "grep", "terminal"] and output:
+            await self._handle_terminal_output(
+                session_id, message_id, tool_name, input_data, output
+            )
+
+        # Read 工具：生成文件内容预览
+        if tool_name == "read" and output:
+            await self._handle_read_preview(
+                session_id, message_id, input_data, output
             )
 
     async def _handle_file_operation(
@@ -661,6 +706,135 @@ class OpenCodeClient:
         except Exception as e:
             logger.error(f"Error handling file operation: {e}")
 
+    async def _handle_terminal_output(
+        self,
+        session_id: str,
+        message_id: str,
+        tool_name: str,
+        input_data: Dict[str, Any],
+        output: str,
+    ):
+        """
+        处理 bash/grep/terminal 工具的输出，生成终端预览事件
+
+        Args:
+            session_id: 会话ID
+            message_id: 消息ID
+            tool_name: 工具名称
+            input_data: 输入参数
+            output: 命令输出
+        """
+        try:
+            if not output:
+                return
+
+            step_id = generate_step_id()
+
+            # 生成预览标题
+            if tool_name == "bash":
+                command = input_data.get("command", "")
+                title = f"终端: {command}" if command else "终端输出"
+            elif tool_name == "grep":
+                pattern = input_data.get("pattern", "")
+                title = f"搜索结果: {pattern}" if pattern else "搜索结果"
+            else:
+                title = "终端输出"
+
+            # 发送终端预览开始事件
+            await self._broadcast_event(
+                session_id,
+                {
+                    "type": "preview_start",
+                    "step_id": step_id,
+                    "title": title,
+                    "action": "terminal",
+                    "tool": tool_name,
+                },
+            )
+
+            # 发送输出内容（逐行推送以模拟终端滚动）
+            lines = output.split("\n")
+            for i, line in enumerate(lines):
+                await self._broadcast_event(
+                    session_id,
+                    {
+                        "type": "preview_delta",
+                        "step_id": step_id,
+                        "delta": {"type": "insert", "position": i, "content": line + "\n"},
+                    },
+                )
+                # 终端输出稍快于打字机效果
+                await asyncio.sleep(0.002)
+
+            # 发送预览结束事件
+            await self._broadcast_event(
+                session_id,
+                {"type": "preview_end", "step_id": step_id, "title": title},
+            )
+
+        except Exception as e:
+            logger.error(f"Error handling terminal output: {e}")
+
+    async def _handle_read_preview(
+        self,
+        session_id: str,
+        message_id: str,
+        input_data: Dict[str, Any],
+        output: str,
+    ):
+        """
+        处理 read 工具的输出，生成文件内容预览事件
+
+        Args:
+            session_id: 会话ID
+            message_id: 消息ID
+            input_data: 输入参数
+            output: 文件内容
+        """
+        try:
+            if not output:
+                return
+
+            file_path = input_data.get("path") or input_data.get("file_path", "")
+            step_id = generate_step_id()
+
+            # 发送文件预览开始事件
+            await self._broadcast_event(
+                session_id,
+                {
+                    "type": "preview_start",
+                    "step_id": step_id,
+                    "file_path": file_path,
+                    "action": "read",
+                },
+            )
+
+            # 打字机效果：逐字符推送内容（稍快于写入）
+            logger.info(
+                f"Starting read preview for {file_path} ({len(output)} chars)"
+            )
+            for i, char in enumerate(output):
+                await self._broadcast_event(
+                    session_id,
+                    {
+                        "type": "preview_delta",
+                        "step_id": step_id,
+                        "delta": {"type": "insert", "position": i, "content": char},
+                    },
+                )
+                # 读取速度稍快
+                await asyncio.sleep(0.003)
+            logger.info(f"Read preview completed for {file_path}")
+
+            # 发送预览结束事件
+            await self._broadcast_event(
+                session_id,
+                {"type": "preview_end", "step_id": step_id, "file_path": file_path},
+            )
+
+        except Exception as e:
+            logger.error(f"Error handling read preview: {e}")
+
     async def _handle_step_start_event(
         self,
         event: Dict[str, Any],
@@ -765,8 +939,9 @@ class OpenCodeClient:
             or part.get("metadata", {}).get("thought")
         )
 
-        if not thought_content and reasoning_tokens > 0:
-            thought_content = f"AI 进行了 {reasoning_tokens} 个 tokens 的推理思考"
+        # 如果没有实际思考内容，跳过（不显示 token 数的占位消息）
+        if not thought_content:
+            return
 
         # 如果有任何思考信息，生成思考事件
         if thought_content:
@@ -887,7 +1062,7 @@ async def execute_opencode_message(
         workspace_base: 工作区基础路径
     """
     client = OpenCodeClient(workspace_base)
-    await client.execute_message(session_id, message_id, user_prompt)
+    await client.execute_message(session_id, message_id, user_prompt, mode=mode)
 
 
 # ====================================================================

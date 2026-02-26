@@ -42,83 +42,159 @@
         }
     </script>
     <script>
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        primary: "#3B82F6",
-                        "background-light": "#F9FAFB",
-                        "background-dark": "#121214",
-                        "surface-light": "#FFFFFF",
-                        "surface-dark": "#1E1E20",
-                        "card-light": "#f7f7f8",
-                        "card-dark": "#2d2d2d",
-                        "border-light": "#E5E7EB",
-                        "border-dark": "#334155",
-                    },
-                    fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', '"Noto Sans SC"', 'sans-serif'],
-                        display: ['"Noto Sans SC"', 'sans-serif'],
-                    },
-                    borderRadius: {
-                        DEFAULT: "0.5rem",
-                        'xl': '0.75rem',
-                        '2xl': '1rem',
-                    },
-                    typography: (theme) => ({
-                        DEFAULT: {
-                            css: {
-                                color: theme('colors.gray.700'),
-                                h1: {
-                                    color: theme('colors.gray.900'),
-                                    fontWeight: '700',
-                                    fontFamily: theme('fontFamily.display'),
-                                },
-                                h2: {
-                                    color: theme('colors.gray.900'),
-                                    fontWeight: '600',
-                                    fontFamily: theme('fontFamily.display'),
-                                },
-                                strong: {
-                                    color: theme('colors.gray.900'),
-                                    fontWeight: '600',
+        // Tailwind 配置
+        if (typeof tailwind !== 'undefined') {
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: "#3B82F6",
+                            "background-light": "#F9FAFB",
+                            "background-dark": "#121214",
+                            "surface-light": "#FFFFFF",
+                            "surface-dark": "#1E1E20",
+                            "card-light": "#f7f7f8",
+                            "card-dark": "#2d2d2d",
+                            "border-light": "#E5E7EB",
+                            "border-dark": "#334155",
+                        },
+                        fontFamily: {
+                            sans: ['"Plus Jakarta Sans"', '"Noto Sans SC"', 'sans-serif'],
+                            display: ['"Noto Sans SC"', 'sans-serif'],
+                        },
+                        borderRadius: {
+                            DEFAULT: "0.5rem",
+                            'xl': '0.75rem',
+                            '2xl': '1rem',
+                        },
+                        typography: (theme) => ({
+                            DEFAULT: {
+                                css: {
+                                    color: theme('colors.gray.700'),
+                                    h1: {
+                                        color: theme('colors.gray.900'),
+                                        fontWeight: '700',
+                                        fontFamily: theme('fontFamily.display'),
+                                    },
+                                    h2: {
+                                        color: theme('colors.gray.900'),
+                                        fontWeight: '600',
+                                        fontFamily: theme('fontFamily.display'),
+                                    },
+                                    strong: {
+                                        color: theme('colors.gray.900'),
+                                        fontWeight: '600',
+                                    },
                                 },
                             },
-                        },
-                        dark: {
-                            css: {
-                                color: theme('colors.gray.300'),
-                                h1: {
-                                    color: theme('colors.gray.100'),
-                                },
-                                h2: {
-                                    color: theme('colors.gray.100'),
-                                },
-                                strong: {
-                                    color: theme('colors.gray.100'),
+                            dark: {
+                                css: {
+                                    color: theme('colors.gray.300'),
+                                    h1: {
+                                        color: theme('colors.gray.100'),
+                                    },
+                                    h2: {
+                                        color: theme('colors.gray.100'),
+                                    },
+                                    strong: {
+                                        color: theme('colors.gray.100'),
+                                    },
                                 },
                             },
+                        }),
+                        animation: {
+                            'fade-in': 'fadeIn 0.3s ease-out forwards',
                         },
-                    }),
-                    animation: {
-                        'fade-in': 'fadeIn 0.3s ease-out forwards',
-                    },
-                    keyframes: {
-                        fadeIn: {
-                            '0%': { opacity: '0', transform: 'translateY(10px)' },
-                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        keyframes: {
+                            fadeIn: {
+                                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                                '100%': { opacity: '1', transform: 'translateY(0)' },
+                            }
                         }
-                    }
+                    },
                 },
-            },
-        };
+            };
+        } else {
+            console.error('Tailwind CSS failed to load. Using fallback styles.');
+        }
     </script>
     <style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        /* 基础样式 */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+            background-color: #f9fafb;
+            color: #1f2937;
         }
 
+        .dark body {
+            background-color: #121214;
+            color: #f3f4f6;
+        }
+
+        #app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 260px;
+            flex-shrink: 0;
+            background-color: white;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dark #sidebar {
+            background-color: #1e1e20;
+            border-color: #334155;
+        }
+
+        #main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #chat-scroll-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        #input-area {
+            padding: 1.5rem;
+            background-color: white;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .dark #input-area {
+            background-color: #121214;
+            border-color: #334155;
+        }
+
+        /* Material Symbols Fallback */
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+
+        /* 移除侧边栏图标的线框背景 */
+        .sidebar-section-title .material-symbols-outlined {
+            outline: none;
+            border: none;
+            background: transparent;
+        }
+
+        /* 滚动条样式 */
         .scrollbar-hide::-webkit-scrollbar {
             display: none;
         }
@@ -153,20 +229,6 @@
             background-color: #52525B;
         }
 
-        /* Hide scrollbar */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        #vm-panel {
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
         /* Tab Buttons */
         .tab-btn {
             font-size: 11px;
@@ -182,6 +244,12 @@
             color: #3b82f6;
         }
 
+        /* VM Panel */
+        #vm-panel {
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+    <style>
         .tab-btn:hover:not(.active) {
             background: rgba(0, 0, 0, 0.05);
         }
@@ -1002,10 +1070,9 @@
         <div
             class="h-14 border-b border-border-light dark:border-border-dark flex items-center px-4 justify-between bg-white dark:bg-surface-dark shrink-0 transition-theme">
             <div class="flex items-center gap-4">
-                <button class="tab-btn active-tab text-sm font-medium px-2 py-4" data-tab="preview">Manus's
+                <button class="tab-btn text-sm font-medium px-2 py-4 text-gray-500 dark:text-gray-400" data-tab="preview">Manus's
                     Computer</button>
-                <button class="tab-btn text-sm font-medium px-2 py-4 text-gray-500 dark:text-gray-400"
-                    data-tab="files">Files</button>
+                <button class="tab-btn active-tab text-sm font-medium px-2 py-4" data-tab="files">Files</button>
             </div>
             <button id="close-vm-panel" class="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors"
                 title="Close">
@@ -1015,7 +1082,7 @@
 
         <div class="flex-1 relative overflow-hidden bg-white dark:bg-background-dark transition-theme">
             <!-- Preview Tab (UVN Projection) -->
-            <div id="tab-preview" class="tab-pane h-full flex flex-col">
+            <div id="tab-preview" class="tab-pane hidden h-full flex flex-col">
                 <!-- noVNC iframe -->
                 <iframe id="uvn-frame" data-src="" class="w-full flex-1 border-none"></iframe>
                 <script>
@@ -1052,7 +1119,7 @@
             </div>
 
             <!-- Files Tab -->
-            <div id="tab-files" class="tab-pane h-full hidden flex flex-col transition-theme">
+            <div id="tab-files" class="tab-pane h-full flex flex-col transition-theme">
                 <!-- Filter Pills -->
                 <div class="px-5 py-4 flex items-center gap-2 overflow-x-auto scrollbar-hide shrink-0">
                     <button id="filter-all"
@@ -1092,19 +1159,18 @@
     <script src="/static/preview-config.js?v=2"></script>
     <script src="/static/code-preview-enhanced.js?v=1"></script>
     <script src="/static/timeline-progress.js?v=2"></script>
-    <script src="/static/enhanced-task-panel.js?v=16"></script>
+    <script src="/static/enhanced-task-panel.js?v=17"></script>
     <script src="/static/right-panel-manager.js?v=7"></script>
-    <script src="/static/files-manager.js?v=7"></script>
     <!-- 新架构 API 客户端和事件适配器 -->
     <script src="/static/api-client.js?v=1"></script>
-    <script src="/static/event-adapter.js?v=1"></script>
+    <script src="/static/event-adapter.js?v=2"></script>
     <!-- 新 API 扩展（Monkey patch submitTask）- 暂时禁用，因为找不到 submitTask 函数 -->
-    <script src="/static/opencode-new-api-patch.js?v=1"></script>
+    <script src="/static/opencode-new-api-patch.js?v=4"></script>
 
     <!-- Mock 数据：仅对 demo session 启用，真实 session 使用 API -->
     <!-- <script src="/static/mock-data.js?v=7"></script> -->
     <!-- <script src="/static/enable-mock.js?v=8"></script> -->
-    <script src="/static/opencode.js?v=22"></script>
+    <script src="/static/opencode.js?v=23"></script>
 
     <!-- 初始化时间轴和预览组件 -->
     <script>
@@ -1153,6 +1219,72 @@
                 });
             }
         });
+    </script>
+
+    <!-- Material Symbols Icon Fallback -->
+    <script>
+        (function() {
+            // 检测Material Symbols字体是否加载成功
+            setTimeout(function() {
+                const testElement = document.createElement('span');
+                testElement.style.fontFamily = 'Material Symbols Outlined';
+                testElement.textContent = 'test';
+                testElement.style.position = 'absolute';
+                testElement.style.visibility = 'hidden';
+                document.body.appendChild(testElement);
+
+                const fontsLoaded = window.getComputedStyle(testElement).fontFamily.includes('Material Symbols');
+                document.body.removeChild(testElement);
+
+                if (!fontsLoaded) {
+                    console.log('[Icon Fallback] Material Symbols not loaded, using emoji fallback');
+                    // 为常用图标添加emoji fallback
+                    const iconMap = {
+                        'add': '➕',
+                        'arrow_upward': '↑',
+                        'delete': '🗑️',
+                        'close': '✕',
+                        'send': '➤',
+                        'stop': '⏹',
+                        'refresh': '🔄',
+                        'schedule': '⏱',
+                        'check': '✅',
+                        'error': '❌',
+                        'psychology': '🧠',
+                        'edit_note': '📝',
+                        'terminal': '💻',
+                        'code': '💻',
+                        'description': '📄',
+                        'palette': '🎨',
+                        'auto_stories': '📚',
+                        'manage_search': '🔍',
+                        'extension': '🔌',
+                        'image': '🖼️',
+                        'folder_open': '📂',
+                        'more_horiz': '⋯',
+                        'present_to_all': '📺',
+                        'play_arrow': '▶️',
+                        'settings': '⚙️',
+                        'menu': '☰',
+                        'home': '🏠',
+                        'history': '📜',
+                        'smart_toy': '🤖',
+                        'lightbulb': '💡',
+                        'search': '🔍',
+                        'content_copy': '📋'
+                    };
+
+                    // 替换所有Material Symbols图标为emoji
+                    document.querySelectorAll('.material-symbols-outlined').forEach(el => {
+                        const text = el.textContent.trim();
+                        if (iconMap[text]) {
+                            el.textContent = iconMap[text];
+                            el.style.fontFamily = 'Apple Color Emoji, "Segoe UI Emoji", sans-serif';
+                        }
+                    });
+                }
+            }, 1000);
+        })();
     </script>
 </body>
 

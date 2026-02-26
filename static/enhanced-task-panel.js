@@ -27,10 +27,14 @@ function renderEnhancedTaskPanel(session) {
             turnContainer.appendChild(userCard);
         }
 
-        // 2. 任务阶段卡片 (仅在最后一轮，且有阶段信息时显示)
-        // 或者是如果我们需要显示历史阶段，这里需要更复杂的逻辑。
-        // 目前系统在每一轮开始时会清空 phases，所以只在最后一轮显示是合理的。
+        // 2. 任务阶段卡片
+        // 如果是最后一轮，显示当前 session 的阶段信息
+        // 如果是历史轮次且该轮次有对应的阶段快照，也可以显示（暂未实现快照逻辑）
         if (i === turnsCount - 1 && session.phases && session.phases.length > 0) {
+            const phasesCard = createPhasesCard(session.phases, session.currentPhase);
+            turnContainer.appendChild(phasesCard);
+        } else if (i === 0 && session.phases && session.phases.length > 0 && turnsCount === 1) {
+            // 兜底逻辑：如果是第一轮（也是最后一轮），确保显示
             const phasesCard = createPhasesCard(session.phases, session.currentPhase);
             turnContainer.appendChild(phasesCard);
         }
@@ -184,8 +188,8 @@ function createPhaseItem(phase, index, currentPhaseId, isLast) {
             }
         };
 
-        // 如果是当前活动阶段，默认展开
-        if (isActive) {
+        // 如果是当前活动阶段或已完成阶段，默认展开
+        if (isActive || isDone) {
             body.classList.remove('hidden');
             const expandIcon = header.querySelector('.expand-icon');
             if (expandIcon) {
@@ -198,6 +202,45 @@ function createPhaseItem(phase, index, currentPhaseId, isLast) {
     item.appendChild(body);
 
     return item;
+}
+
+// 辅助函数：从工具输入中提取有意义的摘要
+function getToolSummary(toolType, input, output) {
+    const tool = toolType.toLowerCase();
+
+    // 提取最有意义的字段作为摘要
+    if (tool === 'read') {
+        const path = input.path || input.file_path || input.file;
+        return path ? `读取文件: ${path}` : '读取文件';
+    }
+
+    if (tool === 'bash' || tool === 'terminal' || tool === 'execute') {
+        const cmd = input.command || input.cmd;
+        return cmd ? `执行命令: ${cmd}` : '执行命令';
+    }
+
+    if (tool === 'write') {
+        const path = input.path || input.file_path || input.file;
+        const contentLen = input.content ? input.content.length : 0;
+        return path ? `写入文件: ${path} (${contentLen} 字符)` : '写入文件';
+    }
+
+    if (tool === 'edit' || tool === 'file_editor') {
+        const path = input.path || input.file_path || input.file;
+        return path ? `编辑文件: ${path}` : '编辑文件';
+    }
+
+    if (tool === 'grep') {
+        const pattern = input.pattern || input.regex || input.search;
+        const path = input.path || input.file_path || input.file;
+        if (pattern && path) {
+            return `搜索: ${pattern} 在 ${path}`;
+        }
+        return pattern ? `搜索: ${pattern}` : '搜索';
+    }
+
+    // 默认返回工具名称
+    return toolType;
 }
 
 // 创建事件项（执行动作）
@@ -216,8 +259,9 @@ function createEventItem(event, index) {
 
     if (isThought) {
         iconHtml = TOOL_ICONS['thought'];
-        title = '思考过程';
-        content = event.content || (typeof event.data === 'string' ? event.data : '');
+        title = 'thought';
+        // 显示完整的思考内容，而不是token数
+        content = event.content || event.data?.text || (typeof event.data === 'string' ? event.data : '') || '思考中...';
         isExpandable = true;
     } else if (isError) {
         iconHtml = '<span class="material-symbols-outlined text-[14px]">error</span>';
@@ -236,13 +280,15 @@ function createEventItem(event, index) {
             iconHtml = TOOL_ICONS['file_editor'];
         }
 
-        title = data.title || toolName;
+        // 使用辅助函数生成友好的摘要
+        const rawInput = data.input || {};
+        const output = data.output || '';
+
+        title = data.title || getToolSummary(toolName, rawInput, output);
 
         // 提取输入输出详情
-        const rawInput = data.input || {};
         const inputIsNotEmpty = Object.keys(rawInput).length > 0;
         const input = inputIsNotEmpty ? JSON.stringify(rawInput, null, 2) : '';
-        const output = data.output || '';
 
         content = input ? `Input: ${input.substring(0, 100)}${input.length > 100 ? '...' : ''}` : (output || `${toolName} 操作`);
 
@@ -301,9 +347,28 @@ function createEventItem(event, index) {
         };
     }
 
-    // 非思考类型移除点击事件
-    if (!isThought) {
-        item.style.cursor = 'default';
+    // 添加工具事件点击响应
+    if (isTool && !isThought) {
+        item.style.cursor = 'pointer';
+        item.onclick = () => {
+            // 调用右侧面板显示完整内容
+            if (typeof window.rightPanelManager === 'object' && window.rightPanelManager) {
+                const data = event.data || {};
+                const toolName = data.tool_name || event.tool || '';
+                const output = data.output || '';
+
+                // 根据工具类型决定显示方式
+                if (toolName.toLowerCase() === 'read' || toolName.toLowerCase().includes('read')) {
+                    // read 工具 - 显示文件内容
+                    const input = data.input || {};
+                    const filePath = input.path || input.file_path || 'unknown';
+                    window.rightPanelManager.showFileEditor(filePath, output);
+                } else if (output && typeof output === 'string' && output.length > 0) {
+                    // bash/grep 等工具 - 显示输出
+                    window.rightPanelManager.showFileEditor(`${toolName} 输出`, output);
+                }
+            }
+        };
     }
 
     return item;
@@ -325,7 +390,7 @@ function createActionItem(action, index) {
     if (isThought) {
         // 思考类型
         iconName = 'psychology';
-        title = '思考过程';
+        title = 'thought';
         content = action.content || '';
     } else if (isError) {
         // 错误类型
@@ -413,13 +478,33 @@ function createDeliverableCard(session) {
         const iconAndColor = getFileIconAndColor(fileExt);
 
         return `
-                            <div class="file-card flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer rounded-xl group"
-                                 data-file-name="${escapeHtml(fileName)}">
+                            <div class="file-card flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all rounded-xl group relative"
+                                 data-file-name="${escapeHtml(fileName)}" data-file-ext="${fileExt}">
                                 <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
                                     <span class="material-symbols-outlined ${iconAndColor.color} text-xl">${iconAndColor.icon}</span>
                                 </div>
-                                <div class="text-[13px] leading-snug text-slate-700 dark:text-slate-300 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
-                                    ${escapeHtml(fileName)}
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-[13px] leading-snug text-slate-700 dark:text-slate-300 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+                                        ${escapeHtml(fileName)}
+                                    </div>
+                                </div>
+                                <!-- 操作按钮菜单 -->
+                                <div class="file-actions relative">
+                                    <button class="action-menu-btn p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded transition-colors opacity-0 group-hover:opacity-100">
+                                        <span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[18px]">more_horiz</span>
+                                    </button>
+                                    <div class="action-menu hidden absolute right-0 top-8 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
+                                        ${fileExt === 'html' ? `
+                                            <button class="view-source-btn w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2">
+                                                <span class="material-symbols-outlined text-[16px]">code</span>
+                                                查看源码
+                                            </button>
+                                        ` : ''}
+                                        <button class="delete-file-btn w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-[16px]">delete</span>
+                                            删除
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -446,11 +531,122 @@ function createDeliverableCard(session) {
     if (hasDeliverables) {
         const fileCards = card.querySelectorAll('.file-card');
         fileCards.forEach(fileCard => {
-            fileCard.onclick = () => {
-                const fileName = fileCard.getAttribute('data-file-name');
-                console.log('打开文件:', fileName);
-                // TODO: 实现文件预览功能
-            };
+            const fileName = fileCard.getAttribute('data-file-name');
+            const fileExt = fileCard.getAttribute('data-file-ext');
+
+            // 点击卡片主体（不包括操作按钮）
+            fileCard.addEventListener('click', (e) => {
+                // 如果点击的是操作按钮或菜单，不触发卡片点击
+                if (e.target.closest('.file-actions')) return;
+
+                console.log('点击文件卡片:', fileName, '扩展名:', fileExt);
+
+                // HTML文件默认预览网页
+                if (fileExt === 'html') {
+                    // 使用正确的文件预览URL
+                    const previewUrl = `/opencode/preview_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`;
+                    console.log('[FileCard] Loading HTML preview:', previewUrl);
+
+                    if (window.rightPanelManager && typeof window.rightPanelManager.showWebPreview === 'function') {
+                        window.rightPanelManager.showWebPreview(previewUrl);
+                    }
+                } else {
+                    // 其他文件显示源码
+                    if (window.rightPanelManager && typeof window.rightPanelManager.showFileEditor === 'function') {
+                        window.rightPanelManager.showFileEditor(fileName, '加载中...');
+                        // 实际加载文件内容
+                        fetch(`/opencode/read_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.status === 'success' && data.content) {
+                                    if (window.rightPanelManager) {
+                                        window.rightPanelManager.showFileEditor(fileName, data.content);
+                                    }
+                                } else {
+                                    console.error('读取文件失败:', data);
+                                    // 显示错误信息
+                                    if (window.rightPanelManager) {
+                                        window.rightPanelManager.showFileEditor(fileName, `无法读取文件: ${data.message || '未知错误'}`);
+                                    }
+                                }
+                            })
+                            .catch(err => {
+                                console.error('读取文件出错:', err);
+                                if (window.rightPanelManager) {
+                                    window.rightPanelManager.showFileEditor(fileName, `读取文件时出错: ${err.message}`);
+                                }
+                            });
+                    }
+                }
+            });
+
+            // 操作菜单按钮点击
+            const menuBtn = fileCard.querySelector('.action-menu-btn');
+            const menu = fileCard.querySelector('.action-menu');
+            if (menuBtn && menu) {
+                menuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // 关闭其他打开的菜单
+                    card.querySelectorAll('.action-menu').forEach(m => {
+                        if (m !== menu) m.classList.add('hidden');
+                    });
+                    menu.classList.toggle('hidden');
+                });
+
+                // 查看源码按钮（仅HTML文件）
+                const viewSourceBtn = fileCard.querySelector('.view-source-btn');
+                if (viewSourceBtn) {
+                    viewSourceBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        menu.classList.add('hidden');
+                        console.log('查看源码:', fileName);
+                        // 读取文件内容并显示
+                        fetch(`/opencode/read_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.status === 'success' && data.content) {
+                                    if (window.rightPanelManager) {
+                                        window.rightPanelManager.showFileEditor(fileName, data.content);
+                                    }
+                                } else {
+                                    console.error('读取文件失败:', data);
+                                }
+                            })
+                            .catch(err => console.error('读取文件出错:', err));
+                    });
+                }
+
+                // 删除按钮
+                const deleteBtn = fileCard.querySelector('.delete-file-btn');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        menu.classList.add('hidden');
+                        if (confirm(`确定要删除文件 "${fileName}" 吗？`)) {
+                            console.log('删除文件:', fileName);
+                            // 从deliverables中移除
+                            const index = session.deliverables.findIndex(f => {
+                                const fName = typeof f === 'string' ? f : (f.name || f.path);
+                                return fName === fileName;
+                            });
+                            if (index > -1) {
+                                session.deliverables.splice(index, 1);
+                                // 重新渲染
+                                if (typeof window.renderResults === 'function') {
+                                    window.renderResults();
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        });
+
+        // 点击其他地方关闭所有菜单
+        card.addEventListener('click', (e) => {
+            if (!e.target.closest('.file-actions')) {
+                card.querySelectorAll('.action-menu').forEach(m => m.classList.add('hidden'));
+            }
         });
 
         // 绑定"查看所有文件"按钮

@@ -3,217 +3,285 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>流光效果登录页面展示</title>
+    <title>像素闹钟 | PIXEL ALARM</title>
     <style>
+
+        :root {
+            --bg: #FFFFFF;
+            --text: #000000;
+            --gray: #808080;
+            --light-gray: #C0C0C0;
+            --dark-gray: #404040;
+            --pixel: 4px;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Courier New', Courier, monospace;
+            image-rendering: pixelated;
         }
-        
+
         body {
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
-            color: white;
+            background-color: var(--light-gray);
+            display: flex;
+            justify-content: center;
+            align-items: center;
             min-height: 100vh;
-            padding: 20px;
+            color: var(--text);
+            overflow: hidden;
         }
-        
+
+
+        .pixel-box {
+            background: var(--bg);
+            border: var(--pixel) solid var(--text);
+            position: relative;
+            padding: calc(var(--pixel) * 4);
+            box-shadow: 
+                var(--pixel) var(--pixel) 0 0 var(--dark-gray),
+                calc(var(--pixel) * 2) calc(var(--pixel) * 2) 0 0 var(--gray);
+        }
+
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        header {
+            width: 320px;
             text-align: center;
-            padding: 40px 0;
         }
-        
+
         h1 {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            background: linear-gradient(45deg, #4dabf7, #339af0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(77, 171, 247, 0.3);
-        }
-        
-        .subtitle {
             font-size: 1.2rem;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 30px;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            border-bottom: var(--pixel) solid var(--text);
+            padding-bottom: 0.5rem;
+            letter-spacing: 2px;
         }
-        
-        .preview-container {
+
+
+        .display {
+            background: #000;
+            color: #FFF;
+            padding: 1.5rem 1rem;
+            font-size: 2.8rem;
+            margin-bottom: 1.5rem;
+            border: var(--pixel) solid var(--gray);
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .display span {
+            display: inline-block;
+            min-width: 1ch;
+        }
+
+        .colon {
+            animation: blink 1s steps(1) infinite;
+        }
+
+        @keyframes blink {
+            50% { visibility: hidden; }
+        }
+
+
+        .controls {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 40px;
+            gap: 1rem;
         }
-        
-        .iframe-wrapper {
-            width: 100%;
-            max-width: 800px;
-            height: 600px;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-            border: 2px solid rgba(255, 255, 255, 0.1);
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
         }
-        
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 40px;
-        }
-        
-        .feature-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: transform 0.3s ease;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .feature-card h3 {
-            color: #4dabf7;
-            margin-bottom: 15px;
-            font-size: 1.5rem;
-        }
-        
-        .feature-card ul {
-            list-style-type: none;
-            padding-left: 0;
-        }
-        
-        .feature-card li {
-            margin-bottom: 10px;
-            padding-left: 25px;
-            position: relative;
-        }
-        
-        .feature-card li:before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: #4dabf7;
-            font-weight: bold;
-        }
-        
-        .code-link {
-            display: inline-block;
-            background: linear-gradient(45deg, #4dabf7, #339af0);
-            color: white;
-            padding: 12px 30px;
-            border-radius: 10px;
-            text-decoration: none;
-            font-weight: bold;
-            margin-top: 20px;
-            transition: all 0.3s ease;
-        }
-        
-        .code-link:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        footer {
+
+        input[type="time"] {
+            border: var(--pixel) solid var(--text);
+            padding: 0.5rem;
+            background: var(--bg);
+            font-size: 1.1rem;
+            outline: none;
+            width: 140px;
             text-align: center;
-            margin-top: 50px;
-            padding: 20px;
-            color: rgba(255, 255, 255, 0.5);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
-        
-        @media (max-width: 768px) {
-            .iframe-wrapper {
-                height: 500px;
-            }
-            
-            h1 {
-                font-size: 2.5rem;
-            }
+
+        button {
+            background: var(--text);
+            color: var(--bg);
+            border: none;
+            padding: 0.5rem 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: var(--pixel) var(--pixel) 0 0 var(--gray);
+            transition: transform 0.05s;
         }
-        
-        @media (max-width: 480px) {
-            .iframe-wrapper {
-                height: 400px;
-            }
-            
-            h1 {
-                font-size: 2rem;
-            }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: calc(var(--pixel) / 2) calc(var(--pixel) / 2) 0 0 var(--gray);
         }
+
+        .status {
+            font-size: 0.8rem;
+            color: var(--dark-gray);
+            height: 1.2rem;
+            margin-top: 0.5rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+
+        .ringing {
+            animation: shake 0.15s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(2px, 2px); }
+            25% { transform: translate(-2px, -2px); }
+            50% { transform: translate(-2px, 2px); }
+            75% { transform: translate(2px, -2px); }
+            100% { transform: translate(2px, 2px); }
+        }
+
+        #stop-btn {
+            background: #000;
+            color: #fff;
+            display: none;
+            margin-top: 0.5rem;
+            border: var(--pixel) solid #fff;
+        }
+
+
+        .pixel-decor {
+            position: absolute;
+            width: var(--pixel);
+            height: var(--pixel);
+            background: var(--text);
+        }
+        .tl { top: calc(var(--pixel) * -1); left: calc(var(--pixel) * -1); }
+        .tr { top: calc(var(--pixel) * -1); right: calc(var(--pixel) * -1); }
+        .bl { bottom: calc(var(--pixel) * -1); left: calc(var(--pixel) * -1); }
+        .br { bottom: calc(var(--pixel) * -1); right: calc(var(--pixel) * -1); }
+
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>流光效果登录页面</h1>
-            <p class="subtitle">一个具有现代流光动画效果的响应式登录界面</p>
-        </header>
+
+    <div class="pixel-box container" id="clock-container">
+
+        <div class="pixel-decor tl"></div>
+        <div class="pixel-decor tr"></div>
+        <div class="pixel-decor bl"></div>
+        <div class="pixel-decor br"></div>
+
+        <h1>Pixel Alarm</h1>
         
-        <main class="preview-container">
-            <div class="iframe-wrapper">
-                <iframe src="login_page.html" title="流光登录页面预览"></iframe>
+        <div class="display">
+            <span id="h">00</span><span class="colon">:</span><span id="m">00</span><span class="colon">:</span><span id="s">00</span>
+        </div>
+
+        <div class="controls">
+            <div class="input-group">
+                <input type="time" id="alarm-time">
+                <button id="set-btn">Set</button>
             </div>
-            
-            <div class="features">
-                <div class="feature-card">
-                    <h3>主要特性</h3>
-                    <ul>
-                        <li>动态流光背景效果</li>
-                        <li>彩虹流光边框动画</li>
-                        <li>浮动粒子特效</li>
-                        <li>毛玻璃模糊效果</li>
-                        <li>响应式设计</li>
-                        <li>交互式表单验证</li>
-                    </ul>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>动画效果</h3>
-                    <ul>
-                        <li>按钮悬停流光效果</li>
-                        <li>输入框焦点动画</li>
-                        <li>登录过程模拟</li>
-                        <li>社交图标悬停效果</li>
-                        <li>背景旋转流光</li>
-                        <li>边框彩虹流动</li>
-                    </ul>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>技术实现</h3>
-                    <ul>
-                        <li>纯CSS3动画</li>
-                        <li>JavaScript交互</li>
-                        <li>Flexbox布局</li>
-                        <li>CSS Grid特性</li>
-                        <li>Font Awesome图标</li>
-                        <li>渐变色彩方案</li>
-                    </ul>
-                </div>
-            </div>
-            
-            <a href="login_page.html" class="code-link" target="_blank">查看完整登录页面</a>
-        </main>
-        
-        <footer>
-            <p>© 2024 流光效果登录页面 | 使用HTML、CSS和JavaScript创建</p>
-        </footer>
+            <div class="status" id="status">No Alarm</div>
+            <button id="stop-btn">Stop Alarm</button>
+        </div>
     </div>
+
+    <script>
+        const hEl = document.getElementById('h');
+        const mEl = document.getElementById('m');
+        const sEl = document.getElementById('s');
+        const timeInput = document.getElementById('alarm-time');
+        const setBtn = document.getElementById('set-btn');
+        const statusEl = document.getElementById('status');
+        const stopBtn = document.getElementById('stop-btn');
+        const container = document.getElementById('clock-container');
+
+        let alarm = null;
+        let isRinging = false;
+        let audioCtx = null;
+
+        function update() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+
+            hEl.textContent = h;
+            mEl.textContent = m;
+            sEl.textContent = s;
+
+
+            if (alarm === `${h}:${m}` && s === '00' && !isRinging) {
+                startRinging();
+            }
+        }
+
+        function startRinging() {
+            isRinging = true;
+            container.classList.add('ringing');
+            stopBtn.style.display = 'block';
+            statusEl.textContent = "!!! WAKE UP !!!";
+            
+            // 简单的像素风格蜂鸣音 (Square Wave)
+
+            
+            const ring = () => {
+                if (!isRinging) return;
+                
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                
+                gain.connect(audioCtx.destination);
+                osc.connect(gain);
+                
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+                
+                setTimeout(ring, 200);
+            };
+            ring();
+        }
+
+        setBtn.addEventListener('click', () => {
+            if (timeInput.value) {
+                alarm = timeInput.value;
+                statusEl.textContent = `Alarm at ${alarm}`;
+                statusEl.style.color = 'black';
+                
+
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            } else {
+                statusEl.textContent = 'Set a time';
+                statusEl.style.color = 'gray';
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            isRinging = false;
+            container.classList.remove('ringing');
+            stopBtn.style.display = 'none';
+            statusEl.textContent = 'Alarm Cleared';
+            alarm = null;
+        });
+
+        setInterval(update, 1000);
+        update();
+    </script>
 </body>
 </html>

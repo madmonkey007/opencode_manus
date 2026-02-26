@@ -145,6 +145,47 @@ function renderSidebar() {
             console.log('  - response:', s.response);
             console.log('  - phases:', s.phases);
             state.activeId = s.id;
+
+            // 清空右侧面板内容，避免显示旧会话的内容
+            if (window.rightPanelManager) {
+                // 重置预览状态
+                window.rightPanelManager.currentMode = null;
+                window.rightPanelManager.currentFilename = null;
+
+                // 清空文件编辑器内容
+                const contentDiv = document.getElementById('file-editor-content');
+                if (contentDiv) {
+                    contentDiv.innerHTML = `
+                        <div class="text-gray-400 dark:text-gray-500 text-center py-8 text-sm">
+                            等待文件操作...
+                        </div>
+                    `;
+                }
+
+                // 隐藏 web preview
+                if (window.rightPanelManager.webPreviewContainer) {
+                    window.rightPanelManager.webPreviewContainer.classList.add('hidden');
+                    const iframe = document.getElementById('web-preview-iframe');
+                    if (iframe) {
+                        iframe.src = 'about:blank';
+                    }
+                }
+
+                // 隐藏 file editor
+                if (window.rightPanelManager.fileEditorContainer) {
+                    window.rightPanelManager.fileEditorContainer.classList.add('hidden');
+                }
+
+                // 隐藏 VNC iframe（如果存在）
+                const vncIframe = document.getElementById('uvn-frame');
+                if (vncIframe) {
+                    vncIframe.style.display = 'none';
+                }
+
+                // 隐藏右侧面板
+                window.rightPanelManager.hide();
+            }
+
             renderAll();
             saveState();
         };

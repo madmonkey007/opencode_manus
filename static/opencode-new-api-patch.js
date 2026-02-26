@@ -81,13 +81,24 @@
                 color: #000;
             }
             #stopStream {
-                border: 2px solid #ff4d4f !important;
-                background: transparent !important;
-                color: #ff4d4f !important;
+                border: 2px solid #000 !important;
+                background: #000 !important;
+                color: #fff !important;
+            }
+            .dark #stopStream {
+                border: 2px solid #fff !important;
+                background: #fff !important;
+                color: #000 !important;
             }
             #stopStream:hover {
-                background: #ff4d4f !important;
+                background: #000 !important;
                 color: #fff !important;
+                opacity: 0.8;
+            }
+            .dark #stopStream:hover {
+                background: #fff !important;
+                color: #000 !important;
+                opacity: 0.8;
             }
         `;
         document.head.appendChild(styles);
@@ -235,6 +246,15 @@
         if (forceNew || !state.activeId || !s || !s.id.startsWith('ses_') || isFakeId) {
             console.log('[NewAPI] Target session is missing or invalid, creating fresh one...');
 
+            // 如果当前是伪造session，先移除它
+            if (isFakeId && s) {
+                const fakeIndex = state.sessions.findIndex(x => x.id === s.id);
+                if (fakeIndex !== -1) {
+                    console.log('[NewAPI] Removing fake session:', s.id);
+                    state.sessions.splice(fakeIndex, 1);
+                }
+            }
+
             const backendSession = await window.apiClient.createSession(prompt.substring(0, 30));
             console.log('[NewAPI] Backend created session:', backendSession.id);
 
@@ -263,12 +283,24 @@
     }
 
     function syncState(state) {
-        localStorage.setItem('opencode_state', JSON.stringify({
-            activeId: state.activeId,
-            sessions: state.sessions.map(s => ({
-                id: s.id, title: s.title, prompt: s.prompt, response: s.response, phases: s.phases
-            }))
-        }));
+        // 调用 opencode.js 中的完整保存函数，而不是自定义逻辑
+        if (typeof window.saveState === 'function') {
+            window.saveState();
+        } else {
+            // 降级方案：手动保存（包含 deliverables）
+            localStorage.setItem('opencode_state', JSON.stringify({
+                activeId: state.activeId,
+                sessions: state.sessions.map(s => ({
+                    id: s.id,
+                    title: s.title,
+                    prompt: s.prompt,
+                    response: s.response,
+                    phases: s.phases || [],
+                    deliverables: s.deliverables || [],
+                    currentPhase: s.currentPhase
+                }))
+            }));
+        }
         if (typeof window.renderSidebar === 'function') window.renderSidebar();
     }
 
@@ -285,7 +317,7 @@
     }
 
     async function handleNewAPIConnection(s, isNewSubmission = false) {
-        console.log('[NewAPI] Establishing SSE for:', s.id);
+        console.log('[NewAPI] Establishing SSE for:', s.id, 'isNewSubmission:', isNewSubmission);
 
         if (window.state.activeSSE) {
             console.log('[NewAPI] Closing existing SSE');
@@ -297,6 +329,22 @@
         const runBtn = document.getElementById('runStream');
         if (stopBtn) stopBtn.classList.remove('hidden');
         if (runBtn) runBtn.classList.add('hidden');
+
+        // 检查会话是否有活跃的 phase 或正在进行中
+        const hasActivePhase = s.phases && s.phases.some(p => p.status === 'active');
+        const isRunning = hasActivePhase || (s.phases && s.phases.length > 0 && s.phases[s.phases.length - 1].status !== 'completed');
+
+        // 如果是新提交或正在运行的会话，自动展开右侧面板
+        if (isNewSubmission || isRunning) {
+            if (window.rightPanelManager && typeof window.rightPanelManager.show === 'function') {
+                window.rightPanelManager.show();
+                // 切换到预览标签页
+                if (typeof window.rightPanelManager.switchTab === 'function') {
+                    window.rightPanelManager.switchTab('preview');
+                }
+                console.log('[NewAPI] Right panel auto-expanded (isNewSubmission:', isNewSubmission, ', isRunning:', isRunning, ')');
+            }
+        }
 
         window.state.activeSSE = window.apiClient.subscribeToEvents(
             s.id,
@@ -341,6 +389,47 @@
     }
 
     function processEvent(s, adapted) {
+        // 处理文件预览事件 - 更新右侧文件面板（带打字机效果）
+        if (adapted.type === 'file_preview_start') {
+            console.log('[NewAPI] File preview start:', adapted.file_path);
+
+            // 显示文件编辑器
+            if (window.rightPanelManager && typeof window.rightPanelManager.showFileEditor === 'function') {
+                window.rightPanelManager.showFileEditor(adapted.file_path, '');
+            }
+            return;
+        }
+
+        if (adapted.type === 'file_preview_delta') {
+            console.log('[NewAPI] File preview delta:', adapted.delta?.substring(0, 50) + '...');
+
+            // 使用打字机效果追加内容
+            if (window.rightPanelManager && typeof window.rightPanelManager.typeAppendContent === 'function') {
+                window.rightPanelManager.typeAppendContent(adapted.delta);
+            } else if (window.rightPanelManager && typeof window.rightPanelManager.appendFileContent === 'function') {
+                // 降级：直接追加（无打字机效果）
+                window.rightPanelManager.appendFileContent(adapted.delta);
+            }
+            return;
+        }
+
+        if (adapted.type === 'file_preview_end') {
+            console.log('[NewAPI] File preview end:', adapted.file_path);
+
+            // 更新状态为完成
+            if (window.rightPanelManager && typeof window.rightPanelManager.setFileStatus === 'function') {
+                window.rightPanelManager.setFileStatus('完成');
+            }
+            return;
+        }
+
+        // 处理时间轴事件 - 更新右侧文件面板
+        if (adapted.type === 'timeline_event') {
+            console.log('[NewAPI] Timeline event:', adapted);
+            // 可以在这里触发右侧面板更新
+            return;
+        }
+
         if (adapted.type === 'answer_chunk') {
             // 支持多轮对话分隔符
             const pSep = '\n\n---\n\n';
@@ -351,6 +440,41 @@
                 s.response += rSep;
             }
             s.response += adapted.text;
+        } else if (adapted.type === 'phases_init') {
+            // 处理阶段初始化
+            const newPhases = (adapted.phases || []).map(p => {
+                const existingPhase = s.phases?.find(sp => sp.id === p.id);
+                return { ...p, events: existingPhase?.events || [] };
+            });
+            
+            const phaseMap = new Map();
+            s.phases?.forEach(p => phaseMap.set(p.id, p));
+            
+            newPhases.forEach(p => {
+                const existing = phaseMap.get(p.id);
+                if (existing) {
+                    // 只有在现有状态是 pending 或者新状态不是 pending 时才更新状态
+                    if (p.status !== 'pending' || existing.status === 'pending') {
+                        existing.status = p.status;
+                    }
+                    if (p.title) existing.title = p.title;
+                    if (p.number !== undefined) existing.number = p.number;
+                } else {
+                    phaseMap.set(p.id, p);
+                }
+            });
+            
+            s.phases = Array.from(phaseMap.values()).sort((a, b) => (a.number || 0) - (b.number || 0));
+
+            // 自动清理临时的 Planning Phase
+            const hasDynamicPhases = s.phases.some(p => p.id?.startsWith('phase_') && p.id !== 'phase_planning');
+            if (hasDynamicPhases) {
+                s.phases = s.phases.filter(p => p.id !== 'phase_planning');
+            }
+            
+            s.currentPhase = adapted.phases.find(p => p.status === 'active')?.id || s.currentPhase;
+        } else if (adapted.type === 'deliverables') {
+            s.deliverables = adapted.items || [];
         } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
             // 标记所有 Phase 为完成
             if (s.phases) {
@@ -387,6 +511,97 @@
             const phase = s.phases.find(p => p.id === adapted.phase_id);
             if (phase) phase.status = 'completed';
         } else if (adapted.type === 'action' || adapted.type === 'thought' || adapted.type === 'error') {
+            // 实时显示到右侧面板
+            if (window.rightPanelManager) {
+                const data = adapted.data || {};
+                const toolName = data.tool_name || adapted.tool || '';
+
+                // 确保右侧面板展开并切换到预览标签页
+                if (typeof window.rightPanelManager.show === 'function') {
+                    window.rightPanelManager.show();
+                }
+                if (typeof window.rightPanelManager.switchTab === 'function') {
+                    window.rightPanelManager.switchTab('preview');
+                }
+
+                // 判断事件类型并显示
+                if (adapted.type === 'thought') {
+                    // 显示思考内容
+                    const content = adapted.content || adapted.data?.text || '';
+                    console.log('[NewAPI] 显示思考内容到右侧面板');
+                    window.rightPanelManager.showFileEditor('💭 思考过程', content);
+                } else if (adapted.type === 'action') {
+                    // 显示工具操作
+                    const output = data.output || '';
+                    const toolLower = toolName.toLowerCase();
+
+                    if (toolLower === 'read') {
+                        // read 工具 - 显示文件内容
+                        const input = data.input || {};
+                        const filePath = input.path || input.file_path || 'unknown';
+                        console.log('[NewAPI] 显示read文件内容:', filePath);
+                        window.rightPanelManager.showFileEditor(filePath, output);
+                    } else if (toolLower === 'bash' || toolLower === 'grep') {
+                        // bash/grep - 显示命令输出
+                        const input = data.input || {};
+                        const command = input.command || input.pattern || '';
+                        const title = command ? `${toolName}: ${command}` : `${toolName} 输出`;
+                        console.log('[NewAPI] 显示终端输出:', title);
+                        window.rightPanelManager.showFileEditor(title, output);
+                    } else if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
+                        // write/edit - 显示正在写入
+                        const input = data.input || {};
+                        const filePath = input.path || input.file_path || 'unknown';
+                        const content = input.content || '';
+
+                        console.log('[NewAPI] 显示写入文件:', filePath);
+                        window.rightPanelManager.showFileEditor(filePath, '正在写入...');
+
+                        // 如果有内容，使用打字机效果
+                        if (content && typeof content === 'string') {
+                            setTimeout(() => {
+                                if (window.rightPanelManager.fileEditorContainer) {
+                                    window.rightPanelManager.fileEditorContainer.classList.remove('hidden');
+                                    const pre = document.getElementById('file-code-content');
+                                    if (pre) {
+                                        pre.textContent = '';
+                                        // 打字机效果
+                                        let i = 0;
+                                        const typeWriter = () => {
+                                            if (i < content.length) {
+                                                pre.textContent += content.charAt(i);
+                                                i++;
+                                                setTimeout(typeWriter, 5); // 5ms 打字速度
+                                            }
+                                        };
+                                        typeWriter();
+                                    }
+                                }
+                            }, 100);
+                        }
+                    } else if (toolLower === 'browser' || toolLower.includes('web')) {
+                        // browser 工具 - 显示浏览器操作
+                        const input = data.input || {};
+                        const action = data.action || toolName;
+                        const details = Object.entries(input).map(([k, v]) => `${k}: ${v}`).join('\n');
+                        console.log('[NewAPI] 显示浏览器操作:', action);
+                        window.rightPanelManager.showFileEditor(`🌐 ${action}`, details || '浏览器操作中...');
+                    } else {
+                        // 其他工具 - 显示通用信息
+                        const input = data.input || {};
+                        const title = `🔧 ${toolName}`;
+                        const details = Object.entries(input).map(([k, v]) => `${k}: ${v}`).join('\n');
+                        console.log('[NewAPI] 显示工具操作:', toolName);
+                        window.rightPanelManager.showFileEditor(title, details || '工具执行中...');
+                    }
+                } else if (adapted.type === 'error') {
+                    // 显示错误信息
+                    const errorMsg = adapted.message || adapted.content || '未知错误';
+                    console.log('[NewAPI] 显示错误信息:', errorMsg);
+                    window.rightPanelManager.showFileEditor('❌ 错误', errorMsg);
+                }
+            }
+
             // 处理 action/thought/error
             if (!s.phases || s.phases.length === 0) {
                 s.phases = [{ id: 'phase_executing', title: '🚀 任务执行中', status: 'active', events: [] }];
@@ -419,6 +634,34 @@
                 } else {
                     // 只有在新事件时才追加
                     targetPhase.events.push(adapted);
+
+                    // 文件收集：如果是write/edit/file_editor工具，将文件添加到deliverables
+                    if (adapted.type === 'action' && adapted.data) {
+                        const toolName = adapted.data.tool_name || adapted.data.tool || '';
+                        const toolLower = toolName.toLowerCase();
+
+                        // 判断是否为文件写入类工具
+                        if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
+                            const input = adapted.data.input || {};
+                            const filePath = input.path || input.file_path || input.file;
+
+                            if (filePath) {
+                                // 初始化deliverables数组
+                                if (!s.deliverables) s.deliverables = [];
+
+                                // 检查文件是否已存在（避免重复）
+                                const exists = s.deliverables.some(d => {
+                                    const dPath = typeof d === 'string' ? d : (d.name || d.path);
+                                    return dPath === filePath;
+                                });
+
+                                if (!exists) {
+                                    s.deliverables.push(filePath);
+                                    console.log('[NewAPI] 文件已添加到deliverables:', filePath);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
