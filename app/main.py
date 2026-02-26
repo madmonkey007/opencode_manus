@@ -210,7 +210,7 @@ class SessionManager:
     def __init__(self):
         self.sessions: Dict[str, Dict[str, Any]] = {}
 
-    async def create_session(self, sid: str, prompt: str):
+    async def create_session(self, sid: str, prompt: str, mode: str = "auto"):
         if sid in self.sessions:
             return self.sessions[sid]
 
@@ -221,10 +221,10 @@ class SessionManager:
         }
 
         # Start background task
-        asyncio.create_task(self._run_process(sid, prompt))
+        asyncio.create_task(self._run_process(sid, prompt, mode))
         return self.sessions[sid]
 
-    async def _run_process(self, sid: str, prompt: str):
+    async def _run_process(self, sid: str, prompt: str, mode: str = "auto"):
         session_dir = os.path.join(WORKSPACE_BASE, sid)
         os.makedirs(session_dir, exist_ok=True)
         log_file = os.path.join(session_dir, "run.log")
@@ -243,7 +243,7 @@ class SessionManager:
             logger.info(f"[DEBUG] Received prompt: '{prompt}'")
             logger.info(f"[DEBUG] Prompt length: {len(prompt)}")
 
-            enhanced_prompt = enhance_prompt(prompt)
+            enhanced_prompt = enhance_prompt(prompt, mode)
             logger.info(f"Original prompt: {prompt[:100]}...")
             logger.info(f"Enhanced prompt length: {len(enhanced_prompt)} chars")
             logger.info(f"[DEBUG] Enhanced prompt: '{enhanced_prompt[:200]}'")
@@ -263,10 +263,16 @@ class SessionManager:
                 "new-api/gemini-3-flash-preview",
                 "--format",
                 "json",
-                enhanced_prompt,
             ]
+            
+            # 添加 agent 模式
+            if mode in ["plan", "build"]:
+                cmd.extend(["--agent", mode])
+            
+            cmd.append(enhanced_prompt)
+
             logger.info(
-                f"[DEBUG] Final command: {' '.join(cmd[:8])}... [prompt length: {len(enhanced_prompt)}]"
+                f"[DEBUG] Final command: {' '.join(cmd[:10])}... [prompt length: {len(enhanced_prompt)}]"
             )
 
             env = {**os.environ}
@@ -346,7 +352,7 @@ _session_id_map = {}
 _reverse_session_id_map = {}  # actual_opencode_sid -> frontend_sid (for reverse lookup)
 
 
-async def run_agent(prompt: str, sid: str):
+async def run_agent(prompt: str, sid: str, mode: str = "auto"):
     """
     Bridge to the official opencode CLI with Manus-level SSE extensions
     """
@@ -354,7 +360,7 @@ async def run_agent(prompt: str, sid: str):
 
     # Ensure session exists or create new
     is_new = sid not in session_manager.sessions
-    await session_manager.create_session(sid, prompt)
+    await session_manager.create_session(sid, prompt, mode)
 
     # Attach listener
     queue = await session_manager.attach(sid)
@@ -812,7 +818,10 @@ async def process_log_line(text: str, sid: str = None):
 
                     # If there's output, also send it as a chunk for visibility
                     if output:
-                        display_text = f"\n`{tool_name}` output:\n{output}\n"
+                        display_text = f"
+`{tool_name}` output:
+{output}
+"
                         yield format_sse({"type": "answer_chunk", "text": display_text})
 
             elif event_type == "text":
@@ -865,10 +874,10 @@ async def process_log_line(text: str, sid: str = None):
 
 
 @app.get("/opencode/run_sse")
-async def run_sse(prompt: str, sid: str | None = None):
+async def run_sse(prompt: str, sid: str | None = None, mode: str = "auto"):
     if not sid:
         sid = str(uuid.uuid4())
-    generator_func = await run_agent(prompt, sid)
+    generator_func = await run_agent(prompt, sid, mode)
     return StreamingResponse(generator_func(), media_type="text/event-stream")
 
 

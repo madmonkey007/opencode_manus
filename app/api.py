@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+from .models import MessageTime
 import time
 from datetime import datetime
 import sys
@@ -543,7 +544,7 @@ async def get_file_history(session_id: str, file_path: str):
                 "action": step.action,
                 "path": step.path,
                 "timestamp": step.timestamp,
-                "operation": step.operation,
+                "operation": step.action_type,
             }
             for step in timeline
             if step.path == file_path

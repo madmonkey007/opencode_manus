@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger("opencode.enhancer")
 
 
-def enhance_prompt(user_prompt: str) -> str:
+def enhance_prompt(user_prompt: str, mode: str = "auto") -> str:
     """
     智能增强用户提示词，添加必要的技术指导
 
@@ -16,6 +16,10 @@ def enhance_prompt(user_prompt: str) -> str:
     """
 
     prompt_lower = user_prompt.lower()
+
+    # 如果是 plan 或 build 模式，放松对子智能体和任务工具的限制
+    # 官方的 plan 和 build 智能体内部依赖这些功能
+    is_agent_mode = mode in ["plan", "build"]
 
     # 检测任务类型
     task_indicators = {
@@ -102,8 +106,20 @@ def enhance_prompt(user_prompt: str) -> str:
 
     # Web 开发任务的额外指导
     if "web_development" in detected_tasks:
-        enhancements.append(
-            """
+        if is_agent_mode:
+            # Agent 模式下允许任务拆分
+            enhancements.append(
+                """
+【Web 开发规范】
+- HTML: 包含完整的文档结构和语义化标签
+- CSS: 包含响应式设计、配色方案和布局
+- JavaScript: 包含完整的交互逻辑和功能实现
+"""
+            )
+        else:
+            # 非 Agent 模式（auto）维持严格限制以保证单轮成功率
+            enhancements.append(
+                """
 【Web 开发规范】
 - HTML: 包含完整的文档结构和语义化标签
 - CSS: 包含响应式设计、配色方案和布局
@@ -115,7 +131,8 @@ def enhance_prompt(user_prompt: str) -> str:
 3. 所有代码必须写入单个文件（如 index.html）
 4. 不要创建子会话或后台任务
 """
-        )
+            )
+
 
     # 代码编辑任务的增强
     if "code_edit" in detected_tasks:
