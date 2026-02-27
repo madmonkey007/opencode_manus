@@ -123,6 +123,15 @@ class EventAdapter {
             };
         }
 
+        // 状态事件（完成后端任务）
+        if (eventType === 'status') {
+            return {
+                type: 'status',
+                value: newEvent.value,
+                timestamp: newEvent.timestamp
+            };
+        }
+
         // 未知事件类型
         console.warn('[EventAdapter] Unknown event type:', eventType, newEvent);
         return null;

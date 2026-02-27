@@ -109,6 +109,14 @@ class OpenCodeClient:
         log_file = os.path.join(session_dir, "run.log")
         status_file = os.path.join(session_dir, "status.txt")
 
+        # 记录执行前的文件列表（用于后续检测新创建的文件）
+        initial_files = set()
+        if os.path.exists(session_dir):
+            for item in os.listdir(session_dir):
+                item_path = os.path.join(session_dir, item)
+                if os.path.isfile(item_path):
+                    initial_files.add(item)
+
         # 初始化日志文件
         with open(status_file, "w", encoding="utf-8") as f:
             f.write("running")
@@ -244,6 +252,11 @@ class OpenCodeClient:
             # 等待进程结束
             return_code = await process.wait()
             logger.info(f"CLI process finished with return code: {return_code}")
+
+            # 扫描新创建的文件并生成预览事件
+            await self._scan_and_preview_new_files(
+                session_id, assistant_message_id, session_dir, initial_files
+            )
 
             # 更新状态文件
             with open(status_file, "w", encoding="utf-8") as f:
@@ -1026,6 +1039,72 @@ class OpenCodeClient:
                     }
                 },
             }
+
+    async def _scan_and_preview_new_files(
+        self,
+        session_id: str,
+        message_id: str,
+        session_dir: str,
+        initial_files: set,
+    ):
+        """
+        扫描并预览新创建的文件
+
+        Args:
+            session_id: 会话ID
+            message_id: 消息ID
+            session_dir: 会话目录
+            initial_files: 执行前的文件集合
+        """
+        try:
+            # 扫描会话目录，查找新文件
+            current_files = set()
+            if os.path.exists(session_dir):
+                for item in os.listdir(session_dir):
+                    item_path = os.path.join(session_dir, item)
+                    if os.path.isfile(item_path):
+                        current_files.add(item)
+
+            # 找出新创建的文件
+            new_files = current_files - initial_files
+
+            # 过滤掉日志文件和状态文件
+            ignored_files = {"run.log", "status.txt"}
+            new_files = new_files - ignored_files
+
+            if not new_files:
+                logger.info(f"[FILE_SCAN] No new files found in session {session_id}")
+                return
+
+            logger.info(f"[FILE_SCAN] Found {len(new_files)} new files: {new_files}")
+
+            # 为每个新文件生成预览事件
+            for filename in sorted(new_files):
+                file_path = os.path.join(session_dir, filename)
+
+                # 读取文件内容
+                try:
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read()
+                except Exception as e:
+                    logger.warning(f"[FILE_SCAN] Failed to read file {filename}: {e}")
+                    continue
+
+                # 生成预览事件
+                await self._handle_file_operation(
+                    session_id=session_id,
+                    message_id=message_id,
+                    tool_name="write",
+                    input_data={
+                        "file_path": f"/app/opencode/workspace/{session_id}/{filename}",
+                        "content": content
+                    },
+                    status="completed"
+                )
+                logger.info(f"[FILE_SCAN] Generated preview for {filename}")
+
+        except Exception as e:
+            logger.error(f"[FILE_SCAN] Error scanning new files: {e}")
 
     async def _broadcast_event(self, session_id: str, event: Dict[str, Any]):
         """

@@ -37,48 +37,6 @@
         // 4. 注入样式和 Mode Selector
         injectAdvancedUI();
 
-        // 5. 劫持 updateInterfaceMode 以在切换模式时清空面板
-        // 使用定时器延迟劫持，因为 opencode.js 在此脚本之后加载
-        let hijackAttempts = 0;
-        let lastActiveId = null; // 跟踪上一次的会话ID
-        const hijackInterval = setInterval(() => {
-            hijackAttempts++;
-            if (typeof window.updateInterfaceMode === 'function' && !window.updateInterfaceMode._isPanelHijacked) {
-                clearInterval(hijackInterval);
-                const originalUpdateInterfaceMode = window.updateInterfaceMode;
-                window.updateInterfaceMode = function() {
-                    // 调用原函数
-                    const result = originalUpdateInterfaceMode.apply(this, arguments);
-
-                    // 只在会话真正切换时才清空面板
-                    const state = window.state;
-                    if (state && state.activeId) {
-                        // 检查会话是否切换
-                        if (lastActiveId && lastActiveId !== state.activeId) {
-                            const activeSession = state.sessions.find(x => x.id === state.activeId);
-                            // 只有切换到空白会话（没有prompt和response）时才清空
-                            if (activeSession && !activeSession.prompt && !activeSession.response) {
-                                if (window.rightPanelManager) {
-                                    window.rightPanelManager.clear();
-                                    console.log('[NewAPI] Cleared panel for new empty session (switched from', lastActiveId, 'to', state.activeId + ')');
-                                }
-                            }
-                        }
-                        // 更新跟踪的会话ID
-                        lastActiveId = state.activeId;
-                    }
-
-                    return result;
-                };
-                window.updateInterfaceMode._isPanelHijacked = true;
-                console.log('[NewAPI] Successfully hijacked updateInterfaceMode for panel clearing');
-            } else if (hijackAttempts > 50) {
-                // 10秒后停止尝试（50 * 200ms）
-                clearInterval(hijackInterval);
-                console.warn('[NewAPI] Failed to hijack updateInterfaceMode after 50 attempts');
-            }
-        }, 200);
-
         console.log('[NewAPI] V2.8 Advanced UI active');
     }
 
@@ -287,53 +245,6 @@
         window._currentMode = 'plan';
         window._turnIndex = 0; // 追踪对话轮次
 
-        // 初始化欢迎页模式选择器
-        initWelcomeModeSelector();
-    }
-
-    /**
-     * 初始化欢迎页模式选择器
-     */
-    function initWelcomeModeSelector() {
-        const container = document.getElementById('welcome-mode-selector');
-        if (!container) return;
-
-        const buttons = container.querySelectorAll('.mode-btn-welcome');
-        const styles = {
-            active: 'bg-white dark:bg-gray-700 shadow',
-            inactive: 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-        };
-
-        function updateButtonSelection(selectedMode) {
-            buttons.forEach(btn => {
-                const mode = btn.dataset.mode;
-                if (mode === selectedMode) {
-                    btn.classList.add(...styles.active.split(' '));
-                    btn.classList.remove(...styles.inactive.split(' '));
-                } else {
-                    btn.classList.remove(...styles.active.split(' '));
-                    btn.classList.add(...styles.inactive.split(' '));
-                }
-            });
-        }
-
-        // 初始化：设置 Build 为默认选中
-        updateButtonSelection('build');
-        window._currentMode = 'build';
-
-        // 添加点击事件监听
-        buttons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const mode = btn.dataset.mode;
-                window._currentMode = mode;
-                updateButtonSelection(mode);
-                console.log('[NewAPI] Welcome page mode switched to:', mode);
-            });
-        });
-
-        console.log('[NewAPI] Welcome mode selector initialized with default mode: build');
     }
 
     /**
@@ -362,7 +273,7 @@
         e.stopPropagation();
         e.preventDefault();
 
-        executeSubmission(target, true);
+        executeSubmission(target);
     }
 
     /**
@@ -378,7 +289,7 @@
 
                 const btnId = activeEl.id === 'prompt-welcome' ? 'runStream-welcome' : 'runStream';
                 const btn = document.getElementById(btnId);
-                if (btn) executeSubmission(btn, true);
+                if (btn) executeSubmission(btn);
             }
         }
     }
@@ -389,13 +300,13 @@
     async function prepareSession(prompt, isWelcome) {
         // 尝试从本地状态查找（如果已经点击过侧边栏切换）
         let existing = window.state.sessions.find(s => s.id === window.state.activeId);
-
+        
         // 如果是新任务，或者当前没有活跃 ID，则创建
         if (!existing || isWelcome) {
             const mode = window._currentMode || 'plan';
             console.log('[NewAPI] Creating new session with mode:', mode);
             const session = await window.apiClient.createSession(prompt, mode);
-
+            
             existing = {
                 id: session.id,
                 title: session.title,
@@ -411,10 +322,7 @@
         return existing;
     }
 
-    /**
-     * 执行提交逻辑
-     */
-    async function executeSubmission(btn, isNewTask) {
+
         const isWelcome = btn.id === 'runStream-welcome';
         const primaryInput = document.getElementById(isWelcome ? 'prompt-welcome' : 'prompt');
         const secondaryInput = document.getElementById(isWelcome ? 'prompt' : 'prompt-welcome');
@@ -425,18 +333,21 @@
         console.log('[NewAPI] Processing submission...', { isWelcome, promptLength: promptValue.length });
 
         try {
-            // 准备 Session
-            const s = await prepareSession(promptValue, isWelcome);
             const mode = s.mode || window._currentMode || 'plan';
             console.log(`[NewAPI] Connecting to events... (Mode: ${mode})`);
+            
+            // 1. 订阅事件
+            window.apiClient.subscribeToEvents(s.id, (data) => {
+                handleNewAPIEvent(data, s);
+            });
 
-            // 使用 handleNewAPIConnection 处理完整的连接和事件流
-            await handleNewAPIConnection(s, isNewTask);
-
-            // 清空输入框
-            if (primaryInput) primaryInput.value = '';
-            if (secondaryInput) secondaryInput.value = '';
+            // 2. 发送消息
+            if (isNewTask) {
+                console.log('[NewAPI] Sending initial message...');
+                await window.apiClient.sendTextMessage(s.id, s.prompt, { mode: mode });
+            }
         } catch (err) {
+
             console.error('[NewAPI] Submission sequence failed:', err);
             alert('服务器响应异常: ' + (err.message || 'Error occurred'));
             const runBtn = document.getElementById('runStream');
@@ -445,6 +356,55 @@
                 runBtn.innerHTML = '<span class="material-symbols-outlined !text-white dark:!text-black">arrow_upward</span>';
             }
         }
+    }
+
+    /**
+     * 获取或创建 Session
+     */
+    async function prepareSession(prompt, forceNew = false) {
+        const state = window.state;
+        let s = state.sessions.find(x => x.id === state.activeId);
+
+        // 识别逻辑：11位为伪造，12位为后端真实
+        const isFakeId = s && s.id && s.id.startsWith('ses_') && s.id.length === 11;
+
+        if (forceNew || !state.activeId || !s || !s.id.startsWith('ses_') || isFakeId) {
+            console.log('[NewAPI] Target session is missing or invalid, creating fresh one...');
+
+            // 如果当前是伪造session，先移除它
+            if (isFakeId && s) {
+                const fakeIndex = state.sessions.findIndex(x => x.id === s.id);
+                if (fakeIndex !== -1) {
+                    console.log('[NewAPI] Removing fake session:', s.id);
+                    state.sessions.splice(fakeIndex, 1);
+                }
+            }
+
+            const backendSession = await window.apiClient.createSession(prompt.substring(0, 30));
+            console.log('[NewAPI] Backend created session:', backendSession.id);
+
+            s = {
+                id: backendSession.id,
+                title: backendSession.title,
+                prompt: prompt,
+                response: '',
+                phases: [],
+                orphanEvents: [],
+                actions: [],
+                currentPhase: null
+            };
+
+            state.sessions.unshift(s);
+            state.activeId = s.id;
+        } else {
+            console.log('[NewAPI] Reusing verified session:', s.id);
+            s.prompt = (s.prompt ? s.prompt + '\n\n---\n\n' : '') + prompt;
+            s.phases = [];
+            s.currentPhase = null;
+        }
+
+        syncState(state);
+        return s;
     }
 
     function syncState(state) {
@@ -539,7 +499,11 @@
 
         if (isNewSubmission) {
             window._turnIndex = (window._turnIndex || 0) + 1; // 每一轮新对话增加索引
-            const currentPrompt = s.prompt.split('\n\n---\n\n').pop();
+            const currentPrompt = s.prompt.split('
+
+---
+
+').pop();
             console.log('[NewAPI] Sending user message to backend (Mode:', window._currentMode, ', Turn:', window._turnIndex, ')');
             await window.apiClient.sendTextMessage(s.id, currentPrompt, { mode: window._currentMode });
         }
@@ -568,16 +532,14 @@
         }
 
         if (adapted.type === 'file_preview_delta') {
-            // delta 是对象格式: {type: "insert", position: i, content: char}
-            const deltaContent = adapted.delta?.content || '';
-            console.log('[NewAPI] File preview delta:', deltaContent.substring(0, Math.min(50, deltaContent.length)) + (deltaContent.length > 50 ? '...' : ''));
+            console.log('[NewAPI] File preview delta:', adapted.delta?.substring(0, 50) + '...');
 
             // 使用打字机效果追加内容
             if (window.rightPanelManager && typeof window.rightPanelManager.typeAppendContent === 'function') {
-                window.rightPanelManager.typeAppendContent(deltaContent);
+                window.rightPanelManager.typeAppendContent(adapted.delta);
             } else if (window.rightPanelManager && typeof window.rightPanelManager.appendFileContent === 'function') {
                 // 降级：直接追加（无打字机效果）
-                window.rightPanelManager.appendFileContent(deltaContent);
+                window.rightPanelManager.appendFileContent(adapted.delta);
             }
             return;
         }

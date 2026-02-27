@@ -909,6 +909,35 @@
                         今天可以帮你做什么？
                     </h1>
 
+                    <!-- Mode Selector for Welcome Page -->
+                    <div class="w-full max-w-3xl mb-4">
+                        <div class="flex justify-center">
+                            <div id="welcome-mode-selector" class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1">
+                                <button class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all"
+                                    data-mode="plan">
+                                    <span class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined !text-[18px]">psychology</span>
+                                        <span>Plan 分析</span>
+                                    </span>
+                                </button>
+                                <button class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all bg-white dark:bg-gray-700 shadow"
+                                    data-mode="build">
+                                    <span class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined !text-[18px]">build</span>
+                                        <span>Build 开发</span>
+                                    </span>
+                                </button>
+                                <button class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all"
+                                    data-mode="auto">
+                                    <span class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined !text-[18px]">auto_awesome</span>
+                                        <span>Auto 智能</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Centered Input for New Tasks -->
                     <div class="w-full max-w-3xl relative">
                         <div
@@ -1044,10 +1073,10 @@
                         </button>
                     </div>
                     <div class="flex items-center gap-3">
-                        <!-- 停止按钮（黑底白方块） -->
+                        <!-- 停止按钮（黑圆白方块） -->
                         <button id="stopStream"
-                            class="hidden flex items-center justify-center w-10 h-10 bg-zinc-900 text-white rounded-xl hover:bg-black transition-all shadow-lg border border-white/10">
-                            <span class="material-symbols-outlined text-[20px] !text-white"
+                            class="hidden flex items-center justify-center w-10 h-10 bg-black dark:bg-white rounded-full hover:bg-gray-800 dark:hover:bg-gray-200 transition-all shadow-lg">
+                            <span class="material-symbols-outlined text-[24px] !text-white dark:!text-black"
                                 style="font-variation-settings: 'FILL' 1">stop</span>
                         </button>
                         <!-- 发送按钮 -->
@@ -1163,9 +1192,9 @@
     <script src="/static/right-panel-manager.js?v=9"></script>
     <!-- 新架构 API 客户端和事件适配器 -->
     <script src="/static/api-client.js?v=1"></script>
-    <script src="/static/event-adapter.js?v=2"></script>
+    <script src="/static/event-adapter.js?v=4"></script>
     <!-- 新 API 扩展（Monkey patch submitTask）- 暂时禁用，因为找不到 submitTask 函数 -->
-    <script src="/static/opencode-new-api-patch.js?v=10"></script>
+    <script src="/static/opencode-new-api-patch.js?v=21"></script>
 
     <!-- Mock 数据：仅对 demo session 启用，真实 session 使用 API -->
     <!-- <script src="/static/mock-data.js?v=7"></script> -->
