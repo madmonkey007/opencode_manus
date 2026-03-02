@@ -1890,3 +1890,496 @@ INFO:     172.19.0.1:34584 - "GET /opencode/list_session_files?sid=ses_afee917b 
 INFO:     172.19.0.1:57084 - "POST /opencode/session/ses_afee917b/message HTTP/1.1" 200 OK
 INFO:     172.19.0.1:34584 - "GET /opencode/events?session_id=ses_afee917b HTTP/1.1" 200 OK
 INFO:     172.19.0.1:57084 - "GET /opencode/list_session_files?sid=ses_afee917b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54092 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54092 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:54092 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54104 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54132 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54108 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54116 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54138 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54092 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54104 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54116 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54138 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54108 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36112 - "GET /opencode/session/ses_6df98d7a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:36114 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36114 - "GET /opencode/list_session_files?sid=ses_eae09526 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36114 - "GET /opencode/run_sse?prompt=%E5%B8%AE%E6%88%91%E5%86%99%E4%B8%80%E4%B8%AA%E7%BA%A2%E7%99%BD%E8%93%9D%E9%A3%8E%E6%A0%BC%E7%9A%84%E5%8D%A1%E7%89%87%E7%94%B5%E5%AD%90%E9%97%B9%E9%92%9F%E7%9A%84%E7%BD%91%E9%A1%B5&sid=ses_eae09526 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35662 - "GET /opencode/list_session_files?sid=ses_eae09526 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32946 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32946 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:32946 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32956 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32988 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33006 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32986 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32972 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32956 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32986 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33006 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32946 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32972 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32946 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:32972 - "GET /opencode/session/ses_6df98d7a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33006 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33260 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33260 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33260 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57824 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57808 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57804 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57806 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57834 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33260 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57806 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57808 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57834 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57804 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57834 - "GET /opencode/session/ses_6df98d7a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:57808 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:57804 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57804 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57804 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:57808 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57834 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33260 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57824 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57806 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57804 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57824 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57804 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57834 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57806 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57808 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57806 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:57808 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57834 - "GET /opencode/session/ses_6df98d7a/messages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:47558 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33372 - "GET /opencode/session/ses_6df98d7a/messages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:36858 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45100 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45100 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45108 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45120 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45146 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45106 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45134 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45134 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45100 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45120 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45108 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45146 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45106 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45120 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45106 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45108 - "GET /opencode/session/ses_6df98d7a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45108 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45108 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45106 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49986 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45108 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49998 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45120 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49984 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45106 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45108 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49986 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49998 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49984 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49984 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:49986 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49998 - "GET /opencode/session/ses_6df98d7a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45876 - "GET /opencode/session/ses_3f34e6dc/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45876 - "GET /opencode/list_session_files?sid=ses_3f34e6dc HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45876 - "GET /opencode/list_session_files?sid=ses_6df98d7a HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45876 - "GET /opencode/list_session_files?sid=ses_e617d142 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45876 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45876 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45876 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33832 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33834 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33848 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33864 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33832 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45876 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33834 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33848 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33848 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33816 - "GET /opencode/list_session_files?sid=ses_e617d142 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /opencode/list_session_files?sid=ses_e617d142 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /opencode/list_session_files?sid=ses_79dcbce7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33816 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53118 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53134 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53132 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53152 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53138 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53118 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53134 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53152 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53132 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53132 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:33816 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /opencode/list_session_files?sid=ses_79dcbce7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /opencode/list_session_files?sid=ses_79dcbce7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /opencode/list_session_files?sid=ses_8486c697 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:56542 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56532 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56570 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56558 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56580 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56532 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56542 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33816 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56580 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56570 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56570 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:56580 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56580 - "GET /opencode/list_session_files?sid=ses_8486c697 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56580 - "GET /opencode/list_session_files?sid=ses_8486c697 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42334 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42334 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42336 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42334 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42352 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42356 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42372 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42386 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42334 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42336 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42352 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42386 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42356 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42334 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42356 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42356 - "GET /opencode/list_session_files?sid=ses_8486c697 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42356 - "GET /opencode/list_session_files?sid=ses_8486c697 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39728 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39728 - "POST /opencode/session/ses_f5cecadd/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39728 - "GET /opencode/list_session_files?sid=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39744 - "GET /opencode/events?session_id=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45804 - "GET /opencode/list_session_files?sid=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45814 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45814 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45814 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45830 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45842 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45868 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45866 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45814 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45830 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45842 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45866 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45866 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45842 - "GET /opencode/session/ses_f5cecadd/messages HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/list_session_files?sid=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/list_session_files?sid=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45842 - "GET /opencode/list_session_files?sid=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45856 - "GET /opencode/list_session_files?sid=ses_eae09526 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/session/ses_f5cecadd/messages HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/list_session_files?sid=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45856 - "GET /opencode/list_session_files?sid=ses_eae09526 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/session/ses_f5cecadd/messages HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/list_session_files?sid=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45856 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45856 - "GET /opencode/list_session_files?sid=ses_eae09526 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45640 - "GET /opencode/session/ses_f5cecadd/messages HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45640 - "GET /opencode/list_session_files?sid=ses_f5cecadd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48212 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48212 - "POST /opencode/session/ses_909fd22d/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48212 - "GET /opencode/events?session_id=ses_909fd22d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48226 - "GET /opencode/list_session_files?sid=ses_909fd22d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42464 - "GET /opencode/list_session_files?sid=ses_909fd22d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:41896 - "GET /opencode/events?session_id=ses_909fd22d HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:51386 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51386 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:51386 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51400 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51424 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51416 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51440 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51388 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51386 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51400 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51424 - "GET /static/opencode-new-api-patch.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51416 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51440 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51424 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51440 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:57822 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57822 - "POST /opencode/session/ses_405fb1d7/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57822 - "GET /opencode/events?session_id=ses_405fb1d7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57836 - "GET /opencode/list_session_files?sid=ses_405fb1d7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36416 - "GET /opencode/list_session_files?sid=ses_405fb1d7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36416 - "GET /opencode/get_file_content?path=ses_405fb1d7%2Findex.html HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36416 - "GET /opencode/list_session_files?sid=ses_405fb1d7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49966 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49966 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:49972 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49974 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49966 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49982 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49990 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49988 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49974 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49972 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49966 - "GET /static/opencode-new-api-patch.js?v=28 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49990 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49982 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49982 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:49990 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49990 - "GET /opencode/list_session_files?sid=ses_405fb1d7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49990 - "GET /opencode/list_session_files?sid=ses_405fb1d7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49990 - "GET /opencode/list_session_files?sid=ses_909fd22d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49990 - "GET /opencode/list_session_files?sid=ses_405fb1d7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33116 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33116 - "POST /opencode/session/ses_d8f8f47d/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33116 - "GET /opencode/list_session_files?sid=ses_d8f8f47d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33132 - "GET /opencode/events?session_id=ses_d8f8f47d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42574 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42574 - "GET /static/opencode-new-api-patch.js?v=28 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53414 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:53416 - "GET /static/preview-config.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:53430 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53442 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:53446 - "GET /static/api-client.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:53414 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53416 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53442 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53446 - "GET /static/opencode.js?v=23 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42574 - "GET /static/history-fix.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:53442 - "GET /opencode/session/ses_c46a620d/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53446 - "GET /opencode/session/ses_39fe8dd7/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53414 - "GET /opencode/session/ses_d772da3b/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53416 - "GET /opencode/session/ses_bebb0a6b/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42574 - "GET /opencode/session/ses_db387860/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53430 - "GET /opencode/session/ses_f30b4312/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53442 - "GET /opencode/session/ses_5652b533/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53446 - "GET /opencode/session/ses_8677faee/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53414 - "GET /opencode/session/ses_deb39e63/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53416 - "GET /opencode/session/ses_c5d5318a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42574 - "GET /opencode/session/ses_cec98711/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53430 - "GET /opencode/session/ses_be351969/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53442 - "GET /opencode/session/ses_2eb1d060/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53446 - "GET /opencode/session/ses_db0054f6/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53414 - "GET /opencode/session/ses_503xto3/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53416 - "GET /opencode/session/ses_eiqqudt/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42574 - "GET /opencode/session/ses_abdd8fc3/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53430 - "GET /opencode/session/ses_ea0ff4c2/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53442 - "GET /opencode/session/ses_2d9069c9/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:53446 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53414 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:53414 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45406 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45406 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:45410 - "GET /static/opencode-new-api-patch.js?v=28 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:45424 - "GET /static/opencode.js?v=24 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45424 - "GET /opencode/session/ses_39fe8dd7/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45410 - "GET /opencode/session/ses_c46a620d/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45406 - "GET /opencode/session/ses_d772da3b/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45440 - "GET /opencode/session/ses_bebb0a6b/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45450 - "GET /opencode/session/ses_db387860/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45458 - "GET /opencode/session/ses_f30b4312/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45406 - "GET /opencode/session/ses_deb39e63/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45424 - "GET /opencode/session/ses_5652b533/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45410 - "GET /opencode/session/ses_8677faee/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45440 - "GET /opencode/session/ses_c5d5318a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45458 - "GET /opencode/session/ses_be351969/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45450 - "GET /opencode/session/ses_cec98711/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45440 - "GET /opencode/session/ses_eiqqudt/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45410 - "GET /opencode/session/ses_503xto3/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45458 - "GET /opencode/session/ses_abdd8fc3/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45424 - "GET /opencode/session/ses_db0054f6/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45406 - "GET /opencode/session/ses_2eb1d060/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45450 - "GET /opencode/session/ses_ea0ff4c2/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45410 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45440 - "GET /opencode/session/ses_2d9069c9/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:45450 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:45450 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55562 - "POST /opencode/session/ses_39fe8dd7/message HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55562 - "GET /opencode/events?session_id=ses_39fe8dd7 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:35458 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35458 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:35476 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35504 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35474 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35522 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35510 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35458 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35474 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35504 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35522 - "GET /static/opencode.js?v=24 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35476 - "GET /static/opencode-new-api-patch.js?v=28 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35510 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35476 - "GET /opencode/session/ses_d8f8f47d/messages HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35522 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:35510 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35510 - "GET /opencode/list_session_files?sid=ses_d8f8f47d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35510 - "GET /opencode/list_session_files?sid=ses_d8f8f47d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35522 - "GET /opencode/list_session_files?sid=ses_d8f8f47d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35522 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35522 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:35522 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40766 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40762 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40802 - "GET /static/api-client.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40788 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35522 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40766 - "GET /static/opencode-new-api-patch.js?v=28 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /static/opencode.js?v=24 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40762 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40788 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40788 - "GET /opencode/session/ses_d8f8f47d/messages HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40762 - "GET /opencode/session/ses_eae09526/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40764 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /opencode/list_session_files?sid=ses_d8f8f47d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40764 - "GET /opencode/list_session_files?sid=ses_d8f8f47d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40788 - "GET /opencode/list_session_files?sid=ses_d8f8f47d HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44338 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44338 - "POST /opencode/session/ses_57941ebe/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44338 - "GET /opencode/events?session_id=ses_57941ebe HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44346 - "GET /opencode/list_session_files?sid=ses_57941ebe HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57616 - "GET /opencode/list_session_files?sid=ses_57941ebe HTTP/1.1" 200 OK
+INFO:     172.19.0.1:58158 - "POST /opencode/session/ses_39fe8dd7/message HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:58168 - "GET /opencode/events?session_id=ses_39fe8dd7 HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40718 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55444 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55454 - "GET /static/opencode-new-api-patch.js?v=28 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:55444 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:55470 - "GET /opencode/session/ses_bebb0a6b/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55454 - "GET /opencode/session/ses_d772da3b/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55444 - "GET /opencode/session/ses_c46a620d/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55480 - "GET /opencode/session/ses_5652b533/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55472 - "GET /opencode/session/ses_db387860/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55474 - "GET /opencode/session/ses_f30b4312/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55454 - "GET /opencode/session/ses_c5d5318a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55470 - "GET /opencode/session/ses_deb39e63/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55444 - "GET /opencode/session/ses_8677faee/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55472 - "GET /opencode/session/ses_cec98711/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55474 - "GET /opencode/session/ses_be351969/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55480 - "GET /opencode/session/ses_2eb1d060/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55444 - "GET /opencode/session/ses_eiqqudt/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55470 - "GET /opencode/session/ses_503xto3/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55454 - "GET /opencode/session/ses_db0054f6/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55474 - "GET /opencode/session/ses_ea0ff4c2/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55472 - "GET /opencode/session/ses_abdd8fc3/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55480 - "GET /opencode/session/ses_2d9069c9/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:55470 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55444 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55444 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42702 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42702 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:42716 - "GET /opencode/session/ses_d772da3b/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42702 - "GET /opencode/session/ses_c46a620d/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42726 - "GET /opencode/session/ses_bebb0a6b/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42732 - "GET /opencode/session/ses_db387860/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42748 - "GET /opencode/session/ses_f30b4312/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42760 - "GET /opencode/session/ses_5652b533/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42702 - "GET /opencode/session/ses_deb39e63/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42716 - "GET /opencode/session/ses_8677faee/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42726 - "GET /opencode/session/ses_c5d5318a/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42732 - "GET /opencode/session/ses_cec98711/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42760 - "GET /opencode/session/ses_be351969/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42748 - "GET /opencode/session/ses_2eb1d060/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42702 - "GET /opencode/session/ses_db0054f6/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42726 - "GET /opencode/session/ses_eiqqudt/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42732 - "GET /opencode/session/ses_abdd8fc3/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42716 - "GET /opencode/session/ses_503xto3/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42760 - "GET /opencode/session/ses_ea0ff4c2/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42748 - "GET /opencode/session/ses_2d9069c9/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42702 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42702 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42702 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_39fe8dd7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/session/ses_c2a417e2/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_c2a417e2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_9bf839c5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/session/ses_ed5b0004/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_ed5b0004 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_68b6bf89 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_cfe5bea2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_e52b521b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_9848f318 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_3c0844a6 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_2d9069c9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_795e9c87 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_f389be80 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_21db3be8 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_24f4cd11 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_e587a7b5 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_78eadd1e HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_08f23781 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_7b4e30ee HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_ce1da574 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_2c3bd4ca HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_4dea1f4b HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_75a4cb82 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_9e6d0368 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_83166db9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_28922a10 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_599ca792 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_59090fcd HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_38f233b9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_071e0290 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_b3af4846 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_3b4e608a HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_f83819d7 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_ea0ff4c2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_abdd8fc3 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_eiqqudt HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40722 - "GET /opencode/list_session_files?sid=ses_503xto3 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59534 - "GET /opencode/list_session_files?sid=ses_db0054f6 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59534 - "GET /opencode/list_session_files?sid=ses_2eb1d060 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59534 - "GET /opencode/session/ses_be351969/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:59534 - "GET /opencode/list_session_files?sid=ses_be351969 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59534 - "GET /opencode/list_session_files?sid=ses_2eb1d060 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59534 - "GET /opencode/list_session_files?sid=ses_cec98711 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59534 - "GET /opencode/list_session_files?sid=ses_cec98711 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59534 - "GET /opencode/list_session_files?sid=ses_cec98711 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59534 - "GET /opencode/list_session_files?sid=ses_cec98711 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51268 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:36568 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36568 - "POST /opencode/session/ses_2972072a/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36568 - "GET /opencode/events?session_id=ses_2972072a HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36570 - "GET /opencode/list_session_files?sid=ses_2972072a HTTP/1.1" 200 OK

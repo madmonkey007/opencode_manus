@@ -11,8 +11,7 @@
     "opencode-pty",
     "opencode-supermemory",
     "@tarquinen/opencode-dcp@1.2.7",
-    "@franlol/opencode-md-table-formatter@0.0.3",
-    "oh-my-opencode@3.8.4"
+    "@franlol/opencode-md-table-formatter@0.0.3"
   ],
   "provider": {
     "google-ai-key1": {
@@ -434,6 +433,36 @@
         "store": false,
         "timeout": 300000
       }
+    },
+    "volcengine": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "volcengine",
+      "options": {
+        "baseURL": "https://ark.cn-beijing.volces.com/api/coding/v3",
+        "apiKey": "dc9a3f58-c366-423e-9be7-b98a30927354"
+      },
+      "models": {
+        "ark-code-latest": {
+          "name": "ark-code-latest"
+        },
+        "kimi-k2.5": {
+          "name": "kimi-k2.5",
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "options": {
+            "thinking": {
+              "type": "enabled"
+            }
+          }
+        }
+      }
     }
   },
   "permission": {
@@ -547,23 +576,17 @@
     },
     "plan": {
       "permission": {
-        "edit": "allow",
-        "write": "allow",
-        "read": "allow",
-        "bash": "allow",
-        "task": "allow",
-        "worktree_*": "allow",
+        "edit": "ask",
+        "write": "ask",
+        "bash": {
+          "*": "ask"
+        },
         "doom_loop": "allow"
       }
     },
     "build": {
       "permission": {
-        "edit": "allow",
-        "write": "allow",
-        "read": "allow",
-        "bash": "allow",
-        "task": "allow",
-        "worktree_*": "allow",
+        "*": "allow",
         "doom_loop": "allow"
       }
     },
@@ -704,6 +727,15 @@
     }
   },
   "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--usage-statistics=false"
+      ]
+    },
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",

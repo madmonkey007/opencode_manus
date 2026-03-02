@@ -1443,8 +1443,21 @@
                     } else if (hasSummaryInResponse) {
                         console.log('[NewAPI] Task summary exists in response but flag is missing, fixing flag');
                         s._hasCompletionSummary = true;
+                        // ✅ v=32: 立即保存修复后的标志位
+                        if (typeof window.saveState === 'function') {
+                            window.saveState();
+                        }
                     } else {
                         console.log('[NewAPI] Task summary flag exists but response missing summary');
+                        // ✅ v=32: 重建总结（防止response被清空后丢失）
+                        const totalActions = s.actions ? s.actions.length : 0;
+                        const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
+                        const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
+                        s.response = (s.response || '') + summary;
+                        // 保存重建的response
+                        if (typeof window.saveState === 'function') {
+                            window.saveState();
+                        }
                     }
                 }
             } else {

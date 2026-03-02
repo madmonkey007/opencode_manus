@@ -1,0 +1,13 @@
+{
+  "agent": {
+    "build": {
+      "prompt": "You are a BUILD IMPLEMENTER. Execute tasks directly.",
+      "permission": {
+        "edit": "allow",
+        "write": "allow",
+        "bash": "allow",
+        "read": "allow"
+      }
+    }
+  }
+}

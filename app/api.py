@@ -181,6 +181,60 @@ async def list_sessions(status: Optional[SessionStatus] = None):
 
 
 # ====================================================================
+# Session Recovery Mechanisms
+# ====================================================================
+
+# ✅ EC1: 并发恢复锁和缓存
+_recovery_locks: Dict[str, bool] = {}
+_recovery_cache: Dict[str, bool] = {}
+
+
+async def _acquire_recovery_lock(session_id: str) -> bool:
+    """获取恢复锁，防止并发恢复同一session"""
+    if session_id in _recovery_locks:
+        return False
+    _recovery_locks[session_id] = True
+    return True
+
+
+def _release_recovery_lock(session_id: str):
+    """释放恢复锁"""
+    _recovery_locks.pop(session_id, None)
+
+
+async def recover_session_from_disk(session_id: str) -> bool:
+    """
+    ✅ I1: 提取恢复逻辑 - 尝试从磁盘恢复session
+    """
+    from app.main import WORKSPACE_BASE
+    session_dir = os.path.join(WORKSPACE_BASE, session_id)
+
+    if not os.path.exists(session_dir):
+        return False
+
+    # 尝试获取锁
+    if not await _acquire_recovery_lock(session_id):
+        # 其他请求正在恢复，等待
+        await asyncio.sleep(0.5)
+        return True
+
+    try:
+        logger.info(f"[Session Recovery] Attempting to recover session {session_id} from disk")
+        # 重新初始化session
+        await session_manager.create_session(
+            session_id=session_id,
+            title=f"Recovered: {session_id}",
+            version="1.0.0"
+        )
+        return True
+    except Exception as e:
+        logger.error(f"[Session Recovery] Failed to recover {session_id}: {e}")
+        return False
+    finally:
+        _release_recovery_lock(session_id)
+
+
+# ====================================================================
 # Message Management Endpoints
 # ====================================================================
 
@@ -189,17 +243,30 @@ async def list_sessions(status: Optional[SessionStatus] = None):
 async def get_messages(session_id: str):
     """
     获取会话的所有消息历史
-
-    Args:
-        session_id: 会话ID
-
-    Returns:
-        消息列表（包含部分）
     """
-    # 直接获取消息（会自动从数据库恢复如果不在内存中）
+    # ✅ S1: 路径验证 - 防止路径遍历攻击
+    import re
+    if not re.match(r'^[a-zA-Z0-9_]+$', session_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid session ID format. Only alphanumeric and underscore allowed."
+        )
+
+    # 尝试从内存/数据库获取
     messages = await session_manager.get_messages(session_id)
 
-    # 如果消息为空，说明session真的不存在
+    # 如果内存中没有，尝试从磁盘恢复
+    if not messages:
+        # ✅ E1: 缓存磁盘检查结果
+        cache_key = f"checked:{session_id}"
+        if not _recovery_cache.get(cache_key, False):
+            _recovery_cache[cache_key] = True
+            
+            if await recover_session_from_disk(session_id):
+                # 重新获取messages
+                messages = await session_manager.get_messages(session_id)
+
+    # 如果仍然找不到，返回404
     if not messages:
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
 
@@ -208,6 +275,7 @@ async def get_messages(session_id: str):
         "messages": [msg.dict() for msg in messages],
         "count": len(messages),
     }
+
 
 
 @router.get("/session/{session_id}/timeline")

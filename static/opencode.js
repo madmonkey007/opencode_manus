@@ -185,7 +185,8 @@ function _executeSave(retryCount = 0) {
                 orphanEvents: s.orphanEvents || [],
                 mode: s.mode || null,
                 _version: s._version || 1,
-                _createdTime: s._createdTime || Date.now()  // ✅ 修复I1: 添加创建时间，用于宽限期判断
+                _createdTime: s._createdTime || Date.now(),  // ✅ 修复I1: 添加创建时间，用于宽限期判断
+                _hasCompletionSummary: s._hasCompletionSummary || false  // ✅ v=32: 持久化任务总结标志位
             };
         });
 
@@ -357,6 +358,11 @@ async function loadState() {
                     if (!s._createdTime) {
                         // 对于旧数据，设置为当前时间（不会立即被清理）
                         s._createdTime = Date.now();
+                        repairedCount++;
+                    }
+                    if (!s._hasCompletionSummary) {
+                        // ✅ v=32: 初始化任务总结标志位 - 从response推断
+                        s._hasCompletionSummary = !!(s.response && s.response.includes('**✅ 任务完成**'));
                         repairedCount++;
                     }
                     s._version = 1;
