@@ -629,6 +629,82 @@
     }
 
     /**
+     * ✅ v=34: 系统消息显示函数 - 用于显示thought、任务完成等消息
+     * 在主聊天区域创建临时的系统消息卡片
+     */
+    function addSystemMessage(content, type = 'info') {
+        try {
+            const s = state.sessions.find(x => x.id === state.activeId);
+            if (!s) {
+                console.warn('[addSystemMessage] No active session found');
+                return;
+            }
+
+            // 找到聊天消息容器
+            const chatMessages = document.querySelector('#chat-messages');
+            if (!chatMessages) {
+                console.warn('[addSystemMessage] Chat messages container not found');
+                return;
+            }
+
+            // 创建系统消息卡片
+            const messageCard = document.createElement('div');
+            messageCard.className = `system-message message-bubble mb-3 p-3 rounded-lg text-sm animate-fade-in`;
+
+            // 根据类型设置样式
+            if (type === 'thought') {
+                messageCard.className += ' bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 text-purple-800 dark:text-purple-200';
+                messageCard.innerHTML = `
+                    <div class="flex items-start gap-2">
+                        <span class="material-symbols-outlined !text-[18px] text-purple-600 dark:text-purple-300">psychology</span>
+                        <div class="flex-1">${content}</div>
+                    </div>
+                `;
+            } else if (type === 'success') {
+                messageCard.className += ' bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 text-green-800 dark:text-green-200';
+                messageCard.innerHTML = `
+                    <div class="flex items-start gap-2">
+                        <span class="material-symbols-outlined !text-[18px] text-green-600 dark:text-green-300">check_circle</span>
+                        <div class="flex-1">${content}</div>
+                    </div>
+                `;
+            } else if (type === 'error') {
+                messageCard.className += ' bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200';
+                messageCard.innerHTML = `
+                    <div class="flex items-start gap-2">
+                        <span class="material-symbols-outlined !text-[18px] text-red-600 dark:text-red-300">error</span>
+                        <div class="flex-1">${content}</div>
+                    </div>
+                `;
+            } else {
+                messageCard.className += ' bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-200';
+                messageCard.innerHTML = `
+                    <div class="flex items-start gap-2">
+                        <span class="material-symbols-outlined !text-[18px] text-blue-600 dark:text-blue-300">info</span>
+                        <div class="flex-1">${content}</div>
+                    </div>
+                `;
+            }
+
+            // 添加到聊天区域（append到最后）
+            chatMessages.appendChild(messageCard);
+
+            // 滚动到底部
+            const scrollArea = document.querySelector('#chat-scroll-area');
+            if (scrollArea) {
+                scrollArea.scrollTop = scrollArea.scrollHeight;
+            }
+
+            console.log(`[addSystemMessage] Displayed ${type} message:`, content.substring(0, 50));
+        } catch (error) {
+            console.error('[addSystemMessage] Failed to display message:', error);
+        }
+    }
+
+    // 暴露到全局作用域，供事件处理函数调用
+    window.addSystemMessage = addSystemMessage;
+
+    /**
      * ✅ 修复3：节流版本的状态更新函数 - 限制DOM更新频率（每500ms最多更新一次）
      * 防止每个字符delta都触发DOM更新
      */
@@ -1615,17 +1691,29 @@
 
                 // 判断事件类型并显示
                 if (adapted.type === 'thought') {
-                    // ✅ v=29: 思考内容显示在主聊天区域，而不是右侧面板
+                    // ✅ v=34: 思考内容立即显示在主聊天区域
                     const content = adapted.content || adapted.data?.text || '';
-                    console.log('[NewAPI] 显示思考内容到主聊天区域');
+                    console.log('[NewAPI] Thought event received:', content.substring(0, 100));
 
-                    // 添加到主聊天区域（作为系统消息）
+                    // ✅ v=34: 立即显示，不受打字机效果限制
                     if (typeof window.addSystemMessage === 'function') {
                         window.addSystemMessage(`💭 ${content}`, 'thought');
+                        console.log('[NewAPI] ✅ Thought displayed immediately');
+                    } else {
+                        console.error('[NewAPI] ❌ addSystemMessage not available!');
                     }
 
-                    // 同时添加到orphanEvents，可以在历史中查看
+                    // ✅ v=34: 同时添加到orphanEvents，确保在历史记录中可见
+                    if (!s.orphanEvents) s.orphanEvents = [];
+                    s.orphanEvents.push({
+                        type: 'thought',
+                        content: content,
+                        timestamp: Date.now()
+                    });
+                    console.log('[NewAPI] Thought added to orphanEvents, total:', s.orphanEvents.length);
+
                     // 不在右侧面板显示，避免覆盖文件预览
+                    return;
                 } else if (adapted.type === 'action') {
                     // 显示工具操作
                     const output = data.output || '';
