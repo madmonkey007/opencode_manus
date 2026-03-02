@@ -42,6 +42,24 @@ except ImportError:
 
 logger = logging.getLogger("opencode.client")
 
+# ✅ 修复可维护性：提取CLI事件相关的常量（避免魔法字符串）
+CLI_EVENT_TYPE_TOOL_USE = 'tool_use'
+CLI_EVENT_TYPE_TOOL_RESULT = 'tool_result'
+CLI_EVENT_TYPE_TEXT = 'text'
+
+PART_TYPE_TOOL = 'tool'
+PART_TYPE_TEXT = 'text'
+PART_TYPE_THOUGHT = 'thought'
+
+# ✅ 已知工具白名单（用于安全验证）
+KNOWN_TOOLS = [
+    'read', 'write', 'edit', 'bash', 'grep', 'task', 'todowrite',
+    'search', 'browse', 'run_server', 'file_editor'
+]
+
+# ✅ JSON大小限制（防止DoS）
+MAX_JSON_SIZE = 10240  # 10KB
+
 
 # ====================================================================
 # OpenCode Client
@@ -438,43 +456,91 @@ class OpenCodeClient:
                     },
                 }
 
-        # ✅ 阶段2原型：尝试解析JSON格式的子代理事件
+        # ✅ 阶段2原型 + 优化：尝试解析JSON格式的子代理事件
         # CLI可能输出JSON格式的tool_use事件
-        if text.strip().startswith(('{', '[')):
-            try:
-                event_data = json.loads(text.strip())
+        
+        # ✅ 修复可读性：缓存strip结果（避免多次调用）
+        stripped_text = text.strip()
+        
+        # ✅ 修复可读性 + 性能：使用早期返回减少嵌套
+        # 检查1：是否可能是JSON（启发式）
+        if not stripped_text.startswith(('{', '[')):
+            pass  # 不是JSON，继续文本处理
+        else:
+            # 检查2：JSON大小限制
+            if len(stripped_text) > MAX_JSON_SIZE:
+                logger.warning(f"[_process_line] JSON too large: {len(stripped_text)}, skipping")
+            else:
+                # 尝试解析JSON
+                try:
+                    event_data = json.loads(stripped_text)
+                    
+                    # 检查3：验证是字典类型
+                    if not isinstance(event_data, dict):
+                        logger.debug(f"[_process_line] Event is not dict, skipping")
+                    # 检查4：验证事件类型
+                    elif event_data.get('type') != CLI_EVENT_TYPE_TOOL_USE:
+                        logger.debug(f"[_process_line] Event type is not tool_use, skipping")
+                    else:
+                        part = event_data.get('part', {})
+                        
+                        # 检查5：验证part类型
+                        if part.get('type') != PART_TYPE_TOOL:
+                            logger.debug(f"[_process_line] Part type is not tool, skipping")
+                        else:
+                            # ✅ 修复正确性：提取工具名称并验证
+                            tool_name = part.get('tool') or 'unknown'
+                            tool_state = part.get('state', {})
+                            
+                            # ✅ 修复正确性：验证工具名称
+                            if tool_name == 'unknown':
+                                logger.warning(f"[_process_line] Missing tool name in part: {part.get('tool')}")
+                            elif tool_name not in KNOWN_TOOLS:
+                                logger.info(f"[_process_line] Unknown tool: {tool_name}")
+                            
+                            # ✅ 修复正确性：正确处理timestamp（避免0被替换）
+                            # 只有当timestamp不存在或为None时才使用当前时间
+                            event_timestamp = event_data.get('timestamp')
+                            if event_timestamp is None:
+                                event_timestamp = int(datetime.now().timestamp() * 1000)
+                            
+                            # ✅ 修复正确性：添加类型验证和转换
+                            output_raw = tool_state.get('output')
+                            output = str(output_raw) if output_raw is not None else ''
+                            
+                            input_raw = tool_state.get('input')
+                            if input_raw is None:
+                                input_data = {}
+                            elif not isinstance(input_raw, dict):
+                                logger.warning(f"[_process_line] Invalid input type: {type(input_raw)}, using empty dict")
+                                input_data = {}
+                            else:
+                                input_data = input_raw
+                            
+                            # ✅ 解析成功，发送tool_event到前端
+                            await self._broadcast_event(session_id, {
+                                "type": "tool_event",
+                                "data": {
+                                    "type": "tool",
+                                    "tool": tool_name,
+                                    "tool_name": tool_name,
+                                    "status": tool_state.get('status', 'running'),
+                                    "input": input_data,
+                                    "output": output,
+                                    "title": tool_state.get('title', f'Using {tool_name}')
+                                },
+                                "timestamp": event_timestamp
+                            })
+                            
+                            logger.debug(f"[_process_line] Parsed tool_event: {tool_name}")
+                            return  # 已处理，不再作为文本
                 
-                # 检查是否是tool_use事件
-                if isinstance(event_data, dict) and event_data.get('type') == 'tool_use':
-                    part = event_data.get('part', {})
-                    if part.get('type') == 'tool':
-                        # ✅ 解析成功，发送tool_event到前端
-                        tool_name = part.get('tool', 'unknown')
-                        tool_state = part.get('state', {})
-                        
-                        await self._broadcast_event(session_id, {
-                            "type": "tool_event",
-                            "data": {
-                                "type": "tool",
-                                "tool": tool_name,
-                                "tool_name": tool_name,
-                                "status": tool_state.get('status', 'running'),
-                                "input": tool_state.get('input', {}),
-                                "output": str(tool_state.get('output', '')),
-                                "title": tool_state.get('title', f'Using {tool_name}')
-                            },
-                            "timestamp": event_data.get('timestamp', int(datetime.now().timestamp() * 1000))
-                        })
-                        
-                        logger.debug(f"[_process_line] Parsed tool_event: {tool_name}")
-                        return  # 已处理，不再作为文本
-            
-            except json.JSONDecodeError:
-                # 不是有效的JSON，继续作为文本处理
-                pass
-            except Exception as e:
-                logger.warning(f"[_process_line] Error parsing JSON: {e}")
-                # 继续作为文本处理
+                except json.JSONDecodeError as e:
+                    # 不是有效的JSON，继续作为文本处理
+                    logger.debug(f"[_process_line] JSON decode error: {e}")
+                except Exception as e:
+                    logger.warning(f"[_process_line] Error parsing JSON: {e}")
+                    # 继续作为文本处理
         
         # 过滤噪音
         # 先检查 ANSI 颜色代码和 CLI 警告（使用原始文本）
