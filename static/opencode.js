@@ -504,9 +504,74 @@ async function loadState() {
                 state.sessions = merged;
                 console.log('[Sync] Total sessions after merge:', state.sessions.length);
 
-                // ✅ 修复：同步后端sessions后保存到localStorage
-                // 确保新sessions（如算盘任务）在刷新后仍然可见
-                setTimeout(() => saveState(), 100);
+                // ✅ v=37修复：对新发现的session，异步深度加载完整内容
+                // 避免创建空session导致刷新后数据丢失
+                const newSessions = backendSessions.filter(bs =>
+                    !state.sessions.find(s => s.id === bs.id) ||
+                    (state.sessions.find(s => s.id === bs.id)?.actions?.length === 0)
+                );
+
+                if (newSessions.length > 0) {
+                    console.log('[Sync] Deep loading', newSessions.length, 'new sessions...');
+                    newSessions.forEach(async bs => {
+                        const session = state.sessions.find(s => s.id === bs.id);
+                        if (!session || session._isLoading) return;
+
+                        session._isLoading = true;
+                        try {
+                            const data = await apiClient.getMessages(bs.id);
+                            if (data && data.messages) {
+                                // 转换后端消息格式到前端 state 格式
+                                session.response = '';
+                                session.phases = [];
+                                session.orphanEvents = [];
+                                session.actions = [];
+
+                                data.messages.forEach(msg => {
+                                    if (msg.role === 'user') {
+                                        const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
+                                        if (userText) session.prompt = userText;
+                                    } else {
+                                        msg.parts?.forEach(part => {
+                                            if (part.type === 'text') {
+                                                session.response += (part.content?.text || part.text || '');
+                                            } else if (part.type === 'tool' || part.type === 'action') {
+                                                const toolContent = part.content || part;
+                                                const toolEv = {
+                                                    type: 'action',
+                                                    id: part.id,
+                                                    data: {
+                                                        tool_name: toolContent.tool || toolContent.tool_name,
+                                                        input: toolContent.input || toolContent.state?.input,
+                                                        output: toolContent.output || toolContent.state?.output,
+                                                        status: toolContent.status || toolContent.state?.status
+                                                    }
+                                                };
+                                                session.orphanEvents.push(toolEv);
+                                                session.actions.push(toolEv);
+                                            }
+                                        });
+                                    }
+                                });
+
+                                console.log('[Sync] Deep load complete for:', bs.id, '(', session.actions.length, 'actions)');
+                            }
+                        } catch (e) {
+                            console.warn('[Sync] Failed to deep load', bs.id, ':', e);
+                        } finally {
+                            session._isLoading = false;
+                        }
+                    });
+
+                    // 等待所有深度加载完成后保存
+                    setTimeout(() => {
+                        console.log('[Sync] Saving state after deep loads');
+                        saveState();
+                    }, 1000);
+                } else {
+                    // 没有新session，直接保存
+                    setTimeout(() => saveState(), 100);
+                }
             }
         } catch (e) {
             console.warn('[Sync] Failed to sync sessions from backend:', e);
