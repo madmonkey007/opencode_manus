@@ -146,6 +146,15 @@ class OpenCodeClient:
             f"Executing message {assistant_message_id} for session {session_id}"
         )
 
+        # ✅ v=38修复：保存assistant message到数据库
+        if self.history_service:
+            await self.history_service.save_message(
+                session_id=session_id,
+                message_id=assistant_message_id,
+                role="assistant"
+            )
+            logger.debug(f"Saved assistant message to database: {assistant_message_id}")
+
         try:
             # 发送开始事件
             await self._broadcast_event(
@@ -740,6 +749,29 @@ class OpenCodeClient:
                 "message_id": message_id,
             },
         }
+
+        # ✅ v=38修复：保存tool part到数据库
+        if self.history_service:
+            part_dict = {
+                "id": tool_part_id,
+                "type": "tool",
+                "content": {
+                    "tool": tool_name,
+                    "call_id": tool_part_id,
+                    "state": state,
+                    "text": output,
+                    "tool_name": tool_name,
+                    "input": input_data,
+                    "output": output,
+                    "status": status,
+                }
+            }
+            await self.history_service.save_part(
+                session_id=session_id,
+                message_id=message_id,
+                part=part_dict
+            )
+            logger.debug(f"Saved tool part to database: {tool_part_id} tool={tool_name}")
 
         # 文件操作：生成预览事件（write/edit）
         # 注意：预览事件发送不依赖 history_service，始终发送

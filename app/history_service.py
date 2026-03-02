@@ -56,6 +56,37 @@ class HistoryService:
                 )
             """)
 
+            # ✅ v=38修复：消息表（解决工具调用Part数据丢失问题）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    message_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    metadata_json TEXT,
+                    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                )
+            """)
+
+            # ✅ v=38修复：消息部分表（工具调用、文本等）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS message_parts (
+                    part_id TEXT PRIMARY KEY,
+                    message_id TEXT NOT NULL,
+                    part_type TEXT NOT NULL,
+                    content_json TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (message_id) REFERENCES messages(message_id) ON DELETE CASCADE
+                )
+            """)
+
+            # ✅ v=38修复：索引优化
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_parts_message ON message_parts(message_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_parts_type ON message_parts(part_type)")
+
             # 添加缺失的列（如果表已存在）
             try:
                 cursor.execute("ALTER TABLE sessions ADD COLUMN title TEXT")
@@ -145,21 +176,140 @@ class HistoryService:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT content FROM file_snapshots 
+                    SELECT content FROM file_snapshots
                     WHERE file_path = ? AND step_id IN (
-                        SELECT step_id FROM steps 
+                        SELECT step_id FROM steps
                         WHERE session_id = ? AND timestamp <= (
                             SELECT timestamp FROM steps WHERE step_id = ?
                         )
                     )
                     ORDER BY timestamp DESC LIMIT 1
                 """, (file_path, session_id, target_step_id))
-                
+
                 row = cursor.fetchone()
                 return row[0] if row else None
         except Exception as e:
             logger.error(f"Error getting file at step: {e}")
             return None
+
+    # ✅ v=38修复：添加Message持久化方法（解决工具调用数据丢失问题）
+    async def save_message(self, session_id: str, message_id: str, role: str) -> bool:
+        """
+        保存消息到数据库
+
+        Args:
+            session_id: 会话ID
+            message_id: 消息ID
+            role: 'user' or 'assistant'
+
+        Returns:
+            是否保存成功
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO messages (message_id, session_id, role, created_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """, (message_id, session_id, role))
+                conn.commit()
+                logger.debug(f"Saved message: {message_id} for session: {session_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error saving message: {e}")
+            return False
+
+    async def save_part(self, session_id: str, message_id: str, part: dict) -> bool:
+        """
+        保存message part到数据库（工具调用、文本等）
+
+        Args:
+            session_id: 会话ID
+            message_id: 消息ID
+            part: part字典，包含id, type, content等字段
+
+        Returns:
+            是否保存成功
+        """
+        try:
+            # 确保message存在
+            await self.save_message(session_id, message_id, "assistant")
+
+            # 提取part内容
+            content_data = part.get("content", {})
+            if isinstance(content_data, dict):
+                content_json = json.dumps({
+                    "text": content_data.get("text"),
+                    "tool": content_data.get("tool"),
+                    "tool_name": content_data.get("tool_name"),
+                    "call_id": content_data.get("call_id"),
+                    "state": content_data.get("state"),
+                    "input": content_data.get("input"),
+                    "output": content_data.get("output"),
+                    "status": content_data.get("status"),
+                }, ensure_ascii=False)
+            else:
+                content_json = json.dumps({"text": str(content_data)}, ensure_ascii=False)
+
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO message_parts
+                    (part_id, message_id, part_type, content_json, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (
+                    part.get("id"),
+                    message_id,
+                    part.get("type", "text"),
+                    content_json
+                ))
+                conn.commit()
+                logger.debug(f"Saved part: {part.get('id')} type={part.get('type')} for message: {message_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error saving part: {e}")
+            return False
+
+    async def get_message_parts(self, session_id: str, message_id: str) -> List[dict]:
+        """
+        获取消息的所有parts（用于刷新后恢复）
+
+        Args:
+            session_id: 会话ID
+            message_id: 消息ID
+
+        Returns:
+            part字典列表
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT part_id, message_id, part_type, content_json
+                    FROM message_parts
+                    WHERE message_id = ?
+                    ORDER BY created_at ASC
+                """, (message_id,))
+
+                parts = []
+                for row in cursor.fetchall():
+                    part_id, msg_id, part_type, content_json = row
+                    try:
+                        content = json.loads(content_json) if content_json else {}
+                        parts.append({
+                            "id": part_id,
+                            "message_id": msg_id,
+                            "type": part_type,
+                            "content": content
+                        })
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse part content: {e}")
+
+                logger.debug(f"Retrieved {len(parts)} parts for message: {message_id}")
+                return parts
+        except Exception as e:
+            logger.error(f"Error getting message parts: {e}")
+            return []
 
 _instance = None
 def get_history_service():
