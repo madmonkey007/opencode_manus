@@ -109,6 +109,20 @@ class OpenCodeAPIClient {
     }
 
     /**
+     * ✅ v=38.1新增：获取会话的时间轴（工具调用历史）
+     * @param {string} sessionId - 会话ID
+     * @returns {Promise<Object>} 返回 {session_id, timeline, count}
+     */
+    async getTimeline(sessionId) {
+        const url = `${this.baseURL}/opencode/session/${encodeURIComponent(sessionId)}/timeline`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to get timeline: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
      * 发送新消息到会话
      * @param {string} sessionId - 会话ID
      * @param {SendMessageRequest} request - 发送消息请求

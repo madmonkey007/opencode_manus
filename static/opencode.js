@@ -426,8 +426,45 @@ async function loadState() {
                                         // ✅ 修复C1: 成功后才设置_deepLoaded
                                         s._deepLoaded = true;
                                     }
-                                }).catch(err => {
+                                }).catch(async (err) => {
                                     console.warn('[loadState] Deep load failed for', s.id, ':', err);
+
+                                    // ✅ v=38.1修复：降级尝试timeline API（从steps表获取工具调用）
+                                    if (typeof apiClient !== 'undefined' && apiClient.getTimeline) {
+                                        try {
+                                            console.log('[loadState] Attempting timeline API fallback for:', s.id);
+                                            const timelineData = await apiClient.getTimeline(s.id);
+
+                                            if (timelineData && timelineData.timeline && timelineData.timeline.length > 0) {
+                                                // 转换timeline steps为actions格式
+                                                s.actions = timelineData.timeline.map(step => ({
+                                                    type: 'action',
+                                                    id: step.step_id,
+                                                    data: {
+                                                        tool_name: step.tool_name,
+                                                        input: step.tool_input ? JSON.parse(step.tool_input) : {},
+                                                        output: null, // steps表没有output字段
+                                                        status: 'completed',
+                                                        action_type: step.action_type,
+                                                        file_path: step.file_path
+                                                    }
+                                                }));
+
+                                                // 同时添加到orphanEvents以保持兼容
+                                                s.orphanEvents = [...s.actions];
+
+                                                console.log('[loadState] Timeline fallback successful for:', s.id, '(', s.actions.length, 'actions from timeline)');
+
+                                                // 保存修复后的数据
+                                                saveState();
+                                                s._deepLoaded = true;
+                                            } else {
+                                                console.log('[loadState] Timeline API returned empty data for:', s.id);
+                                            }
+                                        } catch (timelineError) {
+                                            console.warn('[loadState] Timeline API fallback also failed:', s.id, timelineError);
+                                        }
+                                    }
                                     // ✅ 修复C1: 失败时不设置_deepLoaded，允许下次重试
                                 }).finally(() => {
                                     s._isLoading = false;
@@ -558,6 +595,39 @@ async function loadState() {
                             }
                         } catch (e) {
                             console.warn('[Sync] Failed to deep load', bs.id, ':', e);
+
+                            // ✅ v=38.1修复：降级尝试timeline API（从steps表获取工具调用）
+                            if (typeof apiClient !== 'undefined' && apiClient.getTimeline) {
+                                try {
+                                    console.log('[Sync] Attempting timeline API fallback for:', bs.id);
+                                    const timelineData = await apiClient.getTimeline(bs.id);
+
+                                    if (timelineData && timelineData.timeline && timelineData.timeline.length > 0) {
+                                        // 转换timeline steps为actions格式
+                                        session.actions = timelineData.timeline.map(step => ({
+                                            type: 'action',
+                                            id: step.step_id,
+                                            data: {
+                                                tool_name: step.tool_name,
+                                                input: step.tool_input ? JSON.parse(step.tool_input) : {},
+                                                output: null, // steps表没有output字段
+                                                status: 'completed',
+                                                action_type: step.action_type,
+                                                file_path: step.file_path
+                                            }
+                                        }));
+
+                                        // 同时添加到orphanEvents以保持兼容
+                                        session.orphanEvents = [...session.actions];
+
+                                        console.log('[Sync] Timeline fallback successful for:', bs.id, '(', session.actions.length, 'actions from timeline)');
+                                    } else {
+                                        console.log('[Sync] Timeline API returned empty data for:', bs.id);
+                                    }
+                                } catch (timelineError) {
+                                    console.warn('[Sync] Timeline API fallback also failed:', bs.id, timelineError);
+                                }
+                            }
                         } finally {
                             session._isLoading = false;
                         }
