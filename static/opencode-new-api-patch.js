@@ -629,8 +629,12 @@
     }
 
     /**
-     * ✅ v=34: 系统消息显示函数 - 用于显示thought、任务完成等消息
+     * ✅ v=35: 系统消息显示函数 - 用于显示thought、任务完成等消息（XSS安全）
      * 在主聊天区域创建临时的系统消息卡片
+     *
+     * 安全特性：
+     * - 使用textContent而不是innerHTML插入用户内容
+     * - 防止XSS攻击
      */
     function addSystemMessage(content, type = 'info') {
         try {
@@ -647,44 +651,67 @@
                 return;
             }
 
+            // ✅ v=35: 消息配置对象 - 消除重复，易于扩展
+            const MESSAGE_CONFIG = {
+                thought: {
+                    color: 'purple',
+                    icon: 'psychology',
+                    bgClass: 'bg-purple-50 dark:bg-purple-900/20',
+                    borderClass: 'border-purple-200 dark:border-purple-700',
+                    textClass: 'text-purple-800 dark:text-purple-200',
+                    iconClass: 'text-purple-600 dark:text-purple-300'
+                },
+                success: {
+                    color: 'green',
+                    icon: 'check_circle',
+                    bgClass: 'bg-green-50 dark:bg-green-900/20',
+                    borderClass: 'border-green-200 dark:border-green-700',
+                    textClass: 'text-green-800 dark:text-green-200',
+                    iconClass: 'text-green-600 dark:text-green-300'
+                },
+                error: {
+                    color: 'red',
+                    icon: 'error',
+                    bgClass: 'bg-red-50 dark:bg-red-900/20',
+                    borderClass: 'border-red-200 dark:border-red-700',
+                    textClass: 'text-red-800 dark:text-red-200',
+                    iconClass: 'text-red-600 dark:text-red-300'
+                },
+                info: {
+                    color: 'blue',
+                    icon: 'info',
+                    bgClass: 'bg-blue-50 dark:bg-blue-900/20',
+                    borderClass: 'border-blue-200 dark:border-blue-700',
+                    textClass: 'text-blue-800 dark:text-blue-200',
+                    iconClass: 'text-blue-600 dark:text-blue-300'
+                }
+            };
+
+            const config = MESSAGE_CONFIG[type] || MESSAGE_CONFIG.info;
+
             // 创建系统消息卡片
             const messageCard = document.createElement('div');
-            messageCard.className = `system-message message-bubble mb-3 p-3 rounded-lg text-sm animate-fade-in`;
+            messageCard.className = `system-message message-bubble mb-3 p-3 rounded-lg text-sm animate-fade-in ${config.bgClass} border ${config.borderClass} ${config.textClass}`;
 
-            // 根据类型设置样式
-            if (type === 'thought') {
-                messageCard.className += ' bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 text-purple-800 dark:text-purple-200';
-                messageCard.innerHTML = `
-                    <div class="flex items-start gap-2">
-                        <span class="material-symbols-outlined !text-[18px] text-purple-600 dark:text-purple-300">psychology</span>
-                        <div class="flex-1">${content}</div>
-                    </div>
-                `;
-            } else if (type === 'success') {
-                messageCard.className += ' bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 text-green-800 dark:text-green-200';
-                messageCard.innerHTML = `
-                    <div class="flex items-start gap-2">
-                        <span class="material-symbols-outlined !text-[18px] text-green-600 dark:text-green-300">check_circle</span>
-                        <div class="flex-1">${content}</div>
-                    </div>
-                `;
-            } else if (type === 'error') {
-                messageCard.className += ' bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200';
-                messageCard.innerHTML = `
-                    <div class="flex items-start gap-2">
-                        <span class="material-symbols-outlined !text-[18px] text-red-600 dark:text-red-300">error</span>
-                        <div class="flex-1">${content}</div>
-                    </div>
-                `;
-            } else {
-                messageCard.className += ' bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-200';
-                messageCard.innerHTML = `
-                    <div class="flex items-start gap-2">
-                        <span class="material-symbols-outlined !text-[18px] text-blue-600 dark:text-blue-300">info</span>
-                        <div class="flex-1">${content}</div>
-                    </div>
-                `;
-            }
+            // ✅ v=35: 安全地创建DOM结构（使用createElement而不是innerHTML）
+            const container = document.createElement('div');
+            container.className = 'flex items-start gap-2';
+
+            // 创建图标
+            const iconSpan = document.createElement('span');
+            iconSpan.className = `material-symbols-outlined !text-[18px] ${config.iconClass}`;
+            iconSpan.textContent = config.icon;
+
+            // 创建内容容器
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'flex-1';
+            // ✅ v=35: 关键安全改进 - 使用textContent防止XSS
+            contentDiv.textContent = content;
+
+            // 组装DOM树
+            container.appendChild(iconSpan);
+            container.appendChild(contentDiv);
+            messageCard.appendChild(container);
 
             // 添加到聊天区域（append到最后）
             chatMessages.appendChild(messageCard);
@@ -695,7 +722,11 @@
                 scrollArea.scrollTop = scrollArea.scrollHeight;
             }
 
-            console.log(`[addSystemMessage] Displayed ${type} message:`, content.substring(0, 50));
+            // ✅ v=35: 改进日志 - 显示完整长度信息
+            const preview = content.length > 50
+                ? content.substring(0, 50) + `... (${content.length} chars)`
+                : content;
+            console.log(`[addSystemMessage] Displayed ${type} message:`, preview);
         } catch (error) {
             console.error('[addSystemMessage] Failed to display message:', error);
         }
@@ -1691,11 +1722,16 @@
 
                 // 判断事件类型并显示
                 if (adapted.type === 'thought') {
-                    // ✅ v=34: 思考内容立即显示在主聊天区域
+                    // ✅ v=35: 思考内容立即显示在主聊天区域（XSS安全）
                     const content = adapted.content || adapted.data?.text || '';
-                    console.log('[NewAPI] Thought event received:', content.substring(0, 100));
 
-                    // ✅ v=34: 立即显示，不受打字机效果限制
+                    // ✅ v=35: 改进日志 - 显示完整长度信息
+                    const preview = content.length > 100
+                        ? content.substring(0, 100) + `... (${content.length} chars)`
+                        : content;
+                    console.log('[NewAPI] Thought event received:', preview);
+
+                    // ✅ v=35: 立即显示，不受打字机效果限制
                     if (typeof window.addSystemMessage === 'function') {
                         window.addSystemMessage(`💭 ${content}`, 'thought');
                         console.log('[NewAPI] ✅ Thought displayed immediately');
@@ -1703,7 +1739,7 @@
                         console.error('[NewAPI] ❌ addSystemMessage not available!');
                     }
 
-                    // ✅ v=34: 同时添加到orphanEvents，确保在历史记录中可见
+                    // ✅ v=35: 同时添加到orphanEvents，确保在历史记录中可见
                     if (!s.orphanEvents) s.orphanEvents = [];
                     s.orphanEvents.push({
                         type: 'thought',
