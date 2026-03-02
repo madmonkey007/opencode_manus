@@ -2385,3 +2385,28 @@ INFO:     172.19.0.1:36568 - "GET /opencode/events?session_id=ses_2972072a HTTP/
 INFO:     172.19.0.1:36570 - "GET /opencode/list_session_files?sid=ses_2972072a HTTP/1.1" 200 OK
 INFO:     172.19.0.1:59032 - "GET /opencode/session/ses_cec98711/messages HTTP/1.1" 404 Not Found
 INFO:     172.19.0.1:59032 - "GET /opencode/list_session_files?sid=ses_cec98711 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42270 - "GET / HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42270 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:42270 - "GET /static/preview-config.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:42262 - "GET /static/code-preview-enhanced.js?v=1 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42270 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:42270 - "GET /static/enhanced-task-panel.js?v=17 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42262 - "GET /static/right-panel-manager.js?v=9 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42270 - "GET /static/api-client.js?v=1 HTTP/1.1" 304 Not Modified
+INFO:     172.19.0.1:42262 - "GET /static/event-adapter.js?v=4 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42270 - "GET /static/opencode-new-api-patch.js?v=32 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42262 - "GET /static/opencode.js?v=24 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42270 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42270 - "GET /opencode/session/ses_2v73azq/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42262 - "GET /opencode/session/ses_z8rov17/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42280 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42284 - "GET /opencode/session/ses_f83819d7/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:42284 - "GET /opencode/list_session_files?sid=ses_2v73azq HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42284 - "GET /opencode/list_session_files?sid=ses_2v73azq HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47034 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47034 - "POST /opencode/session/ses_6f12cf06/message HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47034 - "GET /opencode/events?session_id=ses_6f12cf06 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:47038 - "GET /opencode/list_session_files?sid=ses_6f12cf06 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56088 - "GET /opencode/list_session_files?sid=ses_6f12cf06 HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56088 - "GET /opencode/get_file_content?path=ses_6f12cf06%2Findex.html HTTP/1.1" 200 OK
+INFO:     172.19.0.1:56088 - "GET /opencode/list_session_files?sid=ses_6f12cf06 HTTP/1.1" 200 OK

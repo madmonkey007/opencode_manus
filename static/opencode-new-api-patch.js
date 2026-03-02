@@ -1329,26 +1329,51 @@
             }
 
         if (adapted.type === 'answer_chunk') {
-            // ✅ v=32: 过滤掉timeline相关信息，防止代码出现在正文中
+            // ✅ v=33: 精确过滤timeline事件 - 避免误报AI的正常回复
             // 问题：后端可能错误地把timeline信息包装成answer_chunk
             const text = adapted.text || '';
 
-            // 检查是否包含timeline相关的标记
-            const TIMELINE_MARKERS = [
-                'Step ID:',
-                'Timeline event:',
-                'Action: write',
-                'Action: read',
-                'Action: bash',
-                'tool_input:',
-                'file_path:',
-                'step_id:'
+            // ✅ 改进：使用结构化模式匹配，而不是简单的关键词搜索
+            // Timeline事件通常有以下特征：
+            // 1. 以"Step ID:"或"Timeline event:"开头
+            // 2. 包含结构化的字段（Action:, tool_input:, file_path:等）
+            // 3. 通常不在markdown代码块中（AI的正常代码会在```中）
+            const TIMELINE_PATTERNS = [
+                // 模式1: 完整的timeline事件格式
+                /^\s*Step ID:\s*[a-f0-9\-]+.*Action:\s*\w+.*$/mi,
+                // 模式2: Timeline event开头
+                /^\s*Timeline event:\s*\w+.*$/mi,
+                // 模式3: 多个timeline字段组合（至少2个）
+                /(?:Step ID:|Action:|tool_input:|file_path:|step_id:).*(?:Step ID:|Action:|tool_input:|file_path:)/mis
             ];
 
-            const hasTimelineMarkers = TIMELINE_MARKERS.some(marker => text.includes(marker));
+            // ✅ 重要：如果文本在markdown代码块中，不应该被过滤
+            // AI的正常代码会包含"write"、"read"等，但会在```中
+            const isInCodeBlock = /```\s*(?:javascript|python|json|bash|shell)?[\s\S]*?```/.test(text) ||
+                                  text.trim().startsWith('```') ||
+                                  text.includes('```代码');
 
-            if (hasTimelineMarkers) {
-                console.warn('[NewAPI] ⚠️ Filtered timeline-like content from answer_chunk:', text.substring(0, 100));
+            let isTimelineEvent = false;
+            if (!isInCodeBlock && text.length > 0) {
+                // 只有不在代码块中，才检查是否是timeline事件
+                isTimelineEvent = TIMELINE_PATTERNS.some(pattern => pattern.test(text));
+            }
+
+            if (isTimelineEvent) {
+                // ✅ 保存完整内容到debug变量，便于调试
+                if (!window._debugFilteredTimeline) {
+                    window._debugFilteredTimeline = [];
+                }
+                window._debugFilteredTimeline.push({
+                    timestamp: Date.now(),
+                    content: text,
+                    preview: text.substring(0, 200)
+                });
+
+                console.warn('[NewAPI] ⚠️ Filtered structured timeline event from answer_chunk');
+                console.log('[NewAPI] Debug: Filtered content preview:', text.substring(0, 150));
+                console.log('[NewAPI] Debug: Total filtered events:', window._debugFilteredTimeline.length);
+
                 // 不添加到response中，跳过这段文本
                 return;
             }
@@ -1402,21 +1427,29 @@
             
             s.currentPhase = adapted.phases.find(p => p.status === 'active')?.id || s.currentPhase;
 
-            // ✅ v=32: 强制更新phase UI - 即使在打字机效果期间也要显示loading状态和完成标签
+            // ✅ v=33: 强制更新phase UI - 即使在打字机效果期间也要显示loading状态和完成标签
             // 注意：直接调用renderResults而不是不存在的renderPhases函数
             try {
                 // 强制调用renderResults确保UI更新（不受打字机效果限制）
                 if (typeof window.renderResults === 'function') {
                     window.renderResults();
                 } else if (typeof window.renderEnhancedTaskPanel === 'function') {
-                    // 降级方案：如果有renderEnhancedTaskPanel，重新渲染整个面板
-                    const s = state.sessions.find(x => x.id === state.activeId);
-                    if (s) {
-                        const convo = document.querySelector('#chat-messages');
-                        if (convo) {
-                            const panel = window.renderEnhancedTaskPanel(s);
-                            convo.appendChild(panel);
+                    // ✅ v=33: 修复DOM累积 - 清空旧内容后再追加新面板
+                    try {
+                        const s = state.sessions.find(x => x.id === state.activeId);
+                        if (s) {
+                            const convo = document.querySelector('#chat-messages');
+                            if (convo) {
+                                // 清空旧内容，防止DOM节点累积
+                                convo.innerHTML = '';
+                                const panel = window.renderEnhancedTaskPanel(s);
+                                convo.appendChild(panel);
+                                console.log('[NewAPI] Fallback: Used renderEnhancedTaskPanel');
+                            }
                         }
+                    } catch (fallbackError) {
+                        console.error('[NewAPI] Fallback renderEnhancedTaskPanel failed:', fallbackError);
+                        // 降级方案失败，至少不会中断事件流
                     }
                 }
 
@@ -1441,7 +1474,7 @@
             document.getElementById('runStream')?.classList.remove('hidden');
             console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}`);
 
-            // ✅ v=32: 修复总结不显示 - 强制刷新UI确保总结可见
+            // ✅ v=33: 修复总结不显示 - 强制刷新UI确保总结可见（绕过节流）
             if (!isError) {
                 // 双重检查：防止标志位丢失或response已包含总结
                 const SUMMARY_MARKER = '**✅ 任务完成**';
@@ -1466,10 +1499,15 @@
                         window.addSystemMessage(`✅ 任务完成 - 完成${completedPhases}个阶段，执行${totalActions}次工具调用`, 'success');
                     }
 
-                    // ✅ v=32: 强制刷新UI，确保总结立即显示
+                    // ✅ v=33: 强制刷新UI，绕过节流确保总结立即显示
                     try {
-                        if (typeof window.renderResults === 'function') {
+                        // 检查是否有原始的renderResults（非节流版本）
+                        if (typeof window._originalRenderResults === 'function') {
+                            window._originalRenderResults();
+                            console.log('[NewAPI] UI refreshed with _originalRenderResults (no throttle)');
+                        } else if (typeof window.renderResults === 'function') {
                             window.renderResults();
+                            console.log('[NewAPI] UI refreshed with renderResults');
                         }
                         console.log('[NewAPI] UI refreshed to show summary');
                     } catch (error) {
@@ -1491,10 +1529,17 @@
                         const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
                         s.response = (s.response || '') + summary;
 
-                        // ✅ v=32: 重建总结后也要刷新UI
-                        if (typeof window.renderResults === 'function') {
-                            window.renderResults();
+                        // ✅ v=33: 重建总结后也要刷新UI（绕过节流）
+                        try {
+                            if (typeof window._originalRenderResults === 'function') {
+                                window._originalRenderResults();
+                            } else if (typeof window.renderResults === 'function') {
+                                window.renderResults();
+                            }
+                        } catch (error) {
+                            console.error('[NewAPI] Failed to refresh UI after recreating summary:', error);
                         }
+
                         if (typeof window.saveState === 'function') {
                             window.saveState();
                         }

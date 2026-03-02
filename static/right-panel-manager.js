@@ -345,7 +345,7 @@ class RightPanelManager {
         if (lineCountEl) lineCountEl.textContent = `${lineCount} 行`;
         if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
 
-        // ✅ v=32: 修复自动滚动 - 使用双重RAF确保内容完全渲染后再滚动
+        // ✅ v=33: 修复自动滚动 - 使用双重RAF + setTimeout降级确保内容完全渲染
         // 问题：单个RAF可能在DOM完全更新前执行，导致scrollHeight计算不准确
         if (!this._scrollRAFPending) {
             this._scrollRAFPending = true;
@@ -355,39 +355,57 @@ class RightPanelManager {
                 // 第二帧RAF：等待布局完成并获取准确的scrollHeight
                 requestAnimationFrame(() => {
                     try {
-                        // 1. 滚动pre元素（文件内容容器）
-                        const preEl = document.getElementById('file-code-content');
-                        if (preEl) {
-                            // 强制滚动到底部，无论是否已有滚动条
-                            preEl.scrollTop = preEl.scrollHeight;
-                        }
-
-                        // 2. 滚动主容器（file-editor-content）
-                        const containerEl = document.getElementById('file-editor-content');
-                        if (containerEl) {
-                            containerEl.scrollTop = containerEl.scrollHeight;
-                        }
-
-                        // 3. 滚动外层容器（tab-preview）
-                        const tabPreviewEl = document.getElementById('tab-preview');
-                        if (tabPreviewEl) {
-                            tabPreviewEl.scrollTop = tabPreviewEl.scrollHeight;
-                        }
-
-                        // 4. 滚动主面板内容
-                        const panelContentEl = document.querySelector('.right-panel .panel-content');
-                        if (panelContentEl) {
-                            panelContentEl.scrollTop = panelContentEl.scrollHeight;
-                        }
-
-                        console.log('[RightPanel] Auto-scrolled to bottom');
+                        this._performScroll();
+                        console.log('[RightPanel] Auto-scrolled to bottom (double RAF)');
                     } catch (error) {
                         console.error('[RightPanel] Failed to auto-scroll:', error);
                     } finally {
                         this._scrollRAFPending = false;
                     }
                 });
+
+                // ✅ v=33: 添加setTimeout降级方案，确保双重RAF失败时仍能滚动
+                setTimeout(() => {
+                    if (this._scrollRAFPending) {
+                        console.warn('[RightPanel] ⚠️ Double RAF timeout, using setTimeout fallback');
+                        try {
+                            this._performScroll();
+                            console.log('[RightPanel] Auto-scrolled to bottom (setTimeout fallback)');
+                        } catch (error) {
+                            console.error('[RightPanel] Failed to auto-scroll with setTimeout:', error);
+                        } finally {
+                            this._scrollRAFPending = false;
+                        }
+                    }
+                }, 150); // 150ms后降级（3-4帧的时间）
             });
+        }
+    }
+
+    // ✅ v=33: 提取滚动逻辑为独立方法，便于RAF和setTimeout复用
+    _performScroll() {
+        // 1. 滚动pre元素（文件内容容器）
+        const preEl = document.getElementById('file-code-content');
+        if (preEl) {
+            preEl.scrollTop = preEl.scrollHeight;
+        }
+
+        // 2. 滚动主容器（file-editor-content）
+        const containerEl = document.getElementById('file-editor-content');
+        if (containerEl) {
+            containerEl.scrollTop = containerEl.scrollHeight;
+        }
+
+        // 3. 滚动外层容器（tab-preview）
+        const tabPreviewEl = document.getElementById('tab-preview');
+        if (tabPreviewEl) {
+            tabPreviewEl.scrollTop = tabPreviewEl.scrollHeight;
+        }
+
+        // 4. 滚动主面板内容
+        const panelContentEl = document.querySelector('.right-panel .panel-content');
+        if (panelContentEl) {
+            panelContentEl.scrollTop = panelContentEl.scrollHeight;
         }
     }
 
