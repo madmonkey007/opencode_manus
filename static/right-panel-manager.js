@@ -346,20 +346,39 @@ class RightPanelManager {
         if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
 
         // ✅ P0-2: 优化RAF滚动逻辑 - 使用标志位防止回调堆积
+        // ✅ v=29: 修复自动滚动问题，确保所有可能的滚动容器都被滚动
         if (!this._scrollRAFPending) {
             this._scrollRAFPending = true;
 
             requestAnimationFrame(() => {
-                // 滚动主容器（只滚动最外层容器，减少重复计算）
+                // 1. 滚动pre元素（文件内容容器）
+                const pre = document.getElementById('file-code-content');
+                if (pre) {
+                    pre.scrollTop = pre.scrollHeight;
+                }
+
+                // 2. 滚动主容器（file-editor-content）
                 const container = document.getElementById('file-editor-content');
                 if (container) {
                     container.scrollTop = container.scrollHeight;
                 }
 
-                // 滚动主面板内容（如果存在）
+                // 3. 滚动外层容器（tab-preview）
+                const tabPreview = document.getElementById('tab-preview');
+                if (tabPreview) {
+                    tabPreview.scrollTop = tabPreview.scrollHeight;
+                }
+
+                // 4. 滚动主面板内容（如果存在）
                 const panelContent = document.querySelector('.right-panel .panel-content');
                 if (panelContent) {
                     panelContent.scrollTop = panelContent.scrollHeight;
+                }
+
+                // 5. 滚动右侧面板根容器
+                const rightPanel = document.querySelector('.right-panel');
+                if (rightPanel) {
+                    rightPanel.scrollTop = rightPanel.scrollHeight;
                 }
 
                 this._scrollRAFPending = false;

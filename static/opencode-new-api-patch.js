@@ -41,6 +41,10 @@
     const RENDER_THROTTLE_MS = 250; // ✅ P0-5: renderResults节流间隔提高到250ms，减少渲染频率
     const TYPING_EFFECT_TIMEOUT_MS = 30000; // ✅ P0-1: 打字机效果超时时间（30秒）
 
+    // ✅ v=29: 防止重复显示同一个文件的预览
+    const _recentlyPreviewedFiles = new Map(); // path -> timestamp
+    const PREVIEW_DEBOUNCE_MS = 2000; // 2秒内不重复预览同一文件
+
     // ✅ P0-1 & P0-4: 打字机效果管理器（防止UI抖动 + 并发保护 + 超时恢复）
     const TypingEffectManager = (function() {
         let count = 0; // 并发计数器（支持多文件同时写入）
@@ -55,7 +59,7 @@
                 count++;
                 console.log(`[TypingEffectManager] Start (count: ${count}, reason: ${reason})`);
 
-                // ✅ P0-1: 重置超时定时器
+                // ✅ v=29: 每次start都重置超时定时器（而不是只在count=0时设置）
                 if (timeout) {
                     clearTimeout(timeout);
                 }
@@ -1247,7 +1251,7 @@
         }
 
         // 处理时间轴事件 - 更新右侧文件面板
-            if (adapted.type === 'timeline_event') {
+        if (adapted.type === 'timeline_event') {
                 console.log('[NewAPI] Timeline event:', adapted);
 
                 // 渲染timeline事件到右侧面板
@@ -1255,6 +1259,20 @@
                     const step = adapted.step;
                     const action = step.action || step.action_type || 'unknown';
                     const path = step.path || step.file_path || '';
+
+                    // ✅ v=29: 防止重复预览同一文件（2秒内只预览一次）
+                    if (path && _recentlyPreviewedFiles.has(path)) {
+                        const lastPreviewTime = _recentlyPreviewedFiles.get(path);
+                        const now = Date.now();
+                        if (now - lastPreviewTime < PREVIEW_DEBOUNCE_MS) {
+                            console.log(`[NewAPI] Skipping duplicate preview for: ${path} (${now - lastPreviewTime}ms ago)`);
+                            // 仍然添加到orphanEvents，但不显示右侧面板
+                            return;
+                        }
+                    }
+                    if (path) {
+                        _recentlyPreviewedFiles.set(path, Date.now());
+                    }
 
                     // 构建事件标题和内容
                     let title = `[${action}]`;
@@ -1346,11 +1364,19 @@
             
             s.currentPhase = adapted.phases.find(p => p.status === 'active')?.id || s.currentPhase;
 
-            // ✅ P0-3: 触发UI更新以显示phase状态变化（带错误处理）
+            // ✅ v=29: 强制更新phase UI，即使在打字机效果期间也要显示loading状态和完成标签
             try {
+                // 1. 尝试调用专门的renderPhases函数
                 if (typeof window.renderPhases === 'function') {
                     window.renderPhases();
                 }
+
+                // 2. 强制调用renderResults确保UI更新（不受打字机效果限制）
+                if (typeof window.renderResults === 'function') {
+                    window.renderResults();
+                }
+
+                console.log('[NewAPI] Phase UI updated for phases:', adapted.phases.map(p => `${p.id}:${p.status}`).join(', '));
             } catch (error) {
                 console.error('[NewAPI] Failed to render phases:', error);
                 // 不中断事件流，继续处理
@@ -1370,6 +1396,33 @@
             document.getElementById('stopStream')?.classList.add('hidden');
             document.getElementById('runStream')?.classList.remove('hidden');
             console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}`);
+
+            // ✅ v=29: 添加任务完成消息
+            if (!isError) {
+                // 计算任务统计信息
+                const totalActions = s.actions ? s.actions.length : 0;
+                const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
+
+                // 添加总结到response末尾
+                const summary = `\n\n---\n\n**✅ 任务完成**\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
+
+                // 只在还没有总结时添加
+                if (!s.response.includes('**✅ 任务完成**')) {
+                    s.response += summary;
+
+                    // 显示总结消息
+                    if (typeof window.addSystemMessage === 'function') {
+                        window.addSystemMessage(`✅ 任务完成 - 完成${completedPhases}个阶段，执行${totalActions}次工具调用`, 'success');
+                    }
+
+                    console.log('[NewAPI] Task summary added:', summary.trim());
+                }
+            } else {
+                // 错误总结
+                if (typeof window.addSystemMessage === 'function') {
+                    window.addSystemMessage('❌ 任务执行失败', 'error');
+                }
+            }
 
         } else if (adapted.type === 'phase_start') {
             // 停用当前活跃 Phase
@@ -1434,17 +1487,17 @@
 
                 // 判断事件类型并显示
                 if (adapted.type === 'thought') {
-                    // ✅ 修复5 + P0-4: 打字机效果期间不在右侧面板显示thought，避免覆盖文件预览
-                    if (TypingEffectManager.isActive()) {
-                        console.log(`[NewAPI] Thought event during typing (active count: ${TypingEffectManager.getActiveCount()}), skipping right panel display`);
-                        // 思考内容仍然被添加到orphanEvents数组，可以在历史中查看
-                        return;
+                    // ✅ v=29: 思考内容显示在主聊天区域，而不是右侧面板
+                    const content = adapted.content || adapted.data?.text || '';
+                    console.log('[NewAPI] 显示思考内容到主聊天区域');
+
+                    // 添加到主聊天区域（作为系统消息）
+                    if (typeof window.addSystemMessage === 'function') {
+                        window.addSystemMessage(`💭 ${content}`, 'thought');
                     }
 
-                    // 显示思考内容
-                    const content = adapted.content || adapted.data?.text || '';
-                    console.log('[NewAPI] 显示思考内容到右侧面板');
-                    window.rightPanelManager.showFileEditor('💭 思考过程', content);
+                    // 同时添加到orphanEvents，可以在历史中查看
+                    // 不在右侧面板显示，避免覆盖文件预览
                 } else if (adapted.type === 'action') {
                     // 显示工具操作
                     const output = data.output || '';
