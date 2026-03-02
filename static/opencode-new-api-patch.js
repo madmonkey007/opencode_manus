@@ -1005,7 +1005,6 @@
             unsubscribeFromChildSession,
             unsubscribeAllFromMain,
             parseChildSessionId,
-            isSubscribed,  // ✅ 修复Bug: 暴露isSubscribed函数
             getChildSessions,
             isChildSession,
             getMainSessionId
