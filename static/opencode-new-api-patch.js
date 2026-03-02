@@ -242,10 +242,10 @@
         // 注入模式选择器到输入框下方按钮栏
         const target = document.querySelector('#bottom-input-container .flex.items-center.gap-1');
         if (target) {
-            // 从当前session获取mode，如果没有则使用window._currentMode，最后默认为plan
+            // ✅ 修复：从当前session获取mode，如果没有则使用window._currentMode，最后默认为build
             const activeId = window.state?.activeId;
             const activeSession = window.state?.sessions?.find(s => s.id === activeId);
-             const currentMode = activeSession?.mode || window._currentMode || 'plan';
+             const currentMode = activeSession?.mode || window._currentMode || 'build';
 
              const container = document.createElement('div');
              container.className = 'mode-selector-container';
