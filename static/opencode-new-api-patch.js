@@ -31,6 +31,10 @@
         }
     };
 
+    // ✅ 修复可维护性：提取默认模式为常量（统一管理，易于修改）
+    const DEFAULT_MODE = 'build';
+    const VALID_MODES = ['plan', 'build', 'auto'];
+
     function init() {
         console.log('[NewAPI] Initializing V2.8 Patch (Advanced UI Mode)...');
 
@@ -245,7 +249,8 @@
             // ✅ 修复：从当前session获取mode，如果没有则使用window._currentMode，最后默认为build
             const activeId = window.state?.activeId;
             const activeSession = window.state?.sessions?.find(s => s.id === activeId);
-             const currentMode = activeSession?.mode || window._currentMode || 'build';
+             // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
+            const currentMode = activeSession?.mode || window._currentMode || DEFAULT_MODE;
 
              const container = document.createElement('div');
              container.className = 'mode-selector-container';
@@ -568,7 +573,8 @@
 
         // 如果是新任务，或者当前没有活跃 ID，则创建
         if (!existing || isWelcome) {
-            const mode = window._currentMode || 'build';
+            // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
+            const mode = window._currentMode || DEFAULT_MODE;
             console.log('[NewAPI] Creating new session with mode:', mode);
             const session = await window.apiClient.createSession(prompt, mode);
 
@@ -614,7 +620,8 @@
         try {
             // 准备 Session
             const s = await prepareSession(promptValue, isWelcome);
-            const mode = s.mode || window._currentMode || 'build';
+            // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
+            const mode = s.mode || window._currentMode || DEFAULT_MODE;
             console.log(`[NewAPI] Connecting to events... (Mode: ${mode})`);
 
             // 使用 handleNewAPIConnection 处理完整的连接和事件流
