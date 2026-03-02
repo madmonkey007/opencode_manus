@@ -2383,3 +2383,5 @@ INFO:     172.19.0.1:36568 - "POST /opencode/session HTTP/1.1" 200 OK
 INFO:     172.19.0.1:36568 - "POST /opencode/session/ses_2972072a/message HTTP/1.1" 200 OK
 INFO:     172.19.0.1:36568 - "GET /opencode/events?session_id=ses_2972072a HTTP/1.1" 200 OK
 INFO:     172.19.0.1:36570 - "GET /opencode/list_session_files?sid=ses_2972072a HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59032 - "GET /opencode/session/ses_cec98711/messages HTTP/1.1" 404 Not Found
+INFO:     172.19.0.1:59032 - "GET /opencode/list_session_files?sid=ses_cec98711 HTTP/1.1" 200 OK

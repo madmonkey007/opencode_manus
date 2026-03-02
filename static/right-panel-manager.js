@@ -345,38 +345,48 @@ class RightPanelManager {
         if (lineCountEl) lineCountEl.textContent = `${lineCount} 行`;
         if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
 
-        // ✅ P0-2: 优化RAF滚动逻辑 - 使用标志位防止回调堆积
-        // ✅ v=29: 修复自动滚动问题
-        // ✅ v=30: 性能优化 - 只滚动实际有overflow的容器
+        // ✅ v=32: 修复自动滚动 - 使用双重RAF确保内容完全渲染后再滚动
+        // 问题：单个RAF可能在DOM完全更新前执行，导致scrollHeight计算不准确
         if (!this._scrollRAFPending) {
             this._scrollRAFPending = true;
 
+            // 第一帧RAF：等待浏览器开始布局
             requestAnimationFrame(() => {
-                // 1. 滚动pre元素（文件内容容器）- 只在有滚动条时滚动
-                const pre = document.getElementById('file-code-content');
-                if (pre && pre.scrollHeight > pre.clientHeight) {
-                    pre.scrollTop = pre.scrollHeight;
-                }
+                // 第二帧RAF：等待布局完成并获取准确的scrollHeight
+                requestAnimationFrame(() => {
+                    try {
+                        // 1. 滚动pre元素（文件内容容器）
+                        const preEl = document.getElementById('file-code-content');
+                        if (preEl) {
+                            // 强制滚动到底部，无论是否已有滚动条
+                            preEl.scrollTop = preEl.scrollHeight;
+                        }
 
-                // 2. 滚动主容器（file-editor-content）- 只在有滚动条时滚动
-                const container = document.getElementById('file-editor-content');
-                if (container && container.scrollHeight > container.clientHeight) {
-                    container.scrollTop = container.scrollHeight;
-                }
+                        // 2. 滚动主容器（file-editor-content）
+                        const containerEl = document.getElementById('file-editor-content');
+                        if (containerEl) {
+                            containerEl.scrollTop = containerEl.scrollHeight;
+                        }
 
-                // 3. 滚动外层容器（tab-preview）- 只在有滚动条时滚动
-                const tabPreview = document.getElementById('tab-preview');
-                if (tabPreview && tabPreview.scrollHeight > tabPreview.clientHeight) {
-                    tabPreview.scrollTop = tabPreview.scrollHeight;
-                }
+                        // 3. 滚动外层容器（tab-preview）
+                        const tabPreviewEl = document.getElementById('tab-preview');
+                        if (tabPreviewEl) {
+                            tabPreviewEl.scrollTop = tabPreviewEl.scrollHeight;
+                        }
 
-                // 4. 滚动主面板内容 - 只在有滚动条时滚动
-                const panelContent = document.querySelector('.right-panel .panel-content');
-                if (panelContent && panelContent.scrollHeight > panelContent.clientHeight) {
-                    panelContent.scrollTop = panelContent.scrollHeight;
-                }
+                        // 4. 滚动主面板内容
+                        const panelContentEl = document.querySelector('.right-panel .panel-content');
+                        if (panelContentEl) {
+                            panelContentEl.scrollTop = panelContentEl.scrollHeight;
+                        }
 
-                this._scrollRAFPending = false;
+                        console.log('[RightPanel] Auto-scrolled to bottom');
+                    } catch (error) {
+                        console.error('[RightPanel] Failed to auto-scroll:', error);
+                    } finally {
+                        this._scrollRAFPending = false;
+                    }
+                });
             });
         }
     }

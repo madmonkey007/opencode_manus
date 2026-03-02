@@ -1329,6 +1329,30 @@
             }
 
         if (adapted.type === 'answer_chunk') {
+            // ✅ v=32: 过滤掉timeline相关信息，防止代码出现在正文中
+            // 问题：后端可能错误地把timeline信息包装成answer_chunk
+            const text = adapted.text || '';
+
+            // 检查是否包含timeline相关的标记
+            const TIMELINE_MARKERS = [
+                'Step ID:',
+                'Timeline event:',
+                'Action: write',
+                'Action: read',
+                'Action: bash',
+                'tool_input:',
+                'file_path:',
+                'step_id:'
+            ];
+
+            const hasTimelineMarkers = TIMELINE_MARKERS.some(marker => text.includes(marker));
+
+            if (hasTimelineMarkers) {
+                console.warn('[NewAPI] ⚠️ Filtered timeline-like content from answer_chunk:', text.substring(0, 100));
+                // 不添加到response中，跳过这段文本
+                return;
+            }
+
             // 支持多轮对话分隔符
             const pSep = '\n\n---\n\n';
             const rSep = '\n\n---\n\n**新的回答：**\n\n';
@@ -1337,7 +1361,7 @@
             if (pCount > rCount) {
                 s.response += rSep;
             }
-            s.response += adapted.text;
+            s.response += text;
         } else if (adapted.type === 'phases_init') {
             // 处理阶段初始化
             const currentTurnIndex = window._turnIndex || 0;
@@ -1378,16 +1402,22 @@
             
             s.currentPhase = adapted.phases.find(p => p.status === 'active')?.id || s.currentPhase;
 
-            // ✅ v=29: 强制更新phase UI，即使在打字机效果期间也要显示loading状态和完成标签
+            // ✅ v=32: 强制更新phase UI - 即使在打字机效果期间也要显示loading状态和完成标签
+            // 注意：直接调用renderResults而不是不存在的renderPhases函数
             try {
-                // 1. 尝试调用专门的renderPhases函数
-                if (typeof window.renderPhases === 'function') {
-                    window.renderPhases();
-                }
-
-                // 2. 强制调用renderResults确保UI更新（不受打字机效果限制）
+                // 强制调用renderResults确保UI更新（不受打字机效果限制）
                 if (typeof window.renderResults === 'function') {
                     window.renderResults();
+                } else if (typeof window.renderEnhancedTaskPanel === 'function') {
+                    // 降级方案：如果有renderEnhancedTaskPanel，重新渲染整个面板
+                    const s = state.sessions.find(x => x.id === state.activeId);
+                    if (s) {
+                        const convo = document.querySelector('#chat-messages');
+                        if (convo) {
+                            const panel = window.renderEnhancedTaskPanel(s);
+                            convo.appendChild(panel);
+                        }
+                    }
                 }
 
                 console.log('[NewAPI] Phase UI updated for phases:', adapted.phases.map(p => `${p.id}:${p.status}`).join(', '));
@@ -1411,9 +1441,7 @@
             document.getElementById('runStream')?.classList.remove('hidden');
             console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}`);
 
-            // ✅ v=29: 添加任务完成消息
-            // ✅ v=30: 修复不可靠检查 - 使用标志位而不是字符串搜索
-            // ✅ v=31: 修复标志位持久化问题 - 同时检查标志位和response内容
+            // ✅ v=32: 修复总结不显示 - 强制刷新UI确保总结可见
             if (!isError) {
                 // 双重检查：防止标志位丢失或response已包含总结
                 const SUMMARY_MARKER = '**✅ 任务完成**';
@@ -1431,30 +1459,42 @@
                     s.response += summary;
                     s._hasCompletionSummary = true; // 设置标志位
 
-                    // 显示总结消息
+                    console.log('[NewAPI] Task summary added:', summary.trim());
+
+                    // 显示系统消息
                     if (typeof window.addSystemMessage === 'function') {
                         window.addSystemMessage(`✅ 任务完成 - 完成${completedPhases}个阶段，执行${totalActions}次工具调用`, 'success');
                     }
 
-                    console.log('[NewAPI] Task summary added:', summary.trim());
+                    // ✅ v=32: 强制刷新UI，确保总结立即显示
+                    try {
+                        if (typeof window.renderResults === 'function') {
+                            window.renderResults();
+                        }
+                        console.log('[NewAPI] UI refreshed to show summary');
+                    } catch (error) {
+                        console.error('[NewAPI] Failed to refresh UI after summary:', error);
+                    }
                 } else {
                     if (hasSummaryInResponse && hasSummaryFlag) {
                         console.log('[NewAPI] Task summary already exists (both flag and response)');
                     } else if (hasSummaryInResponse) {
                         console.log('[NewAPI] Task summary exists in response but flag is missing, fixing flag');
                         s._hasCompletionSummary = true;
-                        // ✅ v=32: 立即保存修复后的标志位
                         if (typeof window.saveState === 'function') {
                             window.saveState();
                         }
                     } else {
-                        console.log('[NewAPI] Task summary flag exists but response missing summary');
-                        // ✅ v=32: 重建总结（防止response被清空后丢失）
+                        console.log('[NewAPI] Task summary flag exists but response missing summary, recreating...');
                         const totalActions = s.actions ? s.actions.length : 0;
                         const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
                         const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
                         s.response = (s.response || '') + summary;
-                        // 保存重建的response
+
+                        // ✅ v=32: 重建总结后也要刷新UI
+                        if (typeof window.renderResults === 'function') {
+                            window.renderResults();
+                        }
                         if (typeof window.saveState === 'function') {
                             window.saveState();
                         }
