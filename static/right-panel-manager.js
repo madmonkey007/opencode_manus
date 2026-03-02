@@ -346,39 +346,34 @@ class RightPanelManager {
         if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
 
         // ✅ P0-2: 优化RAF滚动逻辑 - 使用标志位防止回调堆积
-        // ✅ v=29: 修复自动滚动问题，确保所有可能的滚动容器都被滚动
+        // ✅ v=29: 修复自动滚动问题
+        // ✅ v=30: 性能优化 - 只滚动实际有overflow的容器
         if (!this._scrollRAFPending) {
             this._scrollRAFPending = true;
 
             requestAnimationFrame(() => {
-                // 1. 滚动pre元素（文件内容容器）
+                // 1. 滚动pre元素（文件内容容器）- 只在有滚动条时滚动
                 const pre = document.getElementById('file-code-content');
-                if (pre) {
+                if (pre && pre.scrollHeight > pre.clientHeight) {
                     pre.scrollTop = pre.scrollHeight;
                 }
 
-                // 2. 滚动主容器（file-editor-content）
+                // 2. 滚动主容器（file-editor-content）- 只在有滚动条时滚动
                 const container = document.getElementById('file-editor-content');
-                if (container) {
+                if (container && container.scrollHeight > container.clientHeight) {
                     container.scrollTop = container.scrollHeight;
                 }
 
-                // 3. 滚动外层容器（tab-preview）
+                // 3. 滚动外层容器（tab-preview）- 只在有滚动条时滚动
                 const tabPreview = document.getElementById('tab-preview');
-                if (tabPreview) {
+                if (tabPreview && tabPreview.scrollHeight > tabPreview.clientHeight) {
                     tabPreview.scrollTop = tabPreview.scrollHeight;
                 }
 
-                // 4. 滚动主面板内容（如果存在）
+                // 4. 滚动主面板内容 - 只在有滚动条时滚动
                 const panelContent = document.querySelector('.right-panel .panel-content');
-                if (panelContent) {
+                if (panelContent && panelContent.scrollHeight > panelContent.clientHeight) {
                     panelContent.scrollTop = panelContent.scrollHeight;
-                }
-
-                // 5. 滚动右侧面板根容器
-                const rightPanel = document.querySelector('.right-panel');
-                if (rightPanel) {
-                    rightPanel.scrollTop = rightPanel.scrollHeight;
                 }
 
                 this._scrollRAFPending = false;

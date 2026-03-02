@@ -42,8 +42,10 @@
     const TYPING_EFFECT_TIMEOUT_MS = 30000; // ✅ P0-1: 打字机效果超时时间（30秒）
 
     // ✅ v=29: 防止重复显示同一个文件的预览
+    // ✅ v=30: 修复内存泄漏 - 使用LRU策略限制Map大小
     const _recentlyPreviewedFiles = new Map(); // path -> timestamp
     const PREVIEW_DEBOUNCE_MS = 2000; // 2秒内不重复预览同一文件
+    const MAX_PREVIEW_CACHE_SIZE = 100; // 最多缓存100个文件路径
 
     // ✅ P0-1 & P0-4: 打字机效果管理器（防止UI抖动 + 并发保护 + 超时恢复）
     const TypingEffectManager = (function() {
@@ -59,14 +61,15 @@
                 count++;
                 console.log(`[TypingEffectManager] Start (count: ${count}, reason: ${reason})`);
 
-                // ✅ v=29: 每次start都重置超时定时器（而不是只在count=0时设置）
-                if (timeout) {
-                    clearTimeout(timeout);
+                // ✅ v=30: 修复并发bug - 只在第一个打字机效果开始时设置超时
+                // 防止"永远不超时"的问题（如果持续调用start会不断重置超时）
+                if (count === 1 && !timeout) {
+                    timeout = setTimeout(() => {
+                        console.warn(`[TypingEffectManager] ⚠️ Timeout after ${TYPING_EFFECT_TIMEOUT_MS}ms, auto-resetting`);
+                        this.reset('timeout');
+                    }, TYPING_EFFECT_TIMEOUT_MS);
+                    console.log(`[TypingEffectManager] Timeout timer set for ${TYPING_EFFECT_TIMEOUT_MS}ms`);
                 }
-                timeout = setTimeout(() => {
-                    console.warn(`[TypingEffectManager] ⚠️ Timeout after ${TYPING_EFFECT_TIMEOUT_MS}ms, auto-resetting`);
-                    this.reset('timeout');
-                }, TYPING_EFFECT_TIMEOUT_MS);
             },
 
             /**
@@ -1261,17 +1264,28 @@
                     const path = step.path || step.file_path || '';
 
                     // ✅ v=29: 防止重复预览同一文件（2秒内只预览一次）
-                    if (path && _recentlyPreviewedFiles.has(path)) {
+                    // ✅ v=30: 修复内存泄漏 - 添加LRU清理机制
+                    if (path) {
                         const lastPreviewTime = _recentlyPreviewedFiles.get(path);
                         const now = Date.now();
-                        if (now - lastPreviewTime < PREVIEW_DEBOUNCE_MS) {
+
+                        // 检查是否在防抖窗口内
+                        if (lastPreviewTime && now - lastPreviewTime < PREVIEW_DEBOUNCE_MS) {
                             console.log(`[NewAPI] Skipping duplicate preview for: ${path} (${now - lastPreviewTime}ms ago)`);
-                            // 仍然添加到orphanEvents，但不显示右侧面板
                             return;
                         }
-                    }
-                    if (path) {
-                        _recentlyPreviewedFiles.set(path, Date.now());
+
+                        // LRU清理：如果缓存已满，删除最旧的条目
+                        if (_recentlyPreviewedFiles.size >= MAX_PREVIEW_CACHE_SIZE) {
+                            const firstKey = _recentlyPreviewedFiles.keys().next().value;
+                            if (firstKey) {
+                                _recentlyPreviewedFiles.delete(firstKey);
+                                console.log(`[NewAPI] LRU cleanup: removed ${firstKey} from preview cache`);
+                            }
+                        }
+
+                        // 添加当前文件到缓存
+                        _recentlyPreviewedFiles.set(path, now);
                     }
 
                     // 构建事件标题和内容
@@ -1398,17 +1412,18 @@
             console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}`);
 
             // ✅ v=29: 添加任务完成消息
+            // ✅ v=30: 修复不可靠检查 - 使用标志位而不是字符串搜索
             if (!isError) {
-                // 计算任务统计信息
-                const totalActions = s.actions ? s.actions.length : 0;
-                const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
+                // 使用标志位检查是否已添加总结
+                if (!s._hasCompletionSummary) {
+                    // 计算任务统计信息
+                    const totalActions = s.actions ? s.actions.length : 0;
+                    const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
 
-                // 添加总结到response末尾
-                const summary = `\n\n---\n\n**✅ 任务完成**\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
-
-                // 只在还没有总结时添加
-                if (!s.response.includes('**✅ 任务完成**')) {
+                    // 添加总结到response末尾
+                    const summary = `\n\n---\n\n**✅ 任务完成**\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
                     s.response += summary;
+                    s._hasCompletionSummary = true; // 设置标志位
 
                     // 显示总结消息
                     if (typeof window.addSystemMessage === 'function') {
