@@ -503,6 +503,10 @@ async function loadState() {
                 });
                 state.sessions = merged;
                 console.log('[Sync] Total sessions after merge:', state.sessions.length);
+
+                // ✅ 修复：同步后端sessions后保存到localStorage
+                // 确保新sessions（如算盘任务）在刷新后仍然可见
+                setTimeout(() => saveState(), 100);
             }
         } catch (e) {
             console.warn('[Sync] Failed to sync sessions from backend:', e);

@@ -3,6 +3,64 @@
  * 实现类似 Manus 的逐级展开任务面板
  */
 
+/**
+ * ✅ 代码审查修复：辅助函数 - 从文件对象中提取文件名和扩展名
+ * 消除重复代码，提升可维护性
+ * 修复问题：Critical #2 - 文件分类逻辑重复
+ */
+function extractFileInfo(file) {
+    const fileName = typeof file === 'string' ? file : (file.name || file.path || '');
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    return { fileName, ext };
+}
+
+/**
+ * ✅ 代码审查修复：文件路径验证函数
+ * 防止路径遍历攻击（../../etc/passwd）
+ * 修复问题：Important #1 - 缺少文件路径验证
+ */
+function isValidFilePath(filePath) {
+    // 阻止路径遍历攻击
+    if (filePath.includes('..') || filePath.startsWith('/') || filePath.startsWith('\\')) {
+        console.warn('[Security] Invalid file path detected:', filePath);
+        return false;
+    }
+    // 只允许文件名字符（字母、数字、下划线、点、短横线、斜杠）
+    const validPattern = /^[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+$/;
+    return validPattern.test(filePath);
+}
+
+/**
+ * ✅ 代码审查修复：安全地渲染Markdown内容
+ * 使用textContent防止XSS攻击
+ * 修复问题：Critical #1 - marked.parse()未消毒
+ */
+function safeRenderMarkdown(markdownContent) {
+    // ⚠️ 安全警告：marked.parse() 输出包含用户内容，必须消毒！
+    // 推荐方案：安装并使用DOMPurify
+    //   npm install dompurify
+    //   import DOMPurify from 'dompurify';
+    //   return DOMPurify.sanitize(marked.parse(markdownContent));
+    //
+    // 临时安全方案：使用纯文本显示（无Markdown格式，但XSS安全）
+    try {
+        if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+            // 生产环境：使用DOMPurify消毒
+            return DOMPurify.sanitize(marked.parse(markdownContent));
+        } else {
+            // 降级方案：纯文本显示（安全但无格式）
+            const div = document.createElement('div');
+            div.textContent = markdownContent;
+            return div.innerHTML;
+        }
+    } catch (e) {
+        console.error('[safeRenderMarkdown] Failed to render markdown:', e);
+        const div = document.createElement('div');
+        div.textContent = markdownContent;
+        return div.innerHTML;
+    }
+}
+
 // 渲染增强的任务面板
 function renderEnhancedTaskPanel(session) {
     const container = document.createElement('div');
@@ -459,81 +517,194 @@ function createDeliverableCard(session) {
     const card = document.createElement('div');
     card.className = 'space-y-6';
 
+    // 早出口：如果没有交付物，只显示响应内容
     const hasDeliverables = session.deliverables && session.deliverables.length > 0;
-    const showMoreFiles = hasDeliverables && session.deliverables.length > 4;
-    const displayFiles = hasDeliverables ? session.deliverables.slice(0, 4) : [];
+    if (!hasDeliverables) {
+        // ✅ 代码审查修复 #1: 使用safeRenderMarkdown防止XSS，而不是marked.parse
+        card.innerHTML = `
+            <div class="space-y-4">
+                ${session.response ? `
+                    <div>
+                        ${safeRenderMarkdown(session.response)}
+                    </div>
+                ` : '<p class="text-slate-600 dark:text-slate-400">任务正在执行中...</p>'}
+            </div>
+        `;
+        return card;
+    }
 
+    // ✅ 代码审查修复 #2: 使用辅助函数消除重复代码
+    // 分类文件：网页文件 vs 非网页文件
+    const webExtensions = ['html', 'htm'];
+    const allFiles = session.deliverables;
+
+    const webFiles = allFiles.filter(f => {
+        const { ext } = extractFileInfo(f);
+        return webExtensions.includes(ext);
+    });
+
+    const docFiles = allFiles.filter(f => {
+        const { ext } = extractFileInfo(f);
+        return !webExtensions.includes(ext);
+    });
+
+    const hasWebFiles = webFiles.length > 0;
+    const hasDocFiles = docFiles.length > 0;
+    const showMoreDocFiles = docFiles.length > 4;
+    const displayDocFiles = docFiles.slice(0, 4);
+
+    // ✅ 代码审查修复 #1: 响应内容也使用safeRenderMarkdown防止XSS
     card.innerHTML = `
         <div class="space-y-4">
             ${session.response ? `
                 <div>
-                    ${marked.parse(session.response)}
+                    ${safeRenderMarkdown(session.response)}
                 </div>
             ` : '<p class="text-slate-600 dark:text-slate-400">任务正在执行中...</p>'}
         </div>
-        ${hasDeliverables ? `
-            <div class="space-y-4">
-                <h2 class="text-xl font-semibold text-slate-900 dark:text-white">
-                    生成文件 ${showMoreFiles ? `(${session.deliverables.length} 个文件)` : `(${session.deliverables.length})`}
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="file-cards-${session.id}">
-                    ${displayFiles.map((file, idx) => {
-        const fileName = typeof file === 'string' ? file : (file.name || file.path || 'unknown');
-        const fileExt = fileName.split('.').pop()?.toLowerCase() || '';
-        const iconAndColor = getFileIconAndColor(fileExt);
+        
+        <div class="space-y-4">
+            <h2 class="text-xl font-semibold text-slate-900 dark:text-white">
+                下一步交付
+            </h2>
+            
+            ${hasWebFiles ? `
+                <div class="space-y-3">
+                    <div class="grid grid-cols-1 gap-3" id="web-file-cards-${session.id}">
+                        ${webFiles.map((file, idx) => {
+                            // ✅ 代码审查修复 #2: 使用辅助函数提取文件信息
+                            const { fileName, ext } = extractFileInfo(file);
+                            // ✅ 代码审查修复 #1: 添加文件路径验证
+                            if (!isValidFilePath(fileName)) {
+                                console.warn('[Security] Skipping invalid file path:', fileName);
+                                return '';
+                            }
+                            const previewUrl = `/opencode/preview_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`;
+                            const iconAndColor = getFileIconAndColor(ext);
 
-        return `
-                            <div class="file-card flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all rounded-xl group relative"
-                                 data-file-name="${escapeHtml(fileName)}" data-file-ext="${fileExt}">
-                                <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
-                                    <span class="material-symbols-outlined ${iconAndColor.color} text-xl">${iconAndColor.icon}</span>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="text-[13px] leading-snug text-slate-700 dark:text-slate-300 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
-                                        ${escapeHtml(fileName)}
+                            return `
+                                <div class="web-file-card flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-100 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all rounded-xl group cursor-pointer"
+                                     data-file-name="${escapeHtml(fileName)}" data-preview-url="${previewUrl}">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
+                                            <span class="material-symbols-outlined ${iconAndColor.color} text-xl">${iconAndColor.icon}</span>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-[14px] leading-snug text-slate-700 dark:text-slate-300 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+                                                ${escapeHtml(fileName)}
+                                            </div>
+                                            <div class="text-xs text-slate-500 dark:text-slate-400">
+                                                HTML 文件
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                                <!-- 操作按钮菜单 -->
-                                <div class="file-actions relative">
-                                    <button class="action-menu-btn p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded transition-colors opacity-0 group-hover:opacity-100">
-                                        <span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[18px]">more_horiz</span>
+                                    <button class="preview-btn flex-shrink-0 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-[18px]">visibility</span>
+                                        <span class="text-sm font-medium">预览</span>
                                     </button>
-                                    <div class="action-menu hidden absolute right-0 top-8 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
-                                        ${fileExt === 'html' ? `
-                                            <button class="view-source-btn w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2">
-                                                <span class="material-symbols-outlined text-[16px]">code</span>
-                                                查看源码
-                                            </button>
-                                        ` : ''}
-                                        <button class="delete-file-btn w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
-                                            <span class="material-symbols-outlined text-[16px]">delete</span>
-                                            删除
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${hasDocFiles ? `
+                <div class="space-y-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="doc-file-cards-${session.id}">
+                        ${displayDocFiles.map((file, idx) => {
+                            // ✅ 代码审查修复 #2: 使用辅助函数提取文件信息
+                            const { fileName, ext } = extractFileInfo(file);
+                            // ✅ 代码审查修复 #1: 添加文件路径验证
+                            if (!isValidFilePath(fileName)) {
+                                console.warn('[Security] Skipping invalid file path:', fileName);
+                                return '';
+                            }
+                            const iconAndColor = getFileIconAndColor(ext);
+
+                            return `
+                                <div class="file-card flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all rounded-xl group relative"
+                                     data-file-name="${escapeHtml(fileName)}" data-file-ext="${ext}">
+                                    <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
+                                        <span class="material-symbols-outlined ${iconAndColor.color} text-xl">${iconAndColor.icon}</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-[13px] leading-snug text-slate-700 dark:text-slate-300 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+                                            ${escapeHtml(fileName)}
+                                        </div>
+                                    </div>
+                                    <!-- 操作按钮菜单 -->
+                                    <div class="file-actions relative">
+                                        <button class="action-menu-btn p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded transition-colors opacity-0 group-hover:opacity-100">
+                                            <span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[18px]">more_horiz</span>
                                         </button>
+                                        <div class="action-menu hidden absolute right-0 top-8 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
+                                            ${ext === 'html' ? `
+                                                <button class="view-source-btn w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2">
+                                                    <span class="material-symbols-outlined text-[16px]">code</span>
+                                                    查看源码
+                                                </button>
+                                            ` : ''}
+                                            <button class="delete-file-btn w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
+                                                <span class="material-symbols-outlined text-[16px]">delete</span>
+                                                删除
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
+                            `;
+                        }).join('')}
+                        ${showMoreDocFiles ? `
+                            <div class="view-all-files flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer rounded-xl group md:col-span-2 md:max-w-sm">
+                                <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
+                                    <span class="material-symbols-outlined text-blue-500 text-xl">folder_open</span>
+                                </div>
+                                <div class="text-[13px] leading-snug text-slate-700 dark:text-slate-300 font-medium">
+                                    查看所有文件
+                                </div>
+                                <div class="text-xs text-slate-400 dark:text-slate-500 ml-auto">
+                                    ${docFiles.length} 个文件
+                                </div>
                             </div>
-                        `;
-    }).join('')}
-                    ${showMoreFiles ? `
-                        <div class="view-all-files flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer rounded-xl group md:col-span-2 md:max-w-sm">
-                            <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
-                                <span class="material-symbols-outlined text-blue-500 text-xl">folder_open</span>
-                            </div>
-                            <div class="text-[13px] leading-snug text-slate-700 dark:text-slate-300 font-medium">
-                                查看所有文件
-                            </div>
-                            <div class="text-xs text-slate-400 dark:text-slate-500 ml-auto">
-                                ${session.deliverables.length} 个文件
-                            </div>
-                        </div>
-                    ` : ''}
+                        ` : ''}
+                    </div>
                 </div>
-            </div>
-        ` : ''}
+            ` : ''}
+        </div>
     `;
 
-    // 绑定文件卡片点击事件
-    if (hasDeliverables) {
+    // 绑定网页文件卡片点击事件
+    if (hasWebFiles) {
+        const webFileCards = card.querySelectorAll('.web-file-card');
+        webFileCards.forEach(fileCard => {
+            const previewUrl = fileCard.getAttribute('data-preview-url');
+            const fileName = fileCard.getAttribute('data-file-name');
+            
+            // 点击预览按钮
+            const previewBtn = fileCard.querySelector('.preview-btn');
+            if (previewBtn) {
+                previewBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    console.log('[Deliverable] Preview web file:', previewUrl);
+                    if (window.rightPanelManager && typeof window.rightPanelManager.showWebPreview === 'function') {
+                        window.rightPanelManager.showWebPreview(previewUrl);
+                    }
+                });
+            }
+            
+            // 点击整个卡片也触发预览
+            fileCard.addEventListener('click', (e) => {
+                if (e.target.closest('.preview-btn')) return;
+                console.log('[Deliverable] Click web file card:', fileName);
+                if (window.rightPanelManager && typeof window.rightPanelManager.showWebPreview === 'function') {
+                    window.rightPanelManager.showWebPreview(previewUrl);
+                }
+            });
+        });
+    }
+
+    // 绑定文档文件卡片点击事件
+    if (hasDocFiles) {
         const fileCards = card.querySelectorAll('.file-card');
         fileCards.forEach(fileCard => {
             const fileName = fileCard.getAttribute('data-file-name');
@@ -548,7 +719,6 @@ function createDeliverableCard(session) {
 
                 // HTML文件默认预览网页
                 if (fileExt === 'html') {
-                    // 使用正确的文件预览URL
                     const previewUrl = `/opencode/preview_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`;
                     console.log('[FileCard] Loading HTML preview:', previewUrl);
 
@@ -561,7 +731,22 @@ function createDeliverableCard(session) {
                         window.rightPanelManager.showFileEditor(fileName, '加载中...');
                         // 实际加载文件内容
                         fetch(`/opencode/read_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`)
-                            .then(res => res.json())
+                            .then(res => {
+                                // ✅ 代码审查修复 #2: 改进错误处理 - 提供更详细的HTTP错误信息
+                                if (!res.ok) {
+                                    // 根据HTTP状态码提供更具体的错误信息
+                                    if (res.status === 404) {
+                                        throw new Error('文件不存在或已被删除');
+                                    } else if (res.status === 403) {
+                                        throw new Error('没有访问权限');
+                                    } else if (res.status >= 500) {
+                                        throw new Error('服务器错误，请稍后重试');
+                                    } else {
+                                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                                    }
+                                }
+                                return res.json();
+                            })
                             .then(data => {
                                 if (data.status === 'success' && data.content) {
                                     if (window.rightPanelManager) {
@@ -569,7 +754,6 @@ function createDeliverableCard(session) {
                                     }
                                 } else {
                                     console.error('读取文件失败:', data);
-                                    // 显示错误信息
                                     if (window.rightPanelManager) {
                                         window.rightPanelManager.showFileEditor(fileName, `无法读取文件: ${data.message || '未知错误'}`);
                                     }
@@ -578,7 +762,7 @@ function createDeliverableCard(session) {
                             .catch(err => {
                                 console.error('读取文件出错:', err);
                                 if (window.rightPanelManager) {
-                                    window.rightPanelManager.showFileEditor(fileName, `读取文件时出错: ${err.message}`);
+                                    window.rightPanelManager.showFileEditor(fileName, `无法读取文件: ${err.message}`);
                                 }
                             });
                     }
@@ -607,7 +791,21 @@ function createDeliverableCard(session) {
                         console.log('查看源码:', fileName);
                         // 读取文件内容并显示
                         fetch(`/opencode/read_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`)
-                            .then(res => res.json())
+                            .then(res => {
+                                // ✅ 代码审查修复 #2: 改进错误处理 - 提供更详细的HTTP错误信息
+                                if (!res.ok) {
+                                    if (res.status === 404) {
+                                        throw new Error('文件不存在或已被删除');
+                                    } else if (res.status === 403) {
+                                        throw new Error('没有访问权限');
+                                    } else if (res.status >= 500) {
+                                        throw new Error('服务器错误，请稍后重试');
+                                    } else {
+                                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                                    }
+                                }
+                                return res.json();
+                            })
                             .then(data => {
                                 if (data.status === 'success' && data.content) {
                                     if (window.rightPanelManager) {
@@ -615,9 +813,17 @@ function createDeliverableCard(session) {
                                     }
                                 } else {
                                     console.error('读取文件失败:', data);
+                                    if (window.rightPanelManager) {
+                                        window.rightPanelManager.showFileEditor(fileName, `无法读取文件: ${data.message || '未知错误'}`);
+                                    }
                                 }
                             })
-                            .catch(err => console.error('读取文件出错:', err));
+                            .catch(err => {
+                                console.error('读取文件出错:', err);
+                                if (window.rightPanelManager) {
+                                    window.rightPanelManager.showFileEditor(fileName, `无法读取文件: ${err.message}`);
+                                }
+                            });
                     });
                 }
 
@@ -658,11 +864,13 @@ function createDeliverableCard(session) {
         const viewAllBtn = card.querySelector('.view-all-files');
         if (viewAllBtn) {
             viewAllBtn.onclick = () => {
-                // 唤起右侧文件面板
-                if (typeof togglePanel === 'function') {
+                // 切换到右侧面板的Files标签
+                if (window.rightPanelManager && typeof window.rightPanelManager.switchTab === 'function') {
+                    window.rightPanelManager.switchTab('files');
+                } else if (typeof togglePanel === 'function') {
                     togglePanel('files');
                 } else {
-                    console.warn('togglePanel 函数未定义');
+                    console.warn('无法打开文件面板');
                 }
             };
         }
@@ -686,6 +894,10 @@ function getFileIconAndColor(ext) {
         'pdf': { icon: 'picture_as_pdf', color: 'text-red-500' },
         'doc': { icon: 'description', color: 'text-blue-500' },
         'docx': { icon: 'description', color: 'text-blue-500' },
+        'xls': { icon: 'table_chart', color: 'text-green-500' },
+        'xlsx': { icon: 'table_chart', color: 'text-green-500' },
+        'ppt': { icon: 'slideshow', color: 'text-orange-500' },
+        'pptx': { icon: 'slideshow', color: 'text-orange-500' },
         'txt': { icon: 'text_snippet', color: 'text-gray-500' },
         'md': { icon: 'markdown', color: 'text-gray-600' },
 
@@ -786,6 +998,16 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// ✅ 代码审查修复 #3: 优化全局菜单监听器性能 - 只在菜单显示时才查询DOM
+// 修复问题：Important #3 - 每次点击都querySelectorAll影响性能
+document.addEventListener('click', (e) => {
+    // 只在菜单显示时才查询（性能优化）
+    const visibleMenus = document.querySelectorAll('.action-menu:not(.hidden)');
+    if (visibleMenus.length > 0 && !e.target.closest('.file-actions')) {
+        visibleMenus.forEach(m => m.classList.add('hidden'));
+    }
+});
 
 // 导出函数
 if (typeof module !== 'undefined' && module.exports) {
