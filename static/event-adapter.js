@@ -10,9 +10,11 @@ class EventAdapter {
      * 将新 API 事件转换为前端格式
      * @param {Object} newEvent - 新 API 事件
      * @param {Object} session - 当前会话对象
+     * @param {Object} options - 可选参数
+     * @param {string} options.childSessionId - 子会话ID（如果事件来自子会话）
      * @returns {Object|null} 转换后的事件，或 null（如果事件应被忽略）
      */
-    static adaptEvent(newEvent, session) {
+    static adaptEvent(newEvent, session, options = {}) {
         const eventType = newEvent.type;
 
         // 跳过心跳事件
@@ -55,7 +57,7 @@ class EventAdapter {
             const part = newEvent.properties?.part;
             if (!part) return null;
 
-            return this.adaptPartEvent(part, session);
+            return this.adaptPartEvent(part, session, options);
         }
 
         // 文件预览事件
@@ -243,12 +245,15 @@ class EventAdapter {
      * 适配 Part 事件
      * @param {Object} part - Part 对象
      * @param {Object} session - 当前会话
+     * @param {Object} options - 可选参数
+     * @param {string} options.childSessionId - 子会话ID
      * @returns {Object} 适配后的事件
      */
-    static adaptPartEvent(part, session) {
+    static adaptPartEvent(part, session, options = {}) {
         const partType = part.type;
 
         const isThought = partType === 'thought';
+        const childSessionId = options.childSessionId;
 
         // TEXT 类型
         if (partType === 'text') {
@@ -288,7 +293,7 @@ class EventAdapter {
             const metadata = part.metadata || {};
             const title = metadata.title || (isThought ? 'Thinking' : `Using ${toolName}`);
 
-            return {
+            const adaptedEvent = {
                 id: part.id,
                 type: 'action',
                 data: {
@@ -303,6 +308,14 @@ class EventAdapter {
                 },
                 message_id: part.message_id
             };
+
+            // 添加子会话上下文标记
+            if (childSessionId) {
+                adaptedEvent._childSessionId = childSessionId;
+                adaptedEvent._isFromChildSession = true;
+            }
+
+            return adaptedEvent;
         }
 
         // STEP-START 类型

@@ -35,6 +35,14 @@
     const DEFAULT_MODE = 'build';
     const VALID_MODES = ['plan', 'build', 'auto'];
 
+    // ✅ 代码质量改进：提取魔法数字为常量
+    // 子会话配置常量
+    const CHILD_SESSION_CLEANUP_DELAY_MS = 5000; // 子会话完成后的清理延迟（毫秒）
+    const RENDER_THROTTLE_MS = 100; // renderResults节流间隔（毫秒）
+
+    // 子会话ID解析模式
+    const TASK_ID_PATTERN = /task_id:\s*(ses_[a-zA-Z0-9]+)/;
+
     function init() {
         console.log('[NewAPI] Initializing V2.8 Patch (Advanced UI Mode)...');
 
@@ -81,6 +89,11 @@
                     if (state && state.activeId) {
                         // 检查会话是否切换
                         if (lastActiveId && lastActiveId !== state.activeId) {
+                            // 清理旧会话的子会话订阅
+                            if (window.ChildSessionManager) {
+                                window.ChildSessionManager.unsubscribeAllFromMain(lastActiveId);
+                            }
+
                             const activeSession = state.sessions.find(x => x.id === state.activeId);
                             // 只有切换到空白会话（没有prompt和response）时才清空
                             if (activeSession && !activeSession.prompt && !activeSession.response) {
@@ -545,6 +558,16 @@
     }, 500);
 
     /**
+     * ✅ 代码质量改进：节流版本的渲染函数 - 限制UI更新频率（每100ms最多一次）
+     * 防止每次事件都触发完整的DOM重渲染，提升性能
+     */
+    const throttledRenderResults = throttle(() => {
+        if (typeof window.renderResults === 'function') {
+            window.renderResults();
+        }
+    }, RENDER_THROTTLE_MS);
+
+    /**
      * 防抖版本的saveState（优化性能，避免频繁写入localStorage）
      * ✅ 修复：缩短防抖时间至100ms，减少数据丢失窗口
      */
@@ -724,15 +747,36 @@
                     debouncedSaveState();
                 }
 
-                // 实时渲染
-                if (typeof window.renderResults === 'function' && window.state.activeId === s.id) {
-                    window.renderResults();
-                }
+                // ✅ 代码质量改进：使用节流版本减少DOM更新频率
+                throttledRenderResults();
 
                 // 检查是否完成
                 if (adapted.type === 'status' && (adapted.value === 'done' || adapted.value === 'completed')) {
                     if (stopBtn) stopBtn.classList.add('hidden');
                     if (runBtn) runBtn.classList.remove('hidden');
+
+                    // ✅ 修复C7: 子会话完成清理 - 防止内存泄漏
+                // 当子会话完成时，延迟清理资源（给用户查看历史事件的时间）
+                if (adapted._isFromChildSession) {
+                    const childSessionId = adapted._childSessionId;
+                    console.log(`[ChildSession] ✅ Child session completed: ${childSessionId}`);
+
+                    // 延迟清理：给用户时间查看子会话的历史事件
+                    // 防止频繁创建子会话导致内存泄漏
+                    setTimeout(() => {
+                        console.log(`[ChildSession] 🧹 Cleaning up completed child session: ${childSessionId}`);
+
+                        // 取消子会话的SSE订阅
+                        if (window.ChildSessionManager) {
+                            window.ChildSessionManager.unsubscribeFromChildSession(childSessionId);
+                        }
+
+                        // 清理深度追踪
+                        eventDepthMap.delete(childSessionId);
+
+                        console.log(`[ChildSession] ✅ Cleanup complete for: ${childSessionId}`);
+                    }, CHILD_SESSION_CLEANUP_DELAY_MS);
+                }
                 }
             },
             (err) => {
@@ -760,9 +804,278 @@
         }
     }
 
-    function processEvent(s, adapted) {
+    // ========================================================================
+    // 子会话自动监听管理器 (V1.0)
+    // ========================================================================
+
+    /**
+     * 子会话管理器 - 负责跟踪和管理子代理session的生命周期
+     *
+     * 设计原则：
+     * 1. Parse, Don't Validate: 在边界处解析子session ID，内部使用可信状态
+     * 2. Early Exit: 所有边界检查在函数顶部处理
+     * 3. Atomic Predictability: 每个函数职责单一，行为可预测
+     */
+    const ChildSessionManager = (function() {
+        // 核心数据结构
+        const childSessions = new Map(); // mainSessionId -> Set<childSessionId>
+        const eventSources = new Map();  // childSessionId -> EventSource
+        const mainSessions = new Map();  // childSessionId -> mainSessionId (反向查找)
+
+        /**
+         * 解析task工具输出中的子session ID
+         * @param {string} output - task工具的output字符串，格式: "task_id: ses_xxx\n\n..."
+         * @returns {string|null} 子session ID（格式: ses_xxx）或null（如果解析失败）
+         * @example
+         *   parseChildSessionId("task_id: ses_abc123\n\n...") // "ses_abc123"
+         *   parseChildSessionId("invalid output") // null
+         */
+        function parseChildSessionId(output) {
+            // Early Exit: 无效输入
+            if (!output || typeof output !== 'string') {
+                return null;
+            }
+
+            // Parse, Don't Validate: 使用常量解析子session ID
+            const match = output.match(TASK_ID_PATTERN);
+            return match ? match[1] : null;
+        }
+
+        /**
+         * 检查是否已订阅子会话
+         * @param {string} mainSessionId - 主session ID
+         * @param {string} childSessionId - 子session ID
+         * @returns {boolean}
+         */
+        function isSubscribed(mainSessionId, childSessionId) {
+            const children = childSessions.get(mainSessionId);
+            return children ? children.has(childSessionId) : false;
+        }
+
+        /**
+         * 添加子会话订阅
+         * @param {string} mainSessionId - 主session ID
+         * @param {string} childSessionId - 子session ID
+         */
+        function addChildSession(mainSessionId, childSessionId) {
+            // Parse, Don't Validate: 创建双向映射，确保数据一致性
+            if (!childSessions.has(mainSessionId)) {
+                childSessions.set(mainSessionId, new Set());
+            }
+            childSessions.get(mainSessionId).add(childSessionId);
+            mainSessions.set(childSessionId, mainSessionId);
+
+            console.log(`[ChildSession] Registered: ${childSessionId} <- ${mainSessionId}`);
+        }
+
+        /**
+         * 移除子会话订阅
+         * @param {string} childSessionId - 子session ID
+         */
+        function removeChildSession(childSessionId) {
+            const mainSessionId = mainSessions.get(childSessionId);
+            if (mainSessionId) {
+                const children = childSessions.get(mainSessionId);
+                if (children) {
+                    children.delete(childSessionId);
+                }
+                mainSessions.delete(childSessionId);
+                console.log(`[ChildSession] Unregistered: ${childSessionId} from ${mainSessionId}`);
+            }
+        }
+
+        /**
+         * 订阅子会话的SSE事件流
+         * @param {string} mainSessionId - 主会话ID
+         * @param {string} childSessionId - 子会话ID
+         * @param {Function} onChildEvent - 子会话事件回调函数 (mainSession, childEvent) => void
+         * @returns {void}
+         * @description
+         *   自动订阅子会话的事件流，并将事件适配到主会话上下文。
+         *   如果已经订阅过，则跳过重复订阅。
+         *   事件会标记为来自子会话（_isFromChildSession: true）。
+         */
+        function subscribeToChildSession(mainSessionId, childSessionId, onChildEvent) {
+            // Early Exit: 防止重复订阅
+            if (isSubscribed(mainSessionId, childSessionId)) {
+                console.log(`[ChildSession] Already subscribed: ${childSessionId}`);
+                return;
+            }
+
+            console.log(`[ChildSession] Subscribing to: ${childSessionId}`);
+
+            // 创建子会话的事件处理器
+            const eventSource = window.apiClient.subscribeToEvents(
+                childSessionId,
+                (newEvent) => {
+                    // Parse, Don't Validate: 适配时保持主session上下文
+                    const mainSession = window.state.sessions.find(s => s.id === mainSessionId);
+                    if (!mainSession) {
+                        console.warn(`[ChildSession] Main session not found: ${mainSessionId}`);
+                        return;
+                    }
+
+                    // 标记事件来源为子会话
+                    const adapted = window.EventAdapter?.adaptEvent(newEvent, mainSession);
+                    if (!adapted) return;
+
+                    // 添加子会话上下文信息
+                    adapted._childSessionId = childSessionId;
+                    adapted._isFromChildSession = true;
+
+                    // 调用回调处理事件
+                    onChildEvent(mainSession, adapted);
+                },
+                (error) => {
+                    console.error(`[ChildSession] SSE error for ${childSessionId}:`, error);
+                    // 发生错误时清理订阅
+                    unsubscribeFromChildSession(childSessionId);
+                }
+            );
+
+            // 保存EventSource以便后续清理
+            eventSources.set(childSessionId, eventSource);
+            addChildSession(mainSessionId, childSessionId);
+        }
+
+        /**
+         * 取消订阅子会话
+         * @param {string} childSessionId - 子会话ID
+         * @returns {void}
+         * @description
+         *   关闭子会话的SSE连接，并清理相关订阅记录。
+         *   如果子会话不存在订阅，则静默忽略。
+         */
+        function unsubscribeFromChildSession(childSessionId) {
+            const eventSource = eventSources.get(childSessionId);
+            if (eventSource) {
+                eventSource.close();
+                eventSources.delete(childSessionId);
+                console.log(`[ChildSession] Unsubscribed: ${childSessionId}`);
+            }
+            removeChildSession(childSessionId);
+        }
+
+        /**
+         * 取消主会话的所有子会话订阅
+         * @param {string} mainSessionId - 主session ID
+         */
+        function unsubscribeAllFromMain(mainSessionId) {
+            const children = childSessions.get(mainSessionId);
+            if (children) {
+                children.forEach(childId => {
+                    unsubscribeFromChildSession(childId);
+                });
+                childSessions.delete(mainSessionId);
+                console.log(`[ChildSession] Unsubscribed all children of: ${mainSessionId}`);
+            }
+        }
+
+        /**
+         * 获取主会话的所有子会话ID
+         * @param {string} mainSessionId - 主session ID
+         * @returns {string[]}
+         */
+        function getChildSessions(mainSessionId) {
+            const children = childSessions.get(mainSessionId);
+            return children ? Array.from(children) : [];
+        }
+
+        /**
+         * 检查会话是否为子会话
+         * @param {string} sessionId - 会话ID
+         * @returns {boolean}
+         */
+        function isChildSession(sessionId) {
+            return mainSessions.has(sessionId);
+        }
+
+        /**
+         * 获取子会话的主会话ID
+         * @param {string} childSessionId - 子会话ID
+         * @returns {string|null}
+         */
+        function getMainSessionId(childSessionId) {
+            return mainSessions.get(childSessionId) || null;
+        }
+
+        // 公共API
+        return {
+            subscribeToChildSession,
+            unsubscribeFromChildSession,
+            unsubscribeAllFromMain,
+            parseChildSessionId,
+            getChildSessions,
+            isChildSession,
+            getMainSessionId
+        };
+    })();
+
+    // ✅ 修复C6: 防止processEvent递归调用导致栈溢出
+    // 添加最大递归深度限制，防止多层嵌套子会话导致栈溢出
+    const MAX_EVENT_DEPTH = 10; // 最大允许10层嵌套
+    const eventDepthMap = new Map(); // 追踪每个会话的事件深度
+
+    function processEvent(s, adapted, depth = 0) {
         // ✅ 添加错误边界：确保任何事件处理异常都不会中断整个数据流
         try {
+            // ====================================================================
+            // 🔴 CRITICAL FIX: 递归深度检查
+            // Early Exit: 防止过深的递归导致栈溢出
+            // ====================================================================
+            if (depth > MAX_EVENT_DEPTH) {
+                console.error(`[processEvent] ❌ CRITICAL: Max recursion depth (${MAX_EVENT_DEPTH}) reached!`);
+                console.error(`[processEvent] Potential infinite loop in session: ${s.id}`);
+                console.error(`[processEvent] Current event type: ${adapted.type}`);
+                return; // 立即返回，防止栈溢出
+            }
+
+            // 记录当前深度
+            eventDepthMap.set(s.id, depth);
+
+            // ====================================================================
+            // 子会话事件处理 - 检测并自动订阅子session
+            // ====================================================================
+            if (adapted.type === 'action' && adapted.data && adapted.data.tool_name === 'task') {
+                console.log('[ChildSession] Detected task tool event');
+
+                // Parse, Don't Validate: 在边界处解析子session ID
+                const output = adapted.data.output || '';
+                const childSessionId = ChildSessionManager.parseChildSessionId(output);
+
+                if (childSessionId) {
+                    console.log(`[ChildSession] Found child session: ${childSessionId}`);
+
+                    // Early Exit: 避免重复订阅
+                    if (!ChildSessionManager.isSubscribed(s.id, childSessionId)) {
+                        // ✅ 修复C6: 传递depth + 1，追踪递归深度
+                        console.log(`[ChildSession] Current depth: ${depth}, subscribing to child at depth: ${depth + 1}`);
+
+                        // 订阅子会话事件流
+                        ChildSessionManager.subscribeToChildSession(
+                            s.id,
+                            childSessionId,
+                            (mainSession, childEvent) => {
+                                // 子会话事件回调 - 路由到主会话的processEvent
+                                console.log(`[ChildSession] Routing event from ${childSessionId} to ${mainSession.id} (depth: ${depth + 1})`);
+                                processEvent(mainSession, childEvent, depth + 1); // ✅ 传递递增的深度
+
+                                // 保存状态
+                                debouncedSaveState();
+
+                                // ✅ 代码质量改进：使用节流版本减少DOM更新频率
+                                throttledRenderResults();
+                            }
+                        );
+                    }
+                } else {
+                    console.warn('[ChildSession] Failed to parse child session ID from task output:', output);
+                }
+            }
+
+            // ====================================================================
+            // 原有事件处理逻辑
+            // ====================================================================
             // 处理文件预览事件 - 更新右侧文件面板（带打字机效果）
             if (adapted.type === 'file_preview_start') {
                 console.log('[NewAPI] File preview start:', adapted.file_path);
@@ -1296,4 +1609,6 @@
     // 暴露函数到全局作用域
     window.loadSessionTimeline = loadSessionTimeline;
     window.handleHistorySessionClick = handleHistorySessionClick;
+    window.ChildSessionManager = ChildSessionManager;
+    console.log('[NewAPI] ChildSessionManager exposed to global scope');
 })();
