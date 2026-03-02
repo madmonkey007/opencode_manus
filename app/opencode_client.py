@@ -178,7 +178,11 @@ class OpenCodeClient:
             # 构建命令行
             safe_prompt = shlex.quote(user_prompt)
             agent_flag = f" --agent {mode}" if mode in ["plan", "build"] else ""
+
             inner_cmd = f"opencode run --model {model_id} --format json --thinking {safe_prompt}{agent_flag}"
+
+            # 添加调试日志，记录完整命令以便排查问题
+            logger.debug(f"CLI command - Mode: '{mode}', Agent flag: '{agent_flag}', Full cmd: {inner_cmd[:200]}...")
 
             if is_windows:
                 # Windows 不需要 script 命令且路径不同
@@ -323,6 +327,19 @@ class OpenCodeClient:
                 event = json.loads(text)
                 event_type = event.get("type")
                 logger.info(f"[_process_line] Parsed JSON event: type={event_type}, sessionID={event.get('sessionID')}, my session_id={session_id}")
+
+                # ✅ CRITICAL-001修复：记录CLI sessionID，但不过滤事件
+                # CLI进程有内部sessionID，与API sessionID不同是正常的
+                # 我们只记录它用于调试，但仍然使用API session_id来广播事件
+                event_cli_session_id = event.get('sessionID')
+                if event_cli_session_id and event_cli_session_id != session_id:
+                    logger.debug(
+                        f"[_process_line] CLI internal sessionID differs from API sessionID:\n"
+                        f"  CLI SessionID: {event_cli_session_id}\n"
+                        f"  API SessionID: {session_id}\n"
+                        f"  This is expected. Using API session_id for broadcasting."
+                    )
+                    # ✅ 不要拒绝事件，继续使用API的session_id处理
 
                 # 处理不同类型的事件
                 if event_type == "text":
@@ -525,8 +542,29 @@ class OpenCodeClient:
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """处理 tool_use 事件"""
         part = event.get("part", {})
+
+        # ✅ CRITICAL-002修复：验证必需字段，防止静默失败
+        if not part:
+            logger.error(f"[_handle_tool_use_event] Missing 'part' field in event. Available keys: {event.keys()}")
+            yield {
+                "type": "error",
+                "properties": {
+                    "session_id": session_id,
+                    "message_id": message_id,
+                    "code": "INVALID_TOOL_EVENT",
+                    "message": "Invalid tool_use event: missing 'part' field"
+                }
+            }
+            return
+
         tool_name = part.get("tool", "unknown")
+        if tool_name == "unknown":
+            logger.warning(f"[_handle_tool_use_event] Missing 'tool' name in part. Available keys: {part.keys()}")
+
         state = part.get("state", {})
+        if not state:
+            logger.warning(f"[_handle_tool_use_event] Missing 'state' in part for tool={tool_name}. Keys: {part.keys()}")
+
         status = state.get("status")
         input_data = part.get("input", {})
         output = state.get("output", "")

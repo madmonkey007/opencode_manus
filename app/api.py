@@ -96,9 +96,27 @@ async def create_session(title: str = "New Session", mode: str = "auto", version
     """
     try:
         session = await session_manager.create_session(title=title, version=version)
+
+        # 创建workspace目录
+        from app.main import WORKSPACE_BASE
+        import os
+        session_dir = os.path.join(WORKSPACE_BASE, session.id)
+        os.makedirs(session_dir, exist_ok=True)
+
+        # 创建初始文件
+        status_file = os.path.join(session_dir, "status.txt")
+        with open(status_file, "w", encoding="utf-8") as f:
+            f.write("created")
+
+        log_file = os.path.join(session_dir, "run.log")
+        with open(log_file, "w", encoding="utf-8") as f:
+            f.write(f"Session created: {session.id}\n")
+
         # 将模式存储在会话元数据中
         session.metadata["mode"] = mode
         logger.info(f"Created session: {session.id} with mode: {mode}")
+        logger.info(f"Workspace directory created: {session_dir}")
+
         return session
 
     except Exception as e:
@@ -178,19 +196,42 @@ async def get_messages(session_id: str):
     Returns:
         消息列表（包含部分）
     """
-    # 验证会话存在
-    session = await session_manager.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
-
-    # 获取消息
+    # 直接获取消息（会自动从数据库恢复如果不在内存中）
     messages = await session_manager.get_messages(session_id)
+
+    # 如果消息为空，说明session真的不存在
+    if not messages:
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
 
     return {
         "session_id": session_id,
         "messages": [msg.dict() for msg in messages],
         "count": len(messages),
     }
+
+
+@router.get("/session/{session_id}/timeline")
+async def get_session_timeline(session_id: str):
+    """
+    获取会话的时间轴（工具调用事件）
+
+    Args:
+        session_id: 会话ID
+
+    Returns:
+        时间轴事件列表
+    """
+    try:
+        timeline = await session_manager.get_timeline(session_id)
+
+        return {
+            "session_id": session_id,
+            "timeline": [step.dict() for step in timeline],
+            "count": len(timeline),
+        }
+    except Exception as e:
+        logger.error(f"Error getting timeline: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get timeline: {str(e)}")
 
 
 @router.post("/session/{session_id}/message", response_model=SendMessageResponse)
@@ -285,9 +326,17 @@ async def send_message(
             logger.error(f"Prompt enhancement failed, falling back to original: {pe}")
             enhanced_user_text = user_text
 
-        # 确定运行模式：请求指定优先（非 auto），其次是 Session 预设，最后默认为 auto
-        session_mode = session.metadata.get("mode") if hasattr(session, "metadata") and session.metadata else "auto"
-        run_mode = request.mode if request.mode != "auto" else (session_mode or "auto")
+        # 确定运行模式：请求指定优先（非 auto），其次是 Session 预设（非auto/非空），最后默认为 build
+        session_mode = getattr(session, "metadata", {}).get("mode", "auto")
+        # 修复：当mode为auto时，默认使用build而不是plan，确保有足够的工具调用
+        run_mode = request.mode if request.mode != "auto" else (session_mode if session_mode not in ["auto", None] else "build")
+
+        # 验证mode值合法性
+        VALID_MODES = {"auto", "plan", "build"}
+        if run_mode not in VALID_MODES:
+            logger.warning(f"Invalid mode '{run_mode}', falling back to 'build'")
+            run_mode = "build"
+
         logger.info(f"Sending message to {session_id} in mode: {run_mode}")
 
         background_tasks.add_task(
@@ -544,7 +593,6 @@ async def get_file_history(session_id: str, file_path: str):
                 "action": step.action,
                 "path": step.path,
                 "timestamp": step.timestamp,
-                "operation": step.action_type,
             }
             for step in timeline
             if step.path == file_path
