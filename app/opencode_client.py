@@ -438,6 +438,44 @@ class OpenCodeClient:
                     },
                 }
 
+        # ✅ 阶段2原型：尝试解析JSON格式的子代理事件
+        # CLI可能输出JSON格式的tool_use事件
+        if text.strip().startswith(('{', '[')):
+            try:
+                event_data = json.loads(text.strip())
+                
+                # 检查是否是tool_use事件
+                if isinstance(event_data, dict) and event_data.get('type') == 'tool_use':
+                    part = event_data.get('part', {})
+                    if part.get('type') == 'tool':
+                        # ✅ 解析成功，发送tool_event到前端
+                        tool_name = part.get('tool', 'unknown')
+                        tool_state = part.get('state', {})
+                        
+                        await self._broadcast_event(session_id, {
+                            "type": "tool_event",
+                            "data": {
+                                "type": "tool",
+                                "tool": tool_name,
+                                "tool_name": tool_name,
+                                "status": tool_state.get('status', 'running'),
+                                "input": tool_state.get('input', {}),
+                                "output": str(tool_state.get('output', '')),
+                                "title": tool_state.get('title', f'Using {tool_name}')
+                            },
+                            "timestamp": event_data.get('timestamp', int(datetime.now().timestamp() * 1000))
+                        })
+                        
+                        logger.debug(f"[_process_line] Parsed tool_event: {tool_name}")
+                        return  # 已处理，不再作为文本
+            
+            except json.JSONDecodeError:
+                # 不是有效的JSON，继续作为文本处理
+                pass
+            except Exception as e:
+                logger.warning(f"[_process_line] Error parsing JSON: {e}")
+                # 继续作为文本处理
+        
         # 过滤噪音
         # 先检查 ANSI 颜色代码和 CLI 警告（使用原始文本）
         if any(pattern in text for pattern in ["[0m", "[93m", "[1m", "\x1b["]):
