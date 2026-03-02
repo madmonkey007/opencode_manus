@@ -38,7 +38,81 @@
     // ✅ 代码质量改进：提取魔法数字为常量
     // 子会话配置常量
     const CHILD_SESSION_CLEANUP_DELAY_MS = 5000; // 子会话完成后的清理延迟（毫秒）
-    const RENDER_THROTTLE_MS = 100; // renderResults节流间隔（毫秒）
+    const RENDER_THROTTLE_MS = 250; // ✅ P0-5: renderResults节流间隔提高到250ms，减少渲染频率
+    const TYPING_EFFECT_TIMEOUT_MS = 30000; // ✅ P0-1: 打字机效果超时时间（30秒）
+
+    // ✅ P0-1 & P0-4: 打字机效果管理器（防止UI抖动 + 并发保护 + 超时恢复）
+    const TypingEffectManager = (function() {
+        let count = 0; // 并发计数器（支持多文件同时写入）
+        let timeout = null; // 超时定时器
+
+        return {
+            /**
+             * 开始打字机效果
+             * @param {string} reason - 开始原因（用于日志）
+             */
+            start(reason = 'unknown') {
+                count++;
+                console.log(`[TypingEffectManager] Start (count: ${count}, reason: ${reason})`);
+
+                // ✅ P0-1: 重置超时定时器
+                if (timeout) {
+                    clearTimeout(timeout);
+                }
+                timeout = setTimeout(() => {
+                    console.warn(`[TypingEffectManager] ⚠️ Timeout after ${TYPING_EFFECT_TIMEOUT_MS}ms, auto-resetting`);
+                    this.reset('timeout');
+                }, TYPING_EFFECT_TIMEOUT_MS);
+            },
+
+            /**
+             * 结束打字机效果
+             * @param {string} reason - 结束原因（用于日志）
+             */
+            end(reason = 'unknown') {
+                count = Math.max(0, count - 1);
+                console.log(`[TypingEffectManager] End (count: ${count}, reason: ${reason})`);
+
+                // ✅ P0-4: 当所有打字机效果都结束时，清除超时定时器
+                if (count === 0 && timeout) {
+                    clearTimeout(timeout);
+                    timeout = null;
+                }
+            },
+
+            /**
+             * 重置打字机效果（异常恢复）
+             * @param {string} reason - 重置原因（用于日志）
+             */
+            reset(reason = 'manual') {
+                const wasActive = count > 0;
+                count = 0;
+                if (timeout) {
+                    clearTimeout(timeout);
+                    timeout = null;
+                }
+                if (wasActive) {
+                    console.warn(`[TypingEffectManager] Reset (reason: ${reason})`);
+                }
+            },
+
+            /**
+             * 检查是否有打字机效果正在进行
+             * @returns {boolean}
+             */
+            isActive() {
+                return count > 0;
+            },
+
+            /**
+             * 获取当前活跃的打字机效果数量
+             * @returns {number}
+             */
+            getActiveCount() {
+                return count;
+            }
+        };
+    })();
 
     // 子会话ID解析模式
     const TASK_ID_PATTERN = /task_id:\s*(ses_[a-zA-Z0-9]+)/;
@@ -558,12 +632,24 @@
     }, 500);
 
     /**
-     * ✅ 代码质量改进：节流版本的渲染函数 - 限制UI更新频率（每100ms最多一次）
+     * ✅ 代码质量改进：节流版本的渲染函数 - 限制UI更新频率（每250ms最多一次）
      * 防止每次事件都触发完整的DOM重渲染，提升性能
      */
     const throttledRenderResults = throttle(() => {
-        if (typeof window.renderResults === 'function') {
-            window.renderResults();
+        // ✅ P0-3: 打字机效果期间跳过renderResults，防止UI抖动
+        if (TypingEffectManager.isActive()) {
+            console.log(`[NewAPI] Skipping renderResults during typing effect (active count: ${TypingEffectManager.getActiveCount()})`);
+            return;
+        }
+
+        // ✅ P0-3: 添加错误处理，防止renderResults异常导致事件流中断
+        try {
+            if (typeof window.renderResults === 'function') {
+                window.renderResults();
+            }
+        } catch (error) {
+            console.error('[NewAPI] Failed to render results:', error);
+            // 不中断事件流，继续处理
         }
     }, RENDER_THROTTLE_MS);
 
@@ -1080,11 +1166,14 @@
             if (adapted.type === 'file_preview_start') {
                 console.log('[NewAPI] File preview start:', adapted.file_path);
 
-                // ✅ 修复3：添加文件路径验证
+                // ✅ P0-1 & P0-4: 添加文件路径验证
                 if (!adapted.file_path) {
                     console.error('[NewAPI] preview_start missing file_path:', adapted);
                     return;
                 }
+
+                // ✅ P0-1 & P0-4: 使用TypingEffectManager开始打字机效果，暂停renderResults
+                TypingEffectManager.start(`file_preview_start: ${adapted.file_path}`);
 
                 // 显示文件编辑器
                 if (window.rightPanelManager && typeof window.rightPanelManager.showFileEditor === 'function') {
@@ -1119,9 +1208,21 @@
         if (adapted.type === 'file_preview_end') {
             console.log('[NewAPI] File preview end:', adapted.file_path);
 
+            // ✅ P0-1 & P0-4: 使用TypingEffectManager结束打字机效果，恢复renderResults
+            TypingEffectManager.end(`file_preview_end: ${adapted.file_path}`);
+
             // 更新状态为完成
             if (window.rightPanelManager && typeof window.rightPanelManager.setFileStatus === 'function') {
                 window.rightPanelManager.setFileStatus('完成');
+            }
+
+            // ✅ P0-3: 触发一次UI更新以显示最终状态（带错误处理）
+            try {
+                if (typeof window.renderResults === 'function') {
+                    window.renderResults();
+                }
+            } catch (error) {
+                console.error('[NewAPI] Failed to render results after preview end:', error);
             }
             return;
         }
@@ -1244,6 +1345,16 @@
             }
             
             s.currentPhase = adapted.phases.find(p => p.status === 'active')?.id || s.currentPhase;
+
+            // ✅ P0-3: 触发UI更新以显示phase状态变化（带错误处理）
+            try {
+                if (typeof window.renderPhases === 'function') {
+                    window.renderPhases();
+                }
+            } catch (error) {
+                console.error('[NewAPI] Failed to render phases:', error);
+                // 不中断事件流，继续处理
+            }
         } else if (adapted.type === 'deliverables') {
             s.deliverables = adapted.items || [];
         } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
@@ -1323,6 +1434,13 @@
 
                 // 判断事件类型并显示
                 if (adapted.type === 'thought') {
+                    // ✅ 修复5 + P0-4: 打字机效果期间不在右侧面板显示thought，避免覆盖文件预览
+                    if (TypingEffectManager.isActive()) {
+                        console.log(`[NewAPI] Thought event during typing (active count: ${TypingEffectManager.getActiveCount()}), skipping right panel display`);
+                        // 思考内容仍然被添加到orphanEvents数组，可以在历史中查看
+                        return;
+                    }
+
                     // 显示思考内容
                     const content = adapted.content || adapted.data?.text || '';
                     console.log('[NewAPI] 显示思考内容到右侧面板');

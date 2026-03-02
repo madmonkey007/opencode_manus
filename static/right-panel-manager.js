@@ -6,6 +6,7 @@ class RightPanelManager {
         this.filesTab = document.getElementById('tab-files');
         this.currentMode = null; // 'browser', 'file-editor', 'idle'
         this.fileEditorContainer = null;
+        this._scrollRAFPending = false; // ✅ v=28: 显式初始化RAF标志位
         this.init();
     }
 
@@ -344,12 +345,26 @@ class RightPanelManager {
         if (lineCountEl) lineCountEl.textContent = `${lineCount} 行`;
         if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
 
-        // 自动滚动到底部
-        const container = document.getElementById('file-editor-content');
-        if (container) {
-            container.scrollTop = container.scrollHeight;
+        // ✅ P0-2: 优化RAF滚动逻辑 - 使用标志位防止回调堆积
+        if (!this._scrollRAFPending) {
+            this._scrollRAFPending = true;
+
+            requestAnimationFrame(() => {
+                // 滚动主容器（只滚动最外层容器，减少重复计算）
+                const container = document.getElementById('file-editor-content');
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+
+                // 滚动主面板内容（如果存在）
+                const panelContent = document.querySelector('.right-panel .panel-content');
+                if (panelContent) {
+                    panelContent.scrollTop = panelContent.scrollHeight;
+                }
+
+                this._scrollRAFPending = false;
+            });
         }
-        pre.scrollTop = pre.scrollHeight;
     }
 
     // 设置文件状态
