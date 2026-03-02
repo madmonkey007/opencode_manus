@@ -1413,15 +1413,21 @@
 
             // ✅ v=29: 添加任务完成消息
             // ✅ v=30: 修复不可靠检查 - 使用标志位而不是字符串搜索
+            // ✅ v=31: 修复标志位持久化问题 - 同时检查标志位和response内容
             if (!isError) {
-                // 使用标志位检查是否已添加总结
-                if (!s._hasCompletionSummary) {
+                // 双重检查：防止标志位丢失或response已包含总结
+                const SUMMARY_MARKER = '**✅ 任务完成**';
+                const hasSummaryInResponse = s.response && s.response.includes(SUMMARY_MARKER);
+                const hasSummaryFlag = s._hasCompletionSummary;
+
+                // 只在两种情况都不存在时才添加总结
+                if (!hasSummaryInResponse && !hasSummaryFlag) {
                     // 计算任务统计信息
                     const totalActions = s.actions ? s.actions.length : 0;
                     const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
 
                     // 添加总结到response末尾
-                    const summary = `\n\n---\n\n**✅ 任务完成**\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
+                    const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
                     s.response += summary;
                     s._hasCompletionSummary = true; // 设置标志位
 
@@ -1431,6 +1437,15 @@
                     }
 
                     console.log('[NewAPI] Task summary added:', summary.trim());
+                } else {
+                    if (hasSummaryInResponse && hasSummaryFlag) {
+                        console.log('[NewAPI] Task summary already exists (both flag and response)');
+                    } else if (hasSummaryInResponse) {
+                        console.log('[NewAPI] Task summary exists in response but flag is missing, fixing flag');
+                        s._hasCompletionSummary = true;
+                    } else {
+                        console.log('[NewAPI] Task summary flag exists but response missing summary');
+                    }
                 }
             } else {
                 // 错误总结
