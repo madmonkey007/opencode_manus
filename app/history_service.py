@@ -19,11 +19,13 @@ class HistoryService:
     def _init_db(self):
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            # 会话表
+            # 会话表 - 添加title和mode字段
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     session_id TEXT PRIMARY KEY,
                     prompt TEXT,
+                    title TEXT,
+                    mode TEXT DEFAULT 'auto',
                     start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     status TEXT DEFAULT 'active'
                 )
@@ -53,16 +55,28 @@ class HistoryService:
                     FOREIGN KEY (step_id) REFERENCES steps (step_id)
                 )
             """)
+
+            # 添加缺失的列（如果表已存在）
+            try:
+                cursor.execute("ALTER TABLE sessions ADD COLUMN title TEXT")
+            except:
+                pass  # 列已存在
+
+            try:
+                cursor.execute("ALTER TABLE sessions ADD COLUMN mode TEXT DEFAULT 'auto'")
+            except:
+                pass  # 列已存在
+
             conn.commit()
 
-    async def capture_tool_use(self, session_id: str, tool_name: str, tool_input: dict, step_id: str = None) -> dict:
+    async def capture_tool_use(self, session_id: str, tool_name: str, tool_input: dict, step_id: str = None, mode: str = "auto") -> dict:
         if not step_id:
             step_id = str(uuid.uuid4())
-        
+
         # 尝试推断 action_type 和 file_path
         action_type = "call"
         file_path = ""
-        
+
         if tool_name in ["write", "create_file"]:
             action_type = "write"
             file_path = str(tool_input.get("file_path") or tool_input.get("path") or "")
@@ -71,20 +85,23 @@ class HistoryService:
             file_path = str(tool_input.get("file_path") or tool_input.get("path") or "")
         elif tool_name in ["bash", "shell", "terminal"]:
             action_type = "bash"
-        
+
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                # 确保会话存在
-                cursor.execute("INSERT OR IGNORE INTO sessions (session_id, status) VALUES (?, ?)", (session_id, 'active'))
-                
+                # 确保会话存在 - 同时保存mode
+                cursor.execute("""
+                    INSERT OR REPLACE INTO sessions (session_id, status, mode, start_time)
+                    VALUES (?, 'active', ?, CURRENT_TIMESTAMP)
+                """, (session_id, mode))
+
                 # 记录步骤
                 cursor.execute("""
                     INSERT INTO steps (step_id, session_id, tool_name, tool_input, action_type, file_path)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, (step_id, session_id, tool_name, json.dumps(tool_input), action_type, file_path))
+                """, (step_id, session_id, tool_name, json.dumps(tool_input, ensure_ascii=False), action_type, file_path))
                 conn.commit()
-                
+
             return {
                 "step_id": step_id,
                 "action_type": action_type,

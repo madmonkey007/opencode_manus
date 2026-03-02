@@ -9,6 +9,28 @@
 
     const ENABLE_NEW_API = true;
 
+    // ✅ 修复1：提取重复的icons和labels定义为常量，消除重复代码
+    const MODE_CONFIG = {
+        plan: {
+            icon: 'psychology',
+            label: 'Plan (分析)',
+            title: 'Plan (分析模式)',
+            desc: '仅制定计划和分析，不修改文件'
+        },
+        build: {
+            icon: 'build',
+            label: 'Build (开发)',
+            title: 'Build (开发模式)',
+            desc: '全自动执行，支持读写文件及运行代码'
+        },
+        auto: {
+            icon: 'auto_awesome',
+            label: 'Auto (智能)',
+            title: 'Auto (智能模式)',
+            desc: '由 OpenCode 根据任务自动选择'
+        }
+    };
+
     function init() {
         console.log('[NewAPI] Initializing V2.8 Patch (Advanced UI Mode)...');
 
@@ -66,6 +88,9 @@
                         }
                         // 更新跟踪的会话ID
                         lastActiveId = state.activeId;
+
+                        // 更新模式选择器显示
+                        updateModeSelectorDisplay(state);
                     }
 
                     return result;
@@ -217,29 +242,34 @@
         // 注入模式选择器到输入框下方按钮栏
         const target = document.querySelector('#bottom-input-container .flex.items-center.gap-1');
         if (target) {
-            const container = document.createElement('div');
-            container.className = 'mode-selector-container';
-            container.innerHTML = `
-                <div class="mode-active-display" id="mode-trigger">
-                    <span class="material-symbols-outlined !text-[16px]">psychology</span>
-                    <span class="mode-label" id="active-mode-name">Plan (分析)</span>
-                    <span class="material-symbols-outlined arrow">expand_more</span>
-                </div>
-                <div class="mode-dropdown" id="mode-dropdown">
-                    <div class="mode-option active" data-mode="plan">
-                        <span class="mode-option-title">Plan (分析模式)</span>
-                        <span class="mode-option-desc">仅制定计划和分析，不修改文件</span>
-                    </div>
-                    <div class="mode-option" data-mode="build">
-                        <span class="mode-option-title">Build (开发模式)</span>
-                        <span class="mode-option-desc">全自动执行，支持读写文件及运行代码</span>
-                    </div>
-                    <div class="mode-option" data-mode="auto">
-                        <span class="mode-option-title">Auto (智能模式)</span>
-                        <span class="mode-option-desc">由 OpenCode 根据任务自动选择</span>
-                    </div>
-                </div>
-            `;
+            // 从当前session获取mode，如果没有则使用window._currentMode，最后默认为plan
+            const activeId = window.state?.activeId;
+            const activeSession = window.state?.sessions?.find(s => s.id === activeId);
+             const currentMode = activeSession?.mode || window._currentMode || 'plan';
+
+             const container = document.createElement('div');
+             container.className = 'mode-selector-container';
+             container.innerHTML = `
+                 <div class="mode-active-display" id="mode-trigger">
+                     <span class="material-symbols-outlined !text-[16px]">${MODE_CONFIG[currentMode].icon}</span>
+                     <span class="mode-label" id="active-mode-name">${MODE_CONFIG[currentMode].label}</span>
+                     <span class="material-symbols-outlined arrow">expand_more</span>
+                 </div>
+                 <div class="mode-dropdown" id="mode-dropdown">
+                     <div class="mode-option ${currentMode === 'plan' ? 'active' : ''}" data-mode="plan">
+                         <span class="mode-option-title">${MODE_CONFIG.plan.title}</span>
+                         <span class="mode-option-desc">${MODE_CONFIG.plan.desc}</span>
+                     </div>
+                     <div class="mode-option ${currentMode === 'build' ? 'active' : ''}" data-mode="build">
+                         <span class="mode-option-title">${MODE_CONFIG.build.title}</span>
+                         <span class="mode-option-desc">${MODE_CONFIG.build.desc}</span>
+                     </div>
+                     <div class="mode-option ${currentMode === 'auto' ? 'active' : ''}" data-mode="auto">
+                         <span class="mode-option-title">${MODE_CONFIG.auto.title}</span>
+                         <span class="mode-option-desc">${MODE_CONFIG.auto.desc}</span>
+                     </div>
+                 </div>
+             `;
             target.appendChild(container);
 
             const trigger = container.querySelector('#mode-trigger');
@@ -284,10 +314,9 @@
                 console.log('[NewAPI] Agent mode switched to:', mode);
             });
         }
-        window._currentMode = 'plan';
         window._turnIndex = 0; // 追踪对话轮次
 
-        // 初始化欢迎页模式选择器
+        // 初始化欢迎页模式选择器（会在内部设置默认模式为 build）
         initWelcomeModeSelector();
     }
 
@@ -334,6 +363,123 @@
         });
 
         console.log('[NewAPI] Welcome mode selector initialized with default mode: build');
+    }
+
+    /**
+     * DOM元素缓存（优化性能，带生命周期验证）
+     */
+    const modeSelectorCache = {
+        modeLabel: null,
+        modeTrigger: null,
+        dropdown: null,
+        initialized: false,
+
+        init() {
+            // ✅ 修复：验证缓存的元素是否仍在DOM中
+            if (this.initialized) {
+                const stillInDOM = (this.modeLabel?.isConnected || document.contains(this.modeLabel)) &&
+                                  (this.modeTrigger?.isConnected || document.contains(this.modeTrigger));
+                if (stillInDOM) {
+                    return; // 缓存仍然有效
+                }
+                // DOM已重建，重新初始化
+                console.log('[NewAPI] DOM cache invalidated, re-initializing');
+            }
+
+            // 重新初始化
+            this.modeLabel = document.getElementById('active-mode-name');
+            this.modeTrigger = document.getElementById('mode-trigger');
+            this.dropdown = document.getElementById('mode-dropdown');
+
+            // 只有在元素存在时才标记为已初始化
+            this.initialized = !!(this.modeLabel && this.modeTrigger);
+
+            if (!this.initialized) {
+                console.warn('[NewAPI] Failed to initialize DOM cache - elements not found');
+            }
+        },
+
+        reset() {
+            this.initialized = false;
+            this.modeLabel = null;
+            this.modeTrigger = null;
+            this.dropdown = null;
+        }
+    };
+
+    /**
+     * 防抖工具函数
+     */
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func.apply(this, args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    /**
+     * ✅ 修复3：节流工具函数 - 限制函数执行频率
+     * @param {Function} func - 要节流的函数
+     * @param {number} limit - 时间限制（毫秒）
+     * @returns {Function} 节流后的函数
+     */
+    function throttle(func, limit) {
+        let inThrottle;
+        return function(...args) {
+            if (!inThrottle) {
+                func.apply(this, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        };
+    }
+
+    /**
+     * 更新模式选择器显示以匹配当前session的mode（性能优化版）
+     */
+    function updateModeSelectorDisplay(state) {
+        if (!state || !state.activeId) return;
+
+        // ✅ 修复：使用最新的state避免快速切换时的竞态条件
+        const activeSession = state.sessions.find(s => s.id === state.activeId);
+        if (!activeSession || !activeSession.mode) return;
+
+        const mode = activeSession.mode;
+
+        // 使用缓存的DOM元素
+        modeSelectorCache.init();
+        const { modeLabel, modeTrigger, dropdown } = modeSelectorCache;
+
+        // ✅ 修复：添加警告日志便于调试
+        if (!modeLabel || !modeTrigger) {
+            console.warn('[NewAPI] Mode selector DOM elements not found, skipping update for session:', state.activeId);
+            return;
+        }
+
+        // ✅ 修复1：使用MODE_CONFIG常量，消除重复代码
+        // 更新显示文本和图标
+        modeLabel.textContent = MODE_CONFIG[mode].label;
+        const iconSpan = modeTrigger.querySelector('.material-symbols-outlined');
+        if (iconSpan && !iconSpan.classList.contains('arrow')) {
+            iconSpan.textContent = MODE_CONFIG[mode].icon;
+        }
+
+        // 更新下拉菜单的选中状态
+        if (dropdown) {
+            dropdown.querySelectorAll('.mode-option').forEach(opt => {
+                opt.classList.remove('active');
+                if (opt.dataset.mode === mode) {
+                    opt.classList.add('active');
+                }
+            });
+        }
+
+        console.log('[NewAPI] Mode selector updated to:', mode, 'for session:', state.activeId);
     }
 
     /**
@@ -384,6 +530,36 @@
     }
 
     /**
+     * ✅ 修复3：节流版本的状态更新函数 - 限制DOM更新频率（每500ms最多更新一次）
+     * 防止每个字符delta都触发DOM更新
+     */
+    const throttledSetFileStatus = throttle((status) => {
+        if (window.rightPanelManager && typeof window.rightPanelManager.setFileStatus === 'function') {
+            window.rightPanelManager.setFileStatus(status);
+        }
+    }, 500);
+
+    /**
+     * 防抖版本的saveState（优化性能，避免频繁写入localStorage）
+     * ✅ 修复：缩短防抖时间至100ms，减少数据丢失窗口
+     */
+    const debouncedSaveState = debounce(() => {
+        if (typeof window.saveState === 'function') {
+            window.saveState();
+        }
+    }, 100);
+
+    /**
+     * ✅ 修复：页面卸载前立即保存状态，防止数据丢失
+     */
+    window.addEventListener('beforeunload', () => {
+        if (typeof window.saveState === 'function') {
+            console.log('[NewAPI] Page unloading, saving state immediately');
+            window.saveState();
+        }
+    });
+
+    /**
      * 准备并切换 Session
      */
     async function prepareSession(prompt, isWelcome) {
@@ -392,7 +568,7 @@
 
         // 如果是新任务，或者当前没有活跃 ID，则创建
         if (!existing || isWelcome) {
-            const mode = window._currentMode || 'plan';
+            const mode = window._currentMode || 'build';
             console.log('[NewAPI] Creating new session with mode:', mode);
             const session = await window.apiClient.createSession(prompt, mode);
 
@@ -402,11 +578,22 @@
                 prompt: prompt,
                 response: '',
                 phases: [],
+                actions: [],          // ✅ 必须初始化，否则刷新后数据丢失
+                orphanEvents: [],      // ✅ 必须初始化
                 deliverables: [],
                 status: 'active',
-                mode: mode // 保存模式
+                mode: mode,
+                _version: 1,          // ✅ 添加版本号用于数据迁移
+                _createdTime: Date.now()  // ✅ 添加创建时间，用于宽限期判断
             };
             window.state.sessions.unshift(existing);
+            window.state.activeId = existing.id;  // ✅ 立即更新activeId，防止临时session被误删
+
+            // ✅ 立即保存新创建的session，确保不会丢失
+            if (typeof window.saveState === 'function') {
+                console.log('[prepareSession] Saving new session to localStorage');
+                window.saveState();
+            }
         }
         return existing;
     }
@@ -427,7 +614,7 @@
         try {
             // 准备 Session
             const s = await prepareSession(promptValue, isWelcome);
-            const mode = s.mode || window._currentMode || 'plan';
+            const mode = s.mode || window._currentMode || 'build';
             console.log(`[NewAPI] Connecting to events... (Mode: ${mode})`);
 
             // 使用 handleNewAPIConnection 处理完整的连接和事件流
@@ -519,6 +706,17 @@
 
                 processEvent(s, adapted);
 
+                // ✅ 优化：使用防抖机制在关键事件后保存状态（避免频繁写入localStorage）
+                const shouldSave = adapted.type === 'answer_chunk' ||
+                                   adapted.type === 'action' ||
+                                   adapted.type === 'phases_init' ||
+                                   adapted.type === 'phase_update' ||
+                                   (adapted.type === 'status' && (adapted.value === 'done' || adapted.value === 'completed'));
+
+                if (shouldSave) {
+                    debouncedSaveState();
+                }
+
                 // 实时渲染
                 if (typeof window.renderResults === 'function' && window.state.activeId === s.id) {
                     window.renderResults();
@@ -556,21 +754,37 @@
     }
 
     function processEvent(s, adapted) {
-        // 处理文件预览事件 - 更新右侧文件面板（带打字机效果）
-        if (adapted.type === 'file_preview_start') {
-            console.log('[NewAPI] File preview start:', adapted.file_path);
+        // ✅ 添加错误边界：确保任何事件处理异常都不会中断整个数据流
+        try {
+            // 处理文件预览事件 - 更新右侧文件面板（带打字机效果）
+            if (adapted.type === 'file_preview_start') {
+                console.log('[NewAPI] File preview start:', adapted.file_path);
 
-            // 显示文件编辑器
-            if (window.rightPanelManager && typeof window.rightPanelManager.showFileEditor === 'function') {
-                window.rightPanelManager.showFileEditor(adapted.file_path, '');
+                // ✅ 修复3：添加文件路径验证
+                if (!adapted.file_path) {
+                    console.error('[NewAPI] preview_start missing file_path:', adapted);
+                    return;
+                }
+
+                // 显示文件编辑器
+                if (window.rightPanelManager && typeof window.rightPanelManager.showFileEditor === 'function') {
+                    window.rightPanelManager.showFileEditor(adapted.file_path, '');
+                }
+                return;
             }
-            return;
-        }
 
         if (adapted.type === 'file_preview_delta') {
+            // ✅ 修复3：添加delta数据验证
+            if (!adapted.delta) {
+                console.error('[NewAPI] file_preview_delta missing delta:', adapted);
+                return;
+            }
+
             // delta 是对象格式: {type: "insert", position: i, content: char}
-            const deltaContent = adapted.delta?.content || '';
-            console.log('[NewAPI] File preview delta:', deltaContent.substring(0, Math.min(50, deltaContent.length)) + (deltaContent.length > 50 ? '...' : ''));
+            const deltaContent = adapted.delta?.content !== undefined ? String(adapted.delta.content) : '';
+
+            // ✅ 修复3：使用节流版本更新UI状态，限制DOM更新频率（每500ms最多一次）
+            throttledSetFileStatus('正在写入...');
 
             // 使用打字机效果追加内容
             if (window.rightPanelManager && typeof window.rightPanelManager.typeAppendContent === 'function') {
@@ -592,12 +806,74 @@
             return;
         }
 
-        // 处理时间轴事件 - 更新右侧文件面板
-        if (adapted.type === 'timeline_event') {
-            console.log('[NewAPI] Timeline event:', adapted);
-            // 可以在这里触发右侧面板更新
+        // ✅ 修复：处理文件生成事件 - 更新文件列表
+        if (adapted.type === 'file_generated') {
+            console.log('[NewAPI] File generated:', adapted.file.path);
+
+            // 更新文件列表管理器
+            if (window.filesManager && typeof window.filesManager.addFile === 'function') {
+                window.filesManager.addFile(adapted.file);
+            }
+
+            // 可选：也在右侧面板显示文件生成信息
+            const fileInfo = `文件: ${adapted.file.name}\n路径: ${adapted.file.path}\n类型: ${adapted.file.type}`;
+            if (window.rightPanelManager && typeof window.rightPanelManager.showFileEditor === 'function') {
+                // 如果文件编辑器已打开，更新内容
+                // 否则不强制显示，避免打扰用户
+                console.log('[NewAPI] File info:', fileInfo);
+            }
             return;
         }
+
+        // 处理时间轴事件 - 更新右侧文件面板
+            if (adapted.type === 'timeline_event') {
+                console.log('[NewAPI] Timeline event:', adapted);
+
+                // 渲染timeline事件到右侧面板
+                if (adapted.step) {
+                    const step = adapted.step;
+                    const action = step.action || step.action_type || 'unknown';
+                    const path = step.path || step.file_path || '';
+
+                    // 构建事件标题和内容
+                    let title = `[${action}]`;
+                    if (path) {
+                        title += ` ${path}`;
+                    } else if (step.tool_name) {
+                        title += ` ${step.tool_name}`;
+                    } else {
+                        title += ' 事件';
+                    }
+
+                    let content = `Step ID: ${step.step_id}\n`;
+                    content += `Action: ${action}\n`;
+                    if (path) content += `Path: ${path}\n`;
+                    if (step.timestamp) content += `Timestamp: ${step.timestamp}\n`;
+                    if (step.tool_input) {
+                        content += `Input: ${JSON.stringify(step.tool_input, null, 2)}\n`;
+                    }
+
+                    // 显示到右侧面板
+                    if (window.rightPanelManager) {
+                        if (typeof window.rightPanelManager.show === 'function') {
+                            window.rightPanelManager.show();
+                        }
+                        if (typeof window.rightPanelManager.switchTab === 'function') {
+                            window.rightPanelManager.switchTab('preview');
+                        }
+                        if (typeof window.rightPanelManager.showFileEditor === 'function') {
+                            window.rightPanelManager.showFileEditor(title, content);
+                        }
+                    }
+
+                    // 同时显示在console区域
+                    if (typeof window.addSystemMessage === 'function') {
+                        window.addSystemMessage(`[Timeline] ${title}`, 'info');
+                    }
+                }
+
+                return;
+            }
 
         if (adapted.type === 'answer_chunk') {
             // 支持多轮对话分隔符
@@ -693,6 +969,25 @@
             const phase = s.phases.find(p => p.id === adapted.phase_id);
             if (phase) phase.status = 'completed';
         } else if (adapted.type === 'action' || adapted.type === 'thought' || adapted.type === 'error') {
+            // ✅ 修复：更新 session 的 actions 和 orphanEvents 数组
+            if (adapted.type === 'action') {
+                const actionEvent = {
+                    type: 'action',
+                    id: adapted.id || adapted.call_id,
+                    data: adapted.data || {}
+                };
+
+                // 确保 actions 和 orphanEvents 数组存在
+                if (!s.actions) s.actions = [];
+                if (!s.orphanEvents) s.orphanEvents = [];
+
+                // 添加到数组
+                s.actions.push(actionEvent);
+                s.orphanEvents.push(actionEvent);
+
+                console.log('[NewAPI] Added action to session:', actionEvent.data.tool_name, 'total actions:', s.actions.length);
+            }
+
             // 实时显示到右侧面板
             if (window.rightPanelManager) {
                 const data = adapted.data || {};
@@ -796,19 +1091,7 @@
 
                 const eventId = adapted.id || (adapted.data && (adapted.data.id || adapted.data.call_id)) || adapted.message_id;
 
-                if (!targetPhase.events) targetPhase.events = [];
-                
-                // 增加 event_id 去重检查，防止重复添加相同动作
-                const isDuplicate = eventId && targetPhase.events.some(e => {
-                    const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;
-                    return eId === eventId;
-                });
-
-                if (isDuplicate) {
-                    console.log('[NewAPI] Skipping duplicate event:', eventId);
-                    return;
-                }
-
+                // ✅ 修复：统一的事件更新逻辑（删除了冗余的去重检查）
                 let existingEventIndex = -1;
 
                 if (eventId) {
@@ -860,8 +1143,150 @@
                 }
             }
         }
+        } catch (error) {
+            // ✅ 修复C5: 错误处理 - 标记session可能处于不一致状态
+            console.error('[processEvent] Error processing event:', adapted.type, error);
+            console.error('[processEvent] Event data:', adapted);
+            console.error('[processEvent] Stack trace:', error.stack);
+
+            // 标记session有处理错误
+            s._hasProcessingError = true;
+            s._lastError = {
+                type: adapted.type,
+                message: error.message,
+                timestamp: Date.now()
+            };
+
+            // 确保至少保存当前状态
+            if (typeof window.saveState === 'function') {
+                try {
+                    window.saveState();
+                    console.log('[processEvent] Emergency save completed (session may be inconsistent)');
+                } catch (saveError) {
+                    console.error('[processEvent] Emergency save failed:', saveError);
+                }
+            }
+
+            // 显示用户警告
+            console.warn('[processEvent] Some data may be inconsistent for session:', s.id);
+        }
+    }
+
+    // 加载会话的完整timeline
+    async function loadSessionTimeline(sessionId) {
+        try {
+            console.log(`[History] Loading timeline for session: ${sessionId}`);
+
+            const response = await fetch(`/opencode/session/${sessionId}/timeline`);
+            if (!response.ok) {
+                console.error(`[History] Failed to load timeline: ${response.status}`);
+                return;
+            }
+
+            const data = await response.json();
+            const timeline = data.timeline || [];
+
+            console.log(`[History] Loaded ${timeline.length} timeline events`);
+
+            // 渲染每个timeline事件
+            timeline.forEach(step => {
+                const adapted = {
+                    type: 'timeline_event',
+                    step: step,
+                    id: step.step_id
+                };
+
+                // ✅ 修复：sessions是数组，使用find查找
+                const session = window.state.sessions ?
+                               window.state.sessions.find(s => s.id === sessionId) : null;
+                if (session) {
+                    processEvent(session, adapted);
+                }
+            });
+
+            console.log(`[History] Timeline rendering complete for session: ${sessionId}`);
+
+        } catch (error) {
+            console.error(`[History] Error loading timeline:`, error);
+        }
+    }
+
+    // 增强历史记录点击处理
+    async function handleHistorySessionClick(sessionId) {
+        console.log(`[History] Loading session: ${sessionId}`);
+
+        try {
+            const response = await fetch(`/opencode/session/${sessionId}/messages`);
+            if (!response.ok) {
+                throw new Error(`Failed to load session: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // ✅ 修复：sessions是数组，不是对象
+            if (!window.state.sessions) {
+                window.state.sessions = [];
+            }
+
+            // 查找或创建session
+            let s = window.state.sessions.find(sess => sess.id === sessionId);
+            if (!s) {
+                s = {
+                    id: sessionId,
+                    phases: [],
+                    actions: [],
+                    orphanEvents: [],
+                    deliverables: [],
+                    currentPhase: null,
+                    prompt: '',
+                    response: ''
+                };
+                window.state.sessions.push(s);
+            }
+
+            if (data.messages && Array.isArray(data.messages)) {
+                data.messages.forEach(msg => {
+                    const info = msg.info || {};
+                    const parts = msg.parts || [];
+
+                    parts.forEach(part => {
+                        let adapted;
+                        if (part.type === 'text') {
+                            adapted = {
+                                type: info.role === 'user' ? 'user_message' : 'text',
+                                content: part.content.text || '',
+                                id: info.id
+                            };
+                            processEvent(s, adapted);
+                        } else if (part.type === 'tool') {
+                            const content = part.content;
+                            adapted = {
+                                type: 'action',
+                                data: {
+                                    tool_name: content.tool,
+                                    id: content.call_id,
+                                    input: content.tool_input
+                                },
+                                id: content.call_id
+                            };
+                            processEvent(s, adapted);
+                        }
+                    });
+                });
+            }
+
+            await loadSessionTimeline(sessionId);
+
+            console.log(`[History] Session loaded complete: ${sessionId}`);
+
+        } catch (error) {
+            console.error(`[History] Error loading session:`, error);
+        }
     }
 
     init();
 
+    // 暴露函数到全局作用域
+    window.loadSessionTimeline = loadSessionTimeline;
+    window.handleHistorySessionClick = handleHistorySessionClick;
 })();

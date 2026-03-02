@@ -23,10 +23,17 @@ class OpenCodeAPIClient {
      * @returns {Promise<Session>}
      */
     async createSession(title = 'New Session', mode = 'auto') {
-        const url = `${this.baseURL}/opencode/session?title=${encodeURIComponent(title)}&mode=${encodeURIComponent(mode)}`;
-        const response = await fetch(url, { method: 'POST' });
+        const url = `${this.baseURL}/opencode/session`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title, mode })
+        });
         if (!response.ok) {
-            throw new Error(`Failed to create session: ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`Failed to create session: ${response.status} - ${errorText}`);
         }
         return await response.json();
     }

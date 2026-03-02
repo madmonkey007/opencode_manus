@@ -8,6 +8,18 @@
  * - 历史回溯功能
  */
 
+// ✅ 修复4：UI字符串常量定义，避免魔法字符串
+const UI_STRINGS = {
+    STATUS_GENERATING: '正在生成...',
+    STATUS_WRITING: '正在写入...',
+    STATUS_COMPLETE: '完成',
+    STATUS_ERROR: '错误',
+    MODE_PLAN: 'Plan (分析)',
+    MODE_BUILD: 'Build (开发)',
+    MODE_RUN: 'Run (运行)',
+    MODE_TASK: 'Task (任务)'
+};
+
 class EnhancedCodePreviewOverlay {
     constructor() {
         this.overlay = null;

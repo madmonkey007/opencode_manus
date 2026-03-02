@@ -310,6 +310,14 @@ class RightPanelManager {
     }
 
     // 打字机效果追加内容
+    /**
+     * 追加文件预览内容（支持SSE流式显示）
+     *
+     * 策略：累积小块内容后批量显示，避免逐字符太慢
+     * - 如果SSE发送的是小块内容（<50字符），立即显示
+     * - 如果SSE发送的是大块内容（≥50字符），也立即显示
+     * - 不创建内部队列，信任SSE的时序控制
+     */
     typeAppendContent(content) {
         if (this.currentMode !== 'file-editor') return;
         if (!content || content.length === 0) return;
@@ -321,39 +329,27 @@ class RightPanelManager {
         // 显示光标
         if (cursor) cursor.style.display = 'block';
 
-        let index = 0;
-        const speed = 5; // 每个字符的延迟（毫秒）
+        // ✅ 策略：直接追加内容，按SSE发送的块显示
+        // 后端已经控制了发送节奏，前端立即显示即可
+        pre.textContent += content;
 
-        const typeNextChar = () => {
-            if (index < content.length) {
-                const char = content[index];
-                pre.textContent += char;
+        // 更新统计
+        const fullContent = pre.textContent;
+        const lineCount = fullContent.split('\n').length;
+        const charCount = fullContent.length;
 
-                // 更新统计
-                const fullContent = pre.textContent;
-                const lineCount = fullContent.split('\n').length;
-                const charCount = fullContent.length;
+        const lineCountEl = document.getElementById('file-line-count');
+        const charCountEl = document.getElementById('file-char-count');
 
-                const lineCountEl = document.getElementById('file-line-count');
-                const charCountEl = document.getElementById('file-char-count');
+        if (lineCountEl) lineCountEl.textContent = `${lineCount} 行`;
+        if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
 
-                if (lineCountEl) lineCountEl.textContent = `${lineCount} 行`;
-                if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
-
-                // 自动滚动到底部
-                const container = document.getElementById('file-editor-content');
-                if (container) container.scrollTop = container.scrollHeight;
-                pre.scrollTop = pre.scrollHeight;
-
-                index++;
-                setTimeout(typeNextChar, speed);
-            } else {
-                // 完成，隐藏光标
-                if (cursor) cursor.style.display = 'none';
-            }
-        };
-
-        typeNextChar();
+        // 自动滚动到底部
+        const container = document.getElementById('file-editor-content');
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+        }
+        pre.scrollTop = pre.scrollHeight;
     }
 
     // 设置文件状态

@@ -168,6 +168,179 @@ class MessageStore:
 
         return self.messages[session_id].get(message_id)
 
+    async def restore_session_from_db(self, session_id: str) -> bool:
+        """
+        从数据库恢复会话到内存
+
+        Args:
+            session_id: 会话ID
+
+        Returns:
+            是否成功恢复
+        """
+        try:
+            import sqlite3
+            from pathlib import Path
+
+            # 查找数据库文件
+            db_path = Path("history.db")
+            if not db_path.exists():
+                logger.warning(f"Database file not found: {db_path}")
+                return False
+
+            # 初始化内存结构
+            if session_id not in self.messages:
+                self.messages[session_id] = {}
+            if session_id not in self.parts:
+                self.parts[session_id] = {}
+            if session_id not in self.message_order:
+                self.message_order[session_id] = []
+            if session_id not in self.file_snapshots:
+                self.file_snapshots[session_id] = []
+            if session_id not in self.timelines:
+                self.timelines[session_id] = []
+
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            # 检查会话是否存在
+            cursor.execute("SELECT COUNT(*) as cnt FROM sessions WHERE session_id = ?", (session_id,))
+            if cursor.fetchone()["cnt"] == 0:
+                logger.warning(f"Session {session_id} not found in database")
+                conn.close()
+                return False
+
+            # 读取messages表
+            cursor.execute("""
+                SELECT message_id, session_id, role, created_at
+                FROM messages
+                WHERE session_id = ?
+                ORDER BY created_at ASC
+            """, (session_id,))
+
+            rows = cursor.fetchall()
+            if not rows:
+                logger.warning(f"No messages found for session {session_id}")
+                conn.close()
+                return False
+
+            for row in rows:
+                message_id = row["message_id"]
+                role = row["role"]
+                created_at = row["created_at"]
+
+                # 创建Message对象
+                from .models import MessageTime, MessageRole as MR
+                message = Message(
+                    id=message_id,
+                    session_id=session_id,
+                    role=MR(role),
+                    time=MessageTime(
+                        created=int(datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").timestamp())
+                    )
+                )
+
+                # 存储到内存
+                self.messages[session_id][message_id] = message
+                if message_id not in self.message_order[session_id]:
+                    self.message_order[session_id].append(message_id)
+
+                # 初始化parts字典
+                self.parts[session_id][message_id] = {}
+
+            # 读取message_parts表（如果存在）
+            try:
+                cursor.execute("""
+                    SELECT part_id, message_id, part_type, content_json, created_at
+                    FROM message_parts
+                    WHERE message_id IN (
+                        SELECT message_id FROM messages WHERE session_id = ?
+                    )
+                    ORDER BY created_at ASC
+                """, (session_id,))
+
+                part_rows = cursor.fetchall()
+                for part_row in part_rows:
+                    from .models import Part, PartType, PartTime, PartContent
+                    import json
+
+                    # 解析content_json
+                    content_data = json.loads(part_row["content_json"]) if part_row["content_json"] else {}
+
+                    # 创建PartContent对象
+                    part_content = PartContent(
+                        text=content_data.get("text"),
+                        tool=content_data.get("tool"),
+                        call_id=content_data.get("call_id")
+                    )
+
+                    # 创建PartTime对象
+                    created_at = part_row["created_at"]
+                    if created_at:
+                        part_time = PartTime(
+                            start=int(datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").timestamp())
+                        )
+                    else:
+                        import time as time_module
+                        part_time = PartTime(
+                            start=int(time_module.time())
+                        )
+
+                    # 创建Part对象
+                    part = Part(
+                        id=part_row["part_id"],
+                        session_id=session_id,
+                        message_id=part_row["message_id"],
+                        type=PartType(part_row["part_type"]),
+                        content=part_content,
+                        time=part_time
+                    )
+                    message_id = part_row["message_id"]
+                    if message_id not in self.parts[session_id]:
+                        self.parts[session_id][message_id] = {}
+                    self.parts[session_id][message_id][part.id] = part
+            except sqlite3.OperationalError:
+                # message_parts表可能不存在
+                logger.debug("message_parts table does not exist, skipping")
+            except Exception as e:
+                logger.warning(f"Error restoring message_parts: {e}")
+
+            # 读取steps表（工具调用事件）
+            try:
+                cursor.execute("""
+                    SELECT step_id, session_id, action_type, file_path, timestamp
+                    FROM steps
+                    WHERE session_id = ?
+                    ORDER BY timestamp ASC
+                """, (session_id,))
+
+                step_rows = cursor.fetchall()
+                for step_row in step_rows:
+                    from .models import TimelineStep
+
+                    step = TimelineStep(
+                        step_id=step_row["step_id"],
+                        action=step_row["action_type"],
+                        path=step_row["file_path"] or "",
+                        timestamp=int(datetime.strptime(
+                            step_row["timestamp"], "%Y-%m-%d %H:%M:%S"
+                        ).timestamp())
+                    )
+                    self.timelines[session_id].append(step)
+            except sqlite3.OperationalError:
+                logger.debug("steps table does not exist, skipping")
+            except Exception as e:
+                logger.warning(f"Error restoring steps: {e}")
+
+            conn.close()
+            logger.info(f"Restored {len(rows)} messages for session {session_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error restoring session from DB: {e}")
+            return False
+
     async def get_messages(self, session_id: str) -> List[MessageWithParts]:
         """
         获取会话的所有消息（按时间顺序）
@@ -561,6 +734,16 @@ class SessionManager:
 
     async def get_messages(self, session_id: str) -> List[MessageWithParts]:
         """获取会话的所有消息（代理到 MessageStore）"""
+        # 如果会话不在内存中，尝试从数据库恢复
+        if session_id not in self.message_store.messages:
+            logger.info(f"Session {session_id} not in memory, restoring from database...")
+            restored = await self.message_store.restore_session_from_db(session_id)
+            if restored:
+                logger.info(f"Successfully restored session {session_id} from database")
+            else:
+                logger.warning(f"Failed to restore session {session_id} from database")
+                return []
+
         return await self.message_store.get_messages(session_id)
 
     async def get_message_count(self, session_id: str) -> int:

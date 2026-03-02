@@ -77,14 +77,102 @@ function renderAll() {
     }
 }
 
+// ✅ 修复3：添加防抖和验证机制
+let _saveStateDebounceTimer = null;
+let _saveStateInProgress = false;
+
 function saveState() {
+    // 防抖：如果已经有待执行的保存，取消它
+    if (_saveStateDebounceTimer) {
+        clearTimeout(_saveStateDebounceTimer);
+    }
+
+    // 防抖：延迟100ms执行，避免频繁写入
+    _saveStateDebounceTimer = setTimeout(() => {
+        _executeSave();
+    }, 100);
+}
+
+// ✅ 修复C1: 在页面刷新前立即执行待处理的保存
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+        if (_saveStateDebounceTimer) {
+            console.log('[beforeunload] Flushing pending save...');
+            clearTimeout(_saveStateDebounceTimer);
+            _saveStateDebounceTimer = null;
+            _executeSave();
+        }
+    });
+}
+
+function _executeSave(retryCount = 0) {
+    // ✅ 修复C3: 添加递归重试限制，防止栈溢出
+    const MAX_RETRIES = 2;
+    if (retryCount > MAX_RETRIES) {
+        console.error('[saveState] Max retries exceeded, giving up');
+        _saveStateInProgress = false;
+        return;
+    }
+
+    if (_saveStateInProgress && retryCount === 0) {
+        console.log('[saveState] Save already in progress, skipping...');
+        return;
+    }
+
+    _saveStateInProgress = true;
+
     try {
-        const stateToSave = {
-            activeId: state.activeId,
-            sessions: state.sessions.map(s => ({
+        // ✅ 验证1：基本数据完整性
+        if (!state || typeof state !== 'object') {
+            throw new Error('Invalid state object');
+        }
+
+        if (!Array.isArray(state.sessions)) {
+            console.error('[saveState] state.sessions is not an array:', state.sessions);
+            throw new Error('state.sessions must be an array');
+        }
+
+        // ✅ 验证2：session数据完整性 + 清理空session
+        const now = Date.now();
+        const GRACE_PERIOD_MS = 5 * 60 * 1000;  // 5分钟宽限期
+
+        const validSessions = state.sessions.filter(s => {
+            if (!s || typeof s !== 'object') return false;
+            if (!s.id) return false;
+
+            // ✅ 修复C2竞态条件: 只清理真正旧的空session
+            // 条件：是后端session AND 不是当前active AND 没有任何数据 AND 超过宽限期
+            if (s.id.startsWith('ses_') &&
+                s.id !== state.activeId &&  // ✅ 保护当前active session
+                !s.prompt &&
+                !s.response &&
+                (!s.actions || s.actions.length === 0) &&
+                (!s.phases || s.phases.length === 0)) {
+
+                // 检查是否在宽限期内（最近创建或正在加载的session）
+                const sessionAge = now - (s._createdTime || now);
+                if (sessionAge < GRACE_PERIOD_MS) {
+                    console.log(`[saveState] Grace period active for ${s.id} (${Math.round(sessionAge/1000)}s old), skipping cleanup`);
+                    return true;  // 保留，在宽限期内
+                }
+
+                // 超过宽限期且确实为空，清理
+                console.log('[saveState] Cleaning up truly empty session:', s.id, `(${Math.round(sessionAge/1000/60)}min old)`);
+                return false;
+            }
+            return true;
+        });
+
+        if (validSessions.length !== state.sessions.length) {
+            console.warn(`[saveState] Filtered ${state.sessions.length - validSessions.length} invalid sessions`);
+            state.sessions = validSessions;
+        }
+
+        // ✅ 验证3：确保每个session都有必需字段
+        const sanitizedSessions = validSessions.map(s => {
+            return {
                 id: s.id,
-                prompt: s.prompt,
-                // 仅保存阶段元数据，不保存具体的 events 详情以节省 localStorage 空间
+                prompt: s.prompt || '',
                 phases: (s.phases || []).map(p => ({
                     id: p.id,
                     title: p.title,
@@ -92,40 +180,306 @@ function saveState() {
                     number: p.number
                 })),
                 response: s.response || '',
-                deliverables: s.deliverables || []
-            }))
+                deliverables: s.deliverables || [],
+                actions: s.actions || [],
+                orphanEvents: s.orphanEvents || [],
+                mode: s.mode || null,
+                _version: s._version || 1,
+                _createdTime: s._createdTime || Date.now()  // ✅ 修复I1: 添加创建时间，用于宽限期判断
+            };
+        });
+
+        const stateToSave = {
+            activeId: state.activeId,
+            sessions: sanitizedSessions
         };
-        localStorage.setItem('opencode_state', JSON.stringify(stateToSave));
+
+        const jsonString = JSON.stringify(stateToSave);
+
+        // ✅ 验证4：检查大小（localStorage通常限制5MB）
+        const sizeInMB = jsonString.length / (1024 * 1024);
+        if (sizeInMB > 4.5) {
+            console.warn(`[saveState] State size large: ${sizeInMB.toFixed(2)}MB, approaching 5MB limit`);
+
+            // ✅ 修复C2: 保护当前active session，正确过滤旧的已完成session
+            const activeSession = state.sessions.find(s => s.id === state.activeId);
+
+            // 找出所有已完成的session（排除当前active session）
+            const oldCompletedSessions = sanitizedSessions.filter(s =>
+                s.phases && s.phases.some(p => p.status === 'completed') &&
+                s.id !== state.activeId
+            );
+
+            if (oldCompletedSessions.length > 10) {
+                // 只保留最新的10个已完成session（删除最旧的）
+                const toRemove = oldCompletedSessions.slice(0, oldCompletedSessions.length - 10);
+                console.log('[saveState] Removing', toRemove.length, 'old completed sessions to free space');
+
+                // 保留：不是被删除的session，或者是当前active session
+                state.sessions = sanitizedSessions.filter(s =>
+                    !toRemove.includes(s) || s.id === state.activeId
+                );
+
+                // 确保active session不会被删除
+                if (activeSession && !state.sessions.find(s => s.id === activeSession.id)) {
+                    console.warn('[saveState] Active session was incorrectly filtered, re-adding');
+                    state.sessions.unshift(activeSession);
+                }
+
+                // ✅ 修复C2: 防止无限递归 - 检查清理后的大小
+                const newSize = JSON.stringify({ activeId: state.activeId, sessions: state.sessions }).length / (1024 * 1024);
+                if (newSize > 4.5) {
+                    console.error('[saveState] Still over limit after cleanup, giving up. Size:', newSize.toFixed(2) + 'MB');
+                    // 不要再递归，避免无限循环
+                    return;
+                }
+
+                console.log('[saveState] Cleanup complete, new size:', newSize.toFixed(2) + 'MB');
+                return _executeSave(retryCount + 1);
+            }
+        }
+
+        localStorage.setItem('opencode_state', jsonString);
+
+        // ✅ 验证5：保存后验证
+        try {
+            const saved = JSON.parse(localStorage.getItem('opencode_state'));
+            if (!saved || saved.sessions.length !== sanitizedSessions.length) {
+                throw new Error('Save verification failed');
+            }
+        } catch (verifyError) {
+            console.error('[saveState] Verification failed:', verifyError);
+            // 清理损坏的localStorage
+            localStorage.removeItem('opencode_state');
+            throw verifyError;
+        }
+
+        console.log(`[saveState] Saved ${sanitizedSessions.length} sessions (${sizeInMB.toFixed(2)}MB)`);
+
     } catch (e) {
-        console.warn('Failed to save state to localStorage', e);
+        console.error('[saveState] Failed to save state:', e);
+
+        // ✅ 用户友好提示
+        if (e.name === 'QuotaExceededError') {
+            console.warn('[saveState] localStorage quota exceeded, clearing old data...');
+            // 清理旧的已完成session
+            if (Array.isArray(state.sessions)) {
+                state.sessions = state.sessions.filter(s => {
+                    const isOld = s.phases && s.phases.some(p => p.status === 'completed');
+                    return !isOld;
+                });
+            }
+        } else {
+            console.error('[saveState] Unknown error:', e.message, e.stack);
+        }
+    } finally {
+        _saveStateInProgress = false;
     }
 }
 
 
 async function loadState() {
+    console.log('[loadState] Loading state...');
     const saved = localStorage.getItem('opencode_state');
     if (saved) {
         try {
             const parsed = JSON.parse(saved);
+            console.log('[loadState] Found', parsed.sessions?.length, 'sessions in localStorage');
             state.sessions = parsed.sessions || [];
             state.activeId = parsed.activeId || null;
+
+            // ✅ 修复4：版本兼容 + 数据修复 + 清理空session
+            let repairedCount = 0;
+            let cleanedCount = 0;
+
+            state.sessions = state.sessions.filter(s => {
+                // 基本验证
+                if (!s || typeof s !== 'object') {
+                    console.warn('[loadState] Invalid session object, removing');
+                    cleanedCount++;
+                    return false;
+                }
+                if (!s.id) {
+                    console.warn('[loadState] Session without ID, removing');
+                    cleanedCount++;
+                    return false;
+                }
+
+                // ✅ 修复C2竞态条件: 添加宽限期，清理真正的旧空session
+                const now = Date.now();
+                const GRACE_PERIOD_MS = 5 * 60 * 1000;  // 5分钟宽限期
+
+                if (s.id.startsWith('ses_') &&
+                    s.id !== state.activeId &&  // ✅ 保护当前active session
+                    !s.prompt &&
+                    !s.response &&
+                    (!s.actions || s.actions.length === 0) &&
+                    (!s.phases || s.phases.length === 0)) {
+
+                    // 检查是否在宽限期内
+                    const sessionAge = now - (s._createdTime || now);
+                    if (sessionAge < GRACE_PERIOD_MS) {
+                        // 在宽限期内，保留
+                        return true;
+                    }
+
+                    // 超过宽限期且确实为空，清理
+                    console.log('[loadState] Cleaning up truly empty session:', s.id, `(${Math.round(sessionAge/1000/60)}min old)`);
+                    cleanedCount++;
+                    return false;
+                }
+
+                return true;
+            });
+
+            if (cleanedCount > 0) {
+                console.warn(`[loadState] Cleaned ${cleanedCount} invalid/empty sessions`);
+            }
+
+            // 数据修复和迁移
+            for (const s of state.sessions) {
+                const version = s._version || 0;
+
+                // 版本0 → 1：添加缺失字段
+                if (version < 1) {
+                    if (!s.actions) {
+                        console.log('[loadState] Migration: Adding actions array to', s.id);
+                        s.actions = [];
+                        repairedCount++;
+                    }
+                    if (!s.orphanEvents) {
+                        s.orphanEvents = [];
+                        repairedCount++;
+                    }
+                    if (!s.mode) {
+                        s.mode = null;
+                    }
+                    if (!s._createdTime) {
+                        // 对于旧数据，设置为当前时间（不会立即被清理）
+                        s._createdTime = Date.now();
+                        repairedCount++;
+                    }
+                    s._version = 1;
+                }
+
+                // ✅ 数据完整性修复：如果session已使用但actions为空，尝试深度加载
+                if (s.id.startsWith('ses_') && s.phases && s.phases.length > 0) {
+                    if (!s.actions || s.actions.length === 0) {
+                        // ✅ 修复C4: 使用统一的_isLoading标志防止竞态条件
+                        if (!s._isLoading && !s._deepLoaded) {
+                            console.log('[loadState] Detected used session with empty actions, triggering deep load:', s.id);
+                            s._isLoading = true;
+                            // ✅ 修复C1: 不要过早设置_deepLoaded，在成功后才设置
+
+                            // 异步深度加载（不阻塞UI）
+                            if (typeof apiClient !== 'undefined') {
+                                apiClient.getMessages(s.id).then(data => {
+                                    if (data && data.messages && data.messages.length > 0) {
+                                        console.log('[loadState] Deep load recovered messages for', s.id);
+                                        s.response = '';
+                                        s.actions = [];
+                                        s.orphanEvents = [];
+
+                                        data.messages.forEach(msg => {
+                                            if (msg.role === 'user') {
+                                                const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
+                                                if (userText) s.prompt = userText;
+                                            } else {
+                                                msg.parts?.forEach(part => {
+                                                    if (part.type === 'text') {
+                                                        s.response += (part.content?.text || part.text || '');
+                                                    } else if (part.type === 'tool' || part.type === 'action') {
+                                                        const toolContent = part.content || part;
+                                                        const toolEv = {
+                                                            type: 'action',
+                                                            id: part.id,
+                                                            data: {
+                                                                tool_name: toolContent.tool || toolContent.tool_name,
+                                                                input: toolContent.input || toolContent.state?.input,
+                                                                output: toolContent.output || toolContent.state?.output,
+                                                                status: toolContent.status || toolContent.state?.status
+                                                            }
+                                                        };
+                                                        s.orphanEvents.push(toolEv);
+                                                        s.actions.push(toolEv);
+                                                    }
+                                                });
+                                            }
+                                        });
+
+                                        // ✅ 修复C4: 保存修复后的数据并刷新界面
+                                        saveState();
+                                        console.log('[loadState] Deep load complete and saved:', s.id);
+
+                                        // 如果当前正在查看这个session，刷新界面
+                                        if (state.activeId === s.id && typeof renderAll === 'function') {
+                                            console.log('[loadState] Refreshing UI for current session');
+                                            renderAll();
+                                        }
+
+                                        // ✅ 修复C1: 成功后才设置_deepLoaded
+                                        s._deepLoaded = true;
+                                    }
+                                }).catch(err => {
+                                    console.warn('[loadState] Deep load failed for', s.id, ':', err);
+                                    // ✅ 修复C1: 失败时不设置_deepLoaded，允许下次重试
+                                }).finally(() => {
+                                    s._isLoading = false;
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // 数据完整性验证
+                if (s.actions && !Array.isArray(s.actions)) {
+                    console.error('[loadState] Invalid actions array for', s.id, ', resetting');
+                    s.actions = [];
+                    repairedCount++;
+                }
+                if (s.orphanEvents && !Array.isArray(s.orphanEvents)) {
+                    console.error('[loadState] Invalid orphanEvents array for', s.id, ', resetting');
+                    s.orphanEvents = [];
+                    repairedCount++;
+                }
+            }
+
+            if (repairedCount > 0) {
+                console.warn(`[loadState] Repaired ${repairedCount} data issues`);
+                // 保存修复后的数据
+                setTimeout(() => saveState(), 100);
+            }
+
         } catch (e) {
             console.error('Failed to parse saved state:', e);
+            // 清理损坏的数据
+            localStorage.removeItem('opencode_state');
+            state.sessions = [];
+            state.activeId = null;
         }
     }
-    
+
     // 从后端同步 Session 列表
     if (typeof apiClient !== 'undefined') {
         try {
             const backendSessions = await apiClient.listSessions();
             if (backendSessions && backendSessions.length > 0) {
+                console.log('[Sync] Found', backendSessions.length, 'sessions from backend');
                 const merged = [...state.sessions];
                 backendSessions.forEach(bs => {
-                    const existing = merged.find(s => s.id === bs.id);
-                    if (existing) {
-                        existing.title = bs.title;
-                        existing.status = bs.status;
+                    const existingIdx = merged.findIndex(s => s.id === bs.id);
+                    if (existingIdx >= 0) {
+                        // ✅ 修复：保留本地完整数据，只更新后端字段
+                        const local = merged[existingIdx];
+                        console.log('[Sync] Merging session', bs.id, '- local has', local.actions?.length, 'actions');
+                        merged[existingIdx] = {
+                            ...local,  // 保留所有本地字段（response, actions, orphanEvents, phases等）
+                            title: bs.title,
+                            status: bs.status
+                        };
                     } else {
+                        // 新 session，添加到列表
+                        console.log('[Sync] Adding new session', bs.id);
                         merged.push({
                             id: bs.id,
                             title: bs.title,
@@ -134,17 +488,21 @@ async function loadState() {
                             response: '',
                             phases: [],
                             actions: [],
-                            orphanEvents: []
+                            orphanEvents: [],
+                            mode: bs.mode || null,
+                            _version: 1,
+                            _createdTime: Date.now()  // ✅ 添加创建时间，用于宽限期判断
                         });
                     }
                 });
                 state.sessions = merged;
+                console.log('[Sync] Total sessions after merge:', state.sessions.length);
             }
         } catch (e) {
             console.warn('[Sync] Failed to sync sessions from backend:', e);
         }
     }
-    
+
     renderAll();
 }
 
@@ -167,11 +525,20 @@ function renderSidebar() {
         `;
         item.onclick = async () => {
             console.log('[点击历史记录] session:', s);
+            console.log('[点击历史记录] actions length:', s.actions?.length);
+            console.log('[点击历史记录] response length:', s.response?.length);
             state.activeId = s.id;
 
+            // 避免重复加载
+            if (s._isLoading) {
+                console.log('[History] Already loading, skipping...');
+                return;
+            }
+
             // 如果是新 API Session 且本地数据不完整（刷新后），从后端深度加载
-            if (s.id.startsWith('ses_') && (!s.response || s.phases.length === 0)) {
-                console.log('[History] Deep loading session content for:', s.id);
+            if (s.id.startsWith('ses_') && (!s.actions || s.actions.length === 0)) {
+                s._isLoading = true;
+                console.log('[History] Deep loading session content for:', s.id, '(actions:', s.actions?.length, ')');
                 try {
                     const data = await apiClient.getMessages(s.id);
                     if (data && data.messages) {
@@ -180,7 +547,7 @@ function renderSidebar() {
                         s.phases = [];
                         s.orphanEvents = [];
                         s.actions = [];
-                        
+
                         data.messages.forEach(msg => {
                             if (msg.role === 'user') {
                                 // 更新 Prompt（如果有的话）
@@ -209,9 +576,16 @@ function renderSidebar() {
                             }
                         });
                         console.log('[History] Deep load complete for:', s.id);
+
+                        // 保存到localStorage，下次无需重新加载
+                        saveState();
                     }
                 } catch (e) {
                     console.warn('[History] Failed to fetch session messages:', e);
+                    // 用户友好提示
+                    console.error('无法加载历史任务，请检查网络连接或刷新页面重试');
+                } finally {
+                    s._isLoading = false;
                 }
             }
 
@@ -1188,11 +1562,15 @@ function bindUI() {
     }
 
     el('#new-task').onclick = () => {
-        // OpenCode 要求 session ID 必须以 "ses" 开头
-        const id = 'ses_' + Math.random().toString(36).slice(2, 9);
-        state.sessions.unshift({ id, prompt: '', response: '', phases: [], actions: [], currentPhase: null, deliverables: [], uploadedFiles: [] });
-        state.activeId = id;
+        // 清空当前激活 ID，这样 renderAll 会显示欢迎页
+        // 且不会在 sessions 列表中产生空 session，直到用户真正提交任务
+        state.activeId = null;
         renderAll();
+        
+        // 切换到侧边栏显示状态（如果之前是折叠的）
+        if (sidebar && sidebar.classList.contains('collapsed') && expandSidebarBtn) {
+            expandSidebarBtn.click();
+        }
     };
 
     // File Upload

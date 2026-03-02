@@ -182,7 +182,7 @@ class OpenCodeClient:
             inner_cmd = f"opencode run --model {model_id} --format json --thinking {safe_prompt}{agent_flag}"
 
             # 添加调试日志，记录完整命令以便排查问题
-            logger.debug(f"CLI command - Mode: '{mode}', Agent flag: '{agent_flag}', Full cmd: {inner_cmd[:200]}...")
+            logger.info(f"CLI command - Mode: '{mode}', Agent flag: '{agent_flag}', Full cmd: {inner_cmd[:200]}...")
 
             if is_windows:
                 # Windows 不需要 script 命令且路径不同

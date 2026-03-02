@@ -25,7 +25,7 @@ class EventAdapter {
             return {
                 type: 'system',
                 content: 'Connected to session',
-                timestamp: newEvent.timestamp
+                timestamp: newEvent.timestamp || Date.now()
             };
         }
 
@@ -69,6 +69,16 @@ class EventAdapter {
         }
 
         if (eventType === 'preview_delta') {
+            // ✅ 修复：添加数据验证，防止delta为空导致UI无内容显示
+            if (!newEvent.delta) {
+                console.warn('[EventAdapter] preview_delta missing delta data, providing default:', newEvent);
+                return {
+                    type: 'file_preview_delta',
+                    step_id: newEvent.step_id,
+                    delta: {type: 'insert', content: '', position: 0}
+                };
+            }
+
             return {
                 type: 'file_preview_delta',
                 step_id: newEvent.step_id,
@@ -92,7 +102,7 @@ class EventAdapter {
                 step_id: step.step_id,
                 action: step.action,
                 path: step.path,
-                timestamp: step.timestamp,
+                timestamp: step.timestamp || Date.now(),
                 status: step.status
             };
         }
@@ -110,7 +120,7 @@ class EventAdapter {
             return {
                 type: 'phases_init',
                 phases: newEvent.phases,
-                timestamp: newEvent.timestamp
+                timestamp: newEvent.timestamp || Date.now()
             };
         }
 
@@ -119,7 +129,7 @@ class EventAdapter {
             return {
                 type: 'deliverables',
                 items: newEvent.items || [],
-                timestamp: newEvent.timestamp
+                timestamp: newEvent.timestamp || Date.now()
             };
         }
 
@@ -128,7 +138,99 @@ class EventAdapter {
             return {
                 type: 'status',
                 value: newEvent.value,
-                timestamp: newEvent.timestamp
+                timestamp: newEvent.timestamp || Date.now()
+            };
+        }
+
+        // ✅ 修复：工具事件（处理后端 tool_event）
+        if (eventType === 'tool_event') {
+            const data = newEvent.data || {};
+
+            // ✅ 添加类型检查
+            if (typeof data !== 'object' || data === null) {
+                console.warn('[EventAdapter] Invalid tool_event data:', data);
+                return null;
+            }
+
+            const toolType = data.type;
+
+            // TOOL 类型：read, bash, write, grep等
+            if (toolType === 'tool') {
+                // ✅ 后端已经映射过类型，data.tool 就是显示类型
+                const displayType = data.tool || 'file_editor';
+
+                return {
+                    id: newEvent.id || EventAdapter.generateEventId('tool'),
+                    type: 'action',
+                    data: {
+                        id: newEvent.id,
+                        tool: displayType,                  // UI显示类型，用于图标映射（如read, bash, write）
+                        tool_name: displayType,             // 向后兼容字段，新API使用相同值（旧API可能包含原始工具名）
+                        title: data.title || `Using ${displayType}`,
+                        status: data.status || 'running',
+                        input: data.input || {},            // 后端不提供，保留空对象
+                        output: data.output || '',
+                        timestamp: newEvent.timestamp || Date.now()
+                    },
+                    message_id: newEvent.message_id
+                };
+            }
+
+            // ERROR 类型
+            if (toolType === 'error') {
+                return {
+                    id: newEvent.id || EventAdapter.generateEventId('error'),
+                    type: 'error',
+                    message: data.content || data.message || 'Unknown error',
+                    timestamp: newEvent.timestamp || Date.now(),
+                    message_id: newEvent.message_id  // ✅ 添加缺失字段
+                };
+            }
+
+            // THOUGHT 类型
+            if (toolType === 'thought') {
+                return {
+                    id: newEvent.id || EventAdapter.generateEventId('thought'),
+                    type: 'thought',
+                    content: data.content || '',
+                    timestamp: newEvent.timestamp || Date.now(),
+                    message_id: newEvent.message_id  // ✅ 添加缺失字段
+                };
+            }
+
+            console.warn('[EventAdapter] Unknown tool_event type:', {
+                toolType,
+                data,
+                fullEvent: newEvent
+            });
+            return null;
+        }
+
+        // ✅ 修复：file_generated事件处理（用于更新文件列表）
+        if (eventType === 'file_generated') {
+            const file = newEvent.file || {};
+
+            // 验证必需字段
+            if (!file.name && !file.path) {
+                console.warn('[EventAdapter] file_generated missing file data:', newEvent);
+                return null;
+            }
+
+            // 安全检查：防止路径遍历攻击
+            const safePath = String(file.path || '');
+            if (safePath.includes('..')) {
+                console.warn('[EventAdapter] Invalid file path (contains ..):', safePath);
+                return null;
+            }
+
+            return {
+                type: 'file_generated',
+                file: {
+                    name: String(file.name || 'unknown'),
+                    path: safePath,
+                    type: String(file.type || 'text')
+                },
+                timestamp: newEvent.timestamp || Date.now()
             };
         }
 
@@ -262,6 +364,15 @@ class EventAdapter {
     }
 
     /**
+     * 生成唯一事件ID
+     * @param {string} type - 事件类型（tool, error, thought等）
+     * @returns {string} 唯一ID
+     */
+    static generateEventId(type) {
+        return `${type}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    /**
      * 批量适配事件
      * @param {Array<Object>} newEvents - 新 API 事件数组
      * @param {Object} session - 当前会话
@@ -292,8 +403,14 @@ class EventAdapter {
      * @returns {Object} 发送消息请求
      */
     static messageToSendRequest(text, options = {}) {
+        // ✅ 修复：添加 apiClient 依赖验证，防止未定义时崩溃
+        const messageId = options.messageId ||
+                         (typeof apiClient !== 'undefined' && apiClient.generateMessageId ?
+                          apiClient.generateMessageId() :
+                          `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+
         return {
-            message_id: options.messageId || apiClient.generateMessageId(),
+            message_id: messageId,
             provider_id: options.providerId || 'anthropic',
             model_id: options.modelId || 'claude-3-5-sonnet-20241022',
             mode: options.mode || 'auto',

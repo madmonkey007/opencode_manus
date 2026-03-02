@@ -268,8 +268,17 @@ class SessionManager:
 
             # Use config_host directly as it's verified to work
             patched_config = "/app/opencode/config_host/opencode.json"
+            # For local development, use relative path if Docker path doesn't exist
+            if not os.path.exists(patched_config):
+                patched_config = "config_host/opencode.json"
+
             if os.path.exists(patched_config):
+                # Use absolute path for reliability
+                patched_config = os.path.abspath(patched_config)
                 env["OPENCODE_CONFIG_FILE"] = patched_config
+                logger.info(f"Using config: {patched_config}")
+            else:
+                logger.warning(f"Config file not found: {patched_config}")
 
             logger.info(f"Starting process for {sid} with command: {cmd}")
             process = await asyncio.create_subprocess_exec(
@@ -340,13 +349,17 @@ async def run_agent(prompt: str, sid: str, mode: str = "auto"):
     """
     session_dir = os.path.join(WORKSPACE_BASE, sid)
 
-    # Ensure session exists
+    # Ensure session exists - 传递mode参数
     await session_manager.create_session(sid, prompt, mode)
 
     # Attach listener
     queue = await session_manager.attach(sid)
     if not queue:
         return None
+
+    # 保存mode到session数据中
+    if sid in session_manager.sessions:
+        session_manager.sessions[sid]["mode"] = mode
 
     async def event_generator():
         logger.info(f"Agent session attached: {sid}")
@@ -493,8 +506,17 @@ async def process_log_line(text: str, sid: str = None):
                     step_id = str(uuid.uuid4())
                     capture_result = None
 
+                    # 获取当前会话的mode
+                    current_mode = "auto"
+                    if sid in session_manager.sessions:
+                        current_mode = session_manager.sessions[sid].get("mode", "auto")
+                    elif sid in _session_id_map:
+                        mapped_sid = _session_id_map[sid]
+                        if mapped_sid in session_manager.sessions:
+                            current_mode = session_manager.sessions[mapped_sid].get("mode", "auto")
+
                     if history_service and sid:
-                        capture_result = await history_service.capture_tool_use(sid, tool_name, input_data, step_id)
+                        capture_result = await history_service.capture_tool_use(sid, tool_name, input_data, step_id, current_mode)
 
                     if tool_name in ["write", "edit", "file_editor", "patch"]:
                         # 改进：识别多种路径和内容键名
@@ -510,7 +532,7 @@ async def process_log_line(text: str, sid: str = None):
                             for i in range(0, len(content), chunk_size):
                                 chunk = content[i:i+chunk_size]
                                 yield format_sse({"type": "preview_delta", "step_id": step_id, "delta": {"type": "insert", "position": i, "content": chunk}})
-                                await asyncio.sleep(0.005)
+                                await asyncio.sleep(0.03)  # ✅ 修复：从5ms增加到30ms，让用户能看到逐步显示效果
                         
                         yield format_sse({"type": "preview_end", "step_id": step_id, "file_path": file_path})
 
@@ -551,3 +573,14 @@ async def run_sse(prompt: str, sid: str | None = None, mode: str = "auto"):
     generator_func = await run_agent(prompt, sid, mode)
     if not generator_func: raise HTTPException(status_code=500, detail="Failed to initialize session")
     return StreamingResponse(generator_func(), media_type="text/event-stream")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8089,
+        reload=False,
+        log_level="info"
+    )
