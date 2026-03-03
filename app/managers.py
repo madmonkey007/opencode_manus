@@ -577,7 +577,15 @@ class SessionManager:
     2. 维护会话状态
     3. 提供会话查询接口
     4. 集成 MessageStore
+    5. 持久化会话到数据库
     """
+    
+    # 常量定义
+    # 使用workspace/history.db（在Docker volume中，opencode CLI可以访问）
+    DB_PATH = "/app/opencode/workspace/history.db"
+    PROMPT_MAX_LENGTH = 500
+    DEFAULT_MODE = "auto"
+    DEFAULT_STATUS = "active"
 
     def __init__(self):
         # {session_id: Session}
@@ -585,8 +593,50 @@ class SessionManager:
 
         # 消息存储
         self.message_store = MessageStore()
+        
+        # 数据库路径
+        self.db_path = self.DB_PATH
 
         logger.info("SessionManager initialized")
+
+    # ====================================================================
+    # Database Operations
+    # ====================================================================
+    
+    def _write_session_to_db(self, sid: str, prompt: str):
+        """
+        将session写入SQLite数据库，让opencode CLI可以查询到。
+        
+        注意事项:
+        - 使用workspace/history.db（在Docker volume中，opencode CLI可以访问）
+        - Schema: id (主键), prompt, created_at, updated_at, status, workspace_path
+        
+        Args:
+            sid: Session ID（格式: ses_XXXXXXXXX）
+            prompt: 用户输入的prompt（限制PROMPT_MAX_LENGTH字符）
+        """
+        try:
+            import sqlite3
+            from datetime import datetime
+
+            # workspace/history.db使用created_at (TIMESTAMP类型，自动设置)
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            # 插入session记录到workspace/history.db（使用id列）
+            cursor.execute("""
+                INSERT INTO sessions (id, prompt, status, workspace_path)
+                VALUES (?, ?, ?, ?)
+            """, (sid, prompt[:self.PROMPT_MAX_LENGTH], "running", f"/app/opencode/workspace/{sid}"))
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"[DB] Session {sid} written to workspace/history.db successfully")
+        except Exception as e:
+            logger.error(f"[DB] Failed to write session {sid} to database: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     # ====================================================================
     # Session CRUD
@@ -619,8 +669,11 @@ class SessionManager:
             status=SessionStatus.ACTIVE
         )
 
-        # 存储会话
+        # 存储会话到内存
         self.sessions[session_id] = session
+
+        # ✅ 添加：写入数据库（让opencode CLI可以查询）
+        self._write_session_to_db(session_id, title)
 
         # 初始化消息存储
         await self.message_store.initialize_session(session_id)

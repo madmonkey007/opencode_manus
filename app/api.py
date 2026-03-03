@@ -472,6 +472,31 @@ async def send_message(
             logger.warning(f"Empty message text in request for session: {session_id}")
             raise HTTPException(status_code=400, detail="Message text cannot be empty")
 
+        # ✅ v=38.4.3修复：更新数据库中的session title和prompt
+        # 这样Go CLI查询时能获取正确的title（非NULL）
+        try:
+            import sqlite3
+            import time
+            from app.main import WORKSPACE_BASE
+
+            db_path = os.path.join(WORKSPACE_BASE, "history.db")
+            title = user_text[:100] if len(user_text) > 100 else user_text
+            now = int(time.time())
+
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE sessions
+                SET title = ?, prompt = ?, updated_at = ?
+                WHERE id = ?
+            """, (title, user_text, now, session_id))
+            conn.commit()
+            conn.close()
+
+            logger.info(f"[DB] Updated session {session_id} with title: {title[:50]}...")
+        except Exception as db_err:
+            logger.warning(f"[DB] Failed to update session title (non-critical): {db_err}")
+
         user_message = Message(
             id=user_message_id,
             session_id=session_id,

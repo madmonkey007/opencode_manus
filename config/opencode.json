@@ -297,6 +297,12 @@
         },
         "glm-4.7": {
           "name": "GLM-4.7"
+        },
+        "qwen3-235b-a22b-instruct": {
+          "name": "qwen3-235b-a22b-instruct"
+        },
+        "gpt-oss-120b": {
+          "name": "gpt-oss-120b"
         }
       }
     },

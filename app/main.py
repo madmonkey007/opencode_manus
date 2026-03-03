@@ -243,7 +243,12 @@ class SessionManager:
             import time
 
             now = int(time.time())
-            title = prompt[:100] if len(prompt) > 100 else prompt
+            # ✅ 修复：如果prompt是"New Session"（API创建时的默认值），使用空字符串作为title
+            # 这样Go CLI查询时不会因为title为NULL而失败
+            if prompt == "New Session":
+                title = ""
+            else:
+                title = prompt[:100] if len(prompt) > 100 else prompt
 
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
