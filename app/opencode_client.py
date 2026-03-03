@@ -205,11 +205,15 @@ class OpenCodeClient:
             # 构建命令行
             safe_prompt = shlex.quote(user_prompt)
             agent_flag = f" --agent {mode}" if mode in ["plan", "build"] else ""
-
-            inner_cmd = f"opencode run --model {model_id} --format json --thinking {safe_prompt}{agent_flag}"
+            
+            # ✅ 长期方案修复：传递 session_id 参数，统一前后端 session ID
+            # 这解决了 Session ID 不匹配问题，前端可以接收到所有事件
+            session_flag = f" --session {session_id}"
+            
+            inner_cmd = f"opencode run --model {model_id} --format json --thinking{session_flag}{safe_prompt}{agent_flag}"
 
             # 添加调试日志，记录完整命令以便排查问题
-            logger.info(f"CLI command - Mode: '{mode}', Agent flag: '{agent_flag}', Full cmd: {inner_cmd[:200]}...")
+            logger.info(f"CLI command - Mode: '{mode}', Session: '{session_id}', Agent flag: '{agent_flag}', Full cmd: {inner_cmd[:200]}...")
 
             if is_windows:
                 # Windows 不需要 script 命令且路径不同
