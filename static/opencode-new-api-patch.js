@@ -147,7 +147,9 @@
         }
 
         // 3. 拦截回车键
-        window.addEventListener('keydown', handleGlobalKeydown, true);
+        // ❌ v=38.3.1修复：注释掉全局Enter键拦截，避免与opencode.js的元素级处理器冲突
+        // 问题：全局捕获 phase 阻止了 opencode.js 中 #prompt 元素的事件处理器执行
+        // window.addEventListener('keydown', handleGlobalKeydown, true);
 
         // 4. 注入样式和 Mode Selector
         injectAdvancedUI();
@@ -611,8 +613,12 @@
     }
 
     /**
-     * 全局按键处理器
+     * ❌ v=38.3.1修复：已禁用全局按键处理器
+     *
+     * 原因：全局捕获 phase 阻止了 opencode.js 中 #prompt 元素的事件处理器执行
+     * 导致 Enter 键失效，无法提交任务
      */
+    /*
     function handleGlobalKeydown(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             const activeEl = document.activeElement;
@@ -627,6 +633,7 @@
             }
         }
     }
+    */
 
     /**
      * ✅ v=35: 系统消息显示函数 - 用于显示thought、任务完成等消息（XSS安全）
