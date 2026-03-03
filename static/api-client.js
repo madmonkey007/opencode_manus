@@ -309,6 +309,113 @@ class OpenCodeAPIClient {
     }
 
     // ====================================================================
+    // Project 管理
+    // ====================================================================
+
+    /**
+     * 创建新项目
+     * @param {string} name - 项目名称
+     * @returns {Promise<Project>}
+     */
+    async createProject(name = '新建项目') {
+        const url = `${this.baseURL}/opencode/project`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to create project: ${response.status} - ${errorText}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * 列出所有项目
+     * @returns {Promise<Project[]>}
+     */
+    async listProjects() {
+        const url = `${this.baseURL}/opencode/projects`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to list projects: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * 获取项目详情
+     * @param {string} projectId - 项目ID
+     * @returns {Promise<Project>}
+     */
+    async getProject(projectId) {
+        const url = `${this.baseURL}/opencode/project/${encodeURIComponent(projectId)}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            if (response.status === 404) {
+                return null;
+            }
+            throw new Error(`Failed to get project: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * 更新项目信息
+     * @param {string} projectId - 项目ID
+     * @param {string} name - 新项目名称
+     * @returns {Promise<Project>}
+     */
+    async updateProject(projectId, name) {
+        const url = `${this.baseURL}/opencode/project/${encodeURIComponent(projectId)}`;
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name })
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to update project: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * 删除项目
+     * @param {string} projectId - 项目ID
+     * @returns {Promise<boolean>}
+     */
+    async deleteProject(projectId) {
+        const url = `${this.baseURL}/opencode/project/${encodeURIComponent(projectId)}`;
+        const response = await fetch(url, { method: 'DELETE' });
+        if (!response.ok) {
+            if (response.status === 404) {
+                return false;
+            }
+            throw new Error(`Failed to delete project: ${response.status}`);
+        }
+        return true;
+    }
+
+    /**
+     * 获取项目下的所有会话
+     * @param {string} projectId - 项目ID
+     * @returns {Promise<Session[]>}
+     */
+    async getProjectSessions(projectId) {
+        const url = `${this.baseURL}/opencode/project/${encodeURIComponent(projectId)}/sessions`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to get project sessions: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    // ====================================================================
     // 兼容旧 API（可选）
     // ====================================================================
 

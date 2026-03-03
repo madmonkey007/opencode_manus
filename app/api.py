@@ -5,7 +5,7 @@ OpenCode 新架构 API 端点
 提供真正的多轮对话支持
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 from fastapi.encoders import jsonable_encoder
 from typing import List, Optional, Dict, Any
@@ -83,7 +83,12 @@ router = APIRouter(prefix="/opencode", tags=["opencode"])
 
 
 @router.post("/session", response_model=Session)
-async def create_session(title: str = "New Session", mode: str = "auto", version: str = "1.0.0"):
+async def create_session(
+    title: str = "New Session",
+    mode: str = "auto",
+    version: str = "1.0.0",
+    project_id: Optional[str] = None
+):
     """
     创建新会话
 
@@ -91,10 +96,22 @@ async def create_session(title: str = "New Session", mode: str = "auto", version
         title: 会话标题
         mode: 初始模式 (plan/build/auto)
         version: API 版本
+        project_id: 所属项目ID（可选，默认使用默认项目）
 
     Returns:
         创建的会话对象
     """
+    from .history_service import get_history_service
+
+    # 验证 project_id 是否存在（如果不是默认项目）
+    if project_id and project_id != "proj_default":
+        history = get_history_service()
+        project = await history.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=400, detail=f"Project {project_id} not found")
+
+    # 使用默认值
+    project_id = project_id or "proj_default"
     try:
         session = await session_manager.create_session(title=title, version=version)
 
@@ -115,7 +132,10 @@ async def create_session(title: str = "New Session", mode: str = "auto", version
 
         # 将模式存储在会话元数据中
         session.metadata["mode"] = mode
-        logger.info(f"Created session: {session.id} with mode: {mode}")
+        # 存储 project_id 到会话元数据
+        session.metadata["project_id"] = project_id
+        session.project_id = project_id
+        logger.info(f"Created session: {session.id} with mode: {mode}, project_id: {project_id}")
         logger.info(f"Workspace directory created: {session_dir}")
 
         return session
@@ -179,6 +199,75 @@ async def list_sessions(status: Optional[SessionStatus] = None):
     """
     sessions = await session_manager.list_sessions(status=status)
     return sessions
+
+
+# ====================================================================
+# Project Management Endpoints
+# ====================================================================
+
+def _generate_project_id() -> str:
+    """生成项目ID"""
+    import uuid
+    return f"proj_{uuid.uuid4().hex[:8]}"
+
+
+@router.post("/project", response_model=dict)
+async def create_project(name: str = "新建项目"):
+    """创建项目"""
+    from .history_service import get_history_service
+    history = get_history_service()
+    project_id = _generate_project_id()
+    project = await history.create_project(project_id, name)
+    logger.info(f"Created project: {project_id} - {name}")
+    return project
+
+
+@router.get("/projects", response_model=list)
+async def list_projects():
+    """获取所有项目列表"""
+    from .history_service import get_history_service
+    history = get_history_service()
+    return await history.list_projects()
+
+
+@router.get("/project/{project_id}", response_model=dict)
+async def get_project(project_id: str):
+    """获取项目详情"""
+    from .history_service import get_history_service
+    history = get_history_service()
+    project = await history.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+@router.put("/project/{project_id}", response_model=dict)
+async def update_project(project_id: str, name: str):
+    """更新项目名称"""
+    from .history_service import get_history_service
+    history = get_history_service()
+    project = await history.update_project(project_id, name)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+@router.delete("/project/{project_id}")
+async def delete_project(project_id: str):
+    """删除项目"""
+    from .history_service import get_history_service
+    history = get_history_service()
+    await history.delete_project(project_id)
+    logger.info(f"Deleted project: {project_id}")
+    return {"status": "deleted"}
+
+
+@router.get("/project/{project_id}/sessions", response_model=list)
+async def get_project_sessions(project_id: str):
+    """获取项目下的会话列表"""
+    from .history_service import get_history_service
+    history = get_history_service()
+    return await history.get_project_sessions(project_id)
 
 
 # ====================================================================

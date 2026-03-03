@@ -4,6 +4,8 @@ const els = (sel) => Array.from(document.querySelectorAll(sel));
 window.state = {
     sessions: [],
     activeId: null,
+    projects: [],          // 项目列表
+    activeProjectId: null, // 当前选中的项目ID
     renderThrottle: null,
     fileFilter: 'all',
     fileSearch: '',
@@ -202,7 +204,8 @@ function _executeSave(retryCount = 0) {
 
         const stateToSave = {
             activeId: state.activeId,
-            sessions: sanitizedSessions
+            sessions: sanitizedSessions,
+            activeProjectId: state.activeProjectId
         };
 
         const jsonString = JSON.stringify(stateToSave);
@@ -266,6 +269,25 @@ function _executeSave(retryCount = 0) {
         }
 
         console.log(`[saveState] Saved ${sanitizedSessions.length} sessions (${sizeInMB.toFixed(2)}MB)`);
+
+        // 单独保存 projects（避免被 sessions 的大数据影响）
+        try {
+            const projectData = (state.projects || []).map(p => ({
+                id: p.id,
+                name: p.name
+            }));
+            localStorage.setItem('opencode_projects', JSON.stringify(projectData));
+            
+            // 保存 activeProjectId
+            if (state.activeProjectId) {
+                localStorage.setItem('opencode_activeProjectId', state.activeProjectId);
+            } else {
+                localStorage.removeItem('opencode_activeProjectId');
+            }
+            console.log(`[saveState] Saved ${projectData.length} projects`);
+        } catch (projectSaveError) {
+            console.warn('[saveState] Failed to save projects:', projectSaveError);
+        }
 
     } catch (e) {
         console.error('[saveState] Failed to save state:', e);
@@ -431,7 +453,67 @@ async function loadState() {
                                         if (state.activeId === s.id && typeof renderAll === 'function') {
                                             console.log('[loadState] Refreshing UI for current session');
                                             renderAll();
-                                        }
+}
+
+
+// 项目删除和重命名功能
+async function confirmDeleteProject(projectId, projectName) {
+    const confirmed = confirm(`确定要删除项目"${projectName}"吗？\n\n项目下的所有任务将被移到"默认项目"中。`);
+    if (!confirmed) return;
+    
+    try {
+        await window.apiClient.deleteProject(projectId);
+        console.log('[Project] Deleted:', projectId);
+        
+        // 从本地 state 移除
+        window.state.projects = window.state.projects.filter(p => p.id !== projectId);
+        
+        // 如果删除的是当前选中项目，切换到默认项目
+        if (window.state.activeProjectId === projectId) {
+            window.state.activeProjectId = null;
+        }
+        
+        // 重新加载会话列表（更新 project_id）
+        if (typeof apiClient !== 'undefined') {
+            try {
+                const sessions = await apiClient.listSessions();
+                window.state.sessions = sessions;
+            } catch (e) {
+                console.warn('[Project] Failed to reload sessions:', e);
+            }
+        }
+        
+        saveState();
+        renderSidebar();
+    } catch (e) {
+        console.error('[Project] Delete failed:', e);
+        alert('删除项目失败: ' + e.message);
+    }
+}
+
+async function renameProject(projectId, currentName) {
+    const newName = prompt('请输入新的项目名称:', currentName);
+    if (!newName || newName.trim() === '') return;
+    if (newName === currentName) return;
+    
+    try {
+        const updated = await window.apiClient.updateProject(projectId, newName.trim());
+        console.log('[Project] Renamed:', updated);
+        
+        // 更新本地 state
+        const project = window.state.projects.find(p => p.id === projectId);
+        if (project) {
+            project.name = updated.name;
+        }
+        
+        saveState();
+        renderSidebar();
+    } catch (e) {
+        console.error('[Project] Rename failed:', e);
+        alert('重命名项目失败: ' + e.message);
+    }
+}
+
 
                                         // ✅ 修复C1: 成功后才设置_deepLoaded
                                         s._deepLoaded = true;
@@ -509,7 +591,29 @@ async function loadState() {
             localStorage.removeItem('opencode_state');
             state.sessions = [];
             state.activeId = null;
+            state.projects = [];
+            state.activeProjectId = null;
         }
+    }
+
+    // 加载本地保存的 projects（如果后端未返回）
+    if (state.projects.length === 0) {
+        const savedProjects = localStorage.getItem('opencode_projects');
+        if (savedProjects) {
+            try {
+                state.projects = JSON.parse(savedProjects);
+                console.log('[State] Loaded projects from localStorage:', state.projects.length);
+            } catch (e) {
+                console.warn('[State] Failed to parse saved projects:', e);
+                state.projects = [];
+            }
+        }
+    }
+
+    // 加载 activeProjectId
+    const savedActiveProjectId = localStorage.getItem('opencode_activeProjectId');
+    if (savedActiveProjectId) {
+        state.activeProjectId = savedActiveProjectId;
     }
 
     // 从后端同步 Session 列表
@@ -658,6 +762,22 @@ async function loadState() {
         }
     }
 
+    // 加载 projects
+    if (typeof apiClient !== 'undefined') {
+        try {
+            const projects = await apiClient.listProjects();
+            if (projects && projects.length > 0) {
+                state.projects = projects;
+                console.log('[State] Loaded projects from API:', state.projects.length);
+            } else {
+                console.log('[State] API returned empty, using local cache');
+            }
+        } catch (e) {
+            console.warn('[State] Failed to load projects from API, using local cache:', e);
+            // 不清空 state.projects，保留 localStorage 的数据
+        }
+    }
+
     renderAll();
 }
 
@@ -665,131 +785,329 @@ async function loadState() {
 function renderSidebar() {
     const list = el('#session-list'); if (!list) return;
     list.innerHTML = '';
-    state.sessions.forEach(s => {
-        const item = document.createElement('div');
-        const isActive = s.id === state.activeId;
-        item.className = `session-item cursor-pointer mb-1 transition-all ${isActive ? 'active' : ''}`;
-        item.innerHTML = `
-            <div class="session-item-icon">
-                <span class="material-symbols-outlined text-[14px]">task</span>
-            </div>
-            <span class="session-item-title">${s.prompt ? (s.prompt.substring(0, 24) + (s.prompt.length > 24 ? '...' : '')) : 'New Task'}</span>
-            <button class="session-delete-btn" onclick="event.stopPropagation(); deleteSession('${s.id}')">
-                <span class="material-symbols-outlined text-[16px]">delete</span>
-            </button>
-        `;
-        item.onclick = async () => {
-            console.log('[点击历史记录] session:', s);
-            console.log('[点击历史记录] actions length:', s.actions?.length);
-            console.log('[点击历史记录] response length:', s.response?.length);
-            state.activeId = s.id;
+    
+    const { sessions, projects, activeId, activeProjectId } = state;
+    
+    // 如果有项目，按项目分组显示
+    if (projects && projects.length > 0) {
+        projects.forEach(project => {
+            // 获取该项目下的会话
+            const projectSessions = sessions.filter(s => s.project_id === project.id);
+            
+            // 创建项目分组
+            const projectItem = document.createElement('div');
+            projectItem.className = 'project-group mb-2';
+            
+            // 项目标题
+            const projectHeader = document.createElement('div');
+            projectHeader.className = `project-header group flex items-center gap-2 px-3 py-2 
+                rounded-lg cursor-pointer transition-colors
+                ${activeProjectId === project.id ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`;
+            projectHeader.innerHTML = `
+                <span class="material-symbols-outlined text-[18px] text-gray-500">
+                    ${project.id === 'proj_default' ? 'folder' : 'folder_open'}
+                </span>
+                <span class="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200 truncate project-name"
+                    ondblclick="event.stopPropagation(); renameProject('${project.id}', '${project.name.replace(/'/g, "\\'")}')"
+                    title="双击重命名">
+                    ${project.name}
+                </span>
+                <span class="text-xs text-gray-400">${projectSessions.length}</span>
+                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    ${project.id !== 'proj_default' ? `
+                    <button class="p-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded" 
+                        onclick="event.stopPropagation(); renameProject('${project.id}', '${project.name.replace(/'/g, "\\'")}')"
+                        title="重命名项目">
+                        <span class="material-symbols-outlined text-[16px] text-gray-400 hover:text-blue-600">edit</span>
+                    </button>
+                    <button class="p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded"
+                        onclick="event.stopPropagation(); confirmDeleteProject('${project.id}', '${project.name.replace(/'/g, "\\'")}')"
+                        title="删除项目">
+                        <span class="material-symbols-outlined text-[16px] text-gray-400 hover:text-red-600">delete</span>
+                    </button>
+                    ` : ''}
+                </div>
+            `;
+            
+            // 点击项目展开/折叠
+            projectHeader.onclick = () => {
+                state.activeProjectId = state.activeProjectId === project.id ? null : project.id;
+                saveState();
+                renderSidebar();
+            };
+            
+            projectItem.appendChild(projectHeader);
+            
+            // 如果项目展开，显示会话列表
+            if (activeProjectId === project.id || project.id === 'proj_default') {
+                const sessionList = document.createElement('div');
+                sessionList.className = 'session-list ml-4 mt-1';
+                
+                if (projectSessions.length === 0) {
+                    sessionList.innerHTML = '<div class="text-xs text-gray-400 px-3 py-2">暂无任务</div>';
+                } else {
+                    projectSessions.forEach(s => {
+                        const isActive = s.id === activeId;
+                        const item = document.createElement('div');
+                        item.className = `session-item group cursor-pointer mb-1 px-3 py-2 rounded-lg transition-all 
+                            ${isActive ? 'bg-blue-50 dark:bg-blue-900/50 border-l-4 border-blue-500' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`;
+                        item.innerHTML = `
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                    <span class="material-symbols-outlined text-[14px] text-gray-400">task</span>
+                                    <span class="session-item-title text-sm text-gray-700 dark:text-gray-200 truncate">
+                                        ${s.prompt ? (s.prompt.substring(0, 20) + '...') : 'New Task'}
+                                    </span>
+                                </div>
+                                <button class="session-delete-btn opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded"
+                                    onclick="event.stopPropagation(); deleteSession('${s.id}')" title="删除任务">
+                                    <span class="material-symbols-outlined text-[16px] text-gray-400 hover:text-red-600">delete</span>
+                                </button>
+                            </div>
+                        `;
+                        item.onclick = async () => {
+                            console.log('[点击历史记录] session:', s);
+                            console.log('[点击历史记录] actions length:', s.actions?.length);
+                            console.log('[点击历史记录] response length:', s.response?.length);
+                            state.activeId = s.id;
 
-            // 避免重复加载
-            if (s._isLoading) {
-                console.log('[History] Already loading, skipping...');
-                return;
-            }
-
-            // 如果是新 API Session 且本地数据不完整（刷新后），从后端深度加载
-            if (s.id.startsWith('ses_') && (!s.actions || s.actions.length === 0)) {
-                s._isLoading = true;
-                console.log('[History] Deep loading session content for:', s.id, '(actions:', s.actions?.length, ')');
-                try {
-                    const data = await apiClient.getMessages(s.id);
-                    if (data && data.messages) {
-                        // 转换后端消息格式到前端 state 格式
-                        s.response = '';
-                        s.phases = [];
-                        s.orphanEvents = [];
-                        s.actions = [];
-
-                        data.messages.forEach(msg => {
-                            if (msg.role === 'user') {
-                                // 更新 Prompt（如果有的话）
-                                const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
-                                if (userText) s.prompt = userText;
-                            } else {
-                                msg.parts?.forEach(part => {
-                                    if (part.type === 'text') {
-                                        s.response += (part.content?.text || part.text || '');
-                                    } else if (part.type === 'tool' || part.type === 'action') {
-                                        const toolContent = part.content || part;
-                                        const toolEv = {
-                                            type: 'action',
-                                            id: part.id,
-                                            data: {
-                                                tool_name: toolContent.tool || toolContent.tool_name,
-                                                input: toolContent.input || toolContent.state?.input,
-                                                output: toolContent.output || toolContent.state?.output,
-                                                status: toolContent.status || toolContent.state?.status
-                                            }
-                                        };
-                                        s.orphanEvents.push(toolEv);
-                                        s.actions.push(toolEv);
-                                    }
-                                });
+                            // 避免重复加载
+                            if (s._isLoading) {
+                                console.log('[History] Already loading, skipping...');
+                                return;
                             }
-                        });
-                        console.log('[History] Deep load complete for:', s.id);
 
-                        // 保存到localStorage，下次无需重新加载
-                        saveState();
-                    }
-                } catch (e) {
-                    console.warn('[History] Failed to fetch session messages:', e);
-                    // 用户友好提示
-                    console.error('无法加载历史任务，请检查网络连接或刷新页面重试');
-                } finally {
-                    s._isLoading = false;
+                            // 如果是新 API Session 且本地数据不完整（刷新后），从后端深度加载
+                            if (s.id.startsWith('ses_') && (!s.actions || s.actions.length === 0)) {
+                                s._isLoading = true;
+                                console.log('[History] Deep loading session content for:', s.id, '(actions:', s.actions?.length, ')');
+                                try {
+                                    const data = await apiClient.getMessages(s.id);
+                                    if (data && data.messages) {
+                                        // 转换后端消息格式到前端 state 格式
+                                        s.response = '';
+                                        s.phases = [];
+                                        s.orphanEvents = [];
+                                        s.actions = [];
+
+                                        data.messages.forEach(msg => {
+                                            if (msg.role === 'user') {
+                                                // 更新 Prompt（如果有的话）
+                                                const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
+                                                if (userText) s.prompt = userText;
+                                            } else {
+                                                msg.parts?.forEach(part => {
+                                                    if (part.type === 'text') {
+                                                        s.response += (part.content?.text || part.text || '');
+                                                    } else if (part.type === 'tool' || part.type === 'action') {
+                                                        const toolContent = part.content || part;
+                                                        const toolEv = {
+                                                            type: 'action',
+                                                            id: part.id,
+                                                            data: {
+                                                                tool_name: toolContent.tool || toolContent.tool_name,
+                                                                input: toolContent.input || toolContent.state?.input,
+                                                                output: toolContent.output || toolContent.state?.output,
+                                                                status: toolContent.status || toolContent.state?.status
+                                                            }
+                                                        };
+                                                        s.orphanEvents.push(toolEv);
+                                                        s.actions.push(toolEv);
+                                                    }
+                                                });
+                                            }
+                                        });
+                                        console.log('[History] Deep load complete for:', s.id);
+
+                                        // 保存到localStorage，下次无需重新加载
+                                        saveState();
+                                    }
+                                } catch (e) {
+                                    console.warn('[History] Failed to fetch session messages:', e);
+                                    console.error('无法加载历史任务，请检查网络连接或刷新页面重试');
+                                } finally {
+                                    s._isLoading = false;
+                                }
+                            }
+
+                            // 清空右侧面板内容，避免显示旧会话的内容
+                            if (window.rightPanelManager) {
+                                // 重置预览状态
+                                window.rightPanelManager.currentMode = null;
+                                window.rightPanelManager.currentFilename = null;
+
+                                // 清空文件编辑器内容
+                                const contentDiv = document.getElementById('file-editor-content');
+                                if (contentDiv) {
+                                    contentDiv.innerHTML = `
+                                        <div class="text-gray-400 dark:text-gray-500 text-center py-8 text-sm">
+                                            等待文件操作...
+                                        </div>
+                                    `;
+                                }
+
+                                // 隐藏 web preview
+                                if (window.rightPanelManager.webPreviewContainer) {
+                                    window.rightPanelManager.webPreviewContainer.classList.add('hidden');
+                                    const iframe = document.getElementById('web-preview-iframe');
+                                    if (iframe) {
+                                        iframe.src = 'about:blank';
+                                    }
+                                }
+
+                                // 隐藏 file editor
+                                if (window.rightPanelManager.fileEditorContainer) {
+                                    window.rightPanelManager.fileEditorContainer.classList.add('hidden');
+                                }
+
+                                // 隐藏 VNC iframe（如果存在）
+                                const vncIframe = document.getElementById('uvn-frame');
+                                if (vncIframe) {
+                                    vncIframe.style.display = 'none';
+                                }
+
+                                // 隐藏右侧面板
+                                window.rightPanelManager.hide();
+                            }
+
+                            renderAll();
+                            saveState();
+                        };
+                        sessionList.appendChild(item);
+                    });
                 }
+                
+                projectItem.appendChild(sessionList);
             }
+            
+            list.appendChild(projectItem);
+        });
+    } else {
+        // 没有项目时，平铺显示所有会话（兼容旧数据）
+        sessions.forEach(s => {
+            const item = document.createElement('div');
+            const isActive = s.id === activeId;
+            item.className = `session-item cursor-pointer mb-1 transition-all ${isActive ? 'active' : ''}`;
+            item.innerHTML = `
+                <div class="session-item-icon">
+                    <span class="material-symbols-outlined text-[14px]">task</span>
+                </div>
+                <span class="session-item-title">${s.prompt ? (s.prompt.substring(0, 24) + (s.prompt.length > 24 ? '...' : '')) : 'New Task'}</span>
+                <button class="session-delete-btn" onclick="event.stopPropagation(); deleteSession('${s.id}')">
+                    <span class="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+            `;
+            item.onclick = async () => {
+                console.log('[点击历史记录] session:', s);
+                console.log('[点击历史记录] actions length:', s.actions?.length);
+                console.log('[点击历史记录] response length:', s.response?.length);
+                state.activeId = s.id;
 
-            // 清空右侧面板内容，避免显示旧会话的内容
-            if (window.rightPanelManager) {
-
-                // 重置预览状态
-                window.rightPanelManager.currentMode = null;
-                window.rightPanelManager.currentFilename = null;
-
-                // 清空文件编辑器内容
-                const contentDiv = document.getElementById('file-editor-content');
-                if (contentDiv) {
-                    contentDiv.innerHTML = `
-                        <div class="text-gray-400 dark:text-gray-500 text-center py-8 text-sm">
-                            等待文件操作...
-                        </div>
-                    `;
+                // 避免重复加载
+                if (s._isLoading) {
+                    console.log('[History] Already loading, skipping...');
+                    return;
                 }
 
-                // 隐藏 web preview
-                if (window.rightPanelManager.webPreviewContainer) {
-                    window.rightPanelManager.webPreviewContainer.classList.add('hidden');
-                    const iframe = document.getElementById('web-preview-iframe');
-                    if (iframe) {
-                        iframe.src = 'about:blank';
+                // 如果是新 API Session 且本地数据不完整（刷新后），从后端深度加载
+                if (s.id.startsWith('ses_') && (!s.actions || s.actions.length === 0)) {
+                    s._isLoading = true;
+                    console.log('[History] Deep loading session content for:', s.id, '(actions:', s.actions?.length, ')');
+                    try {
+                        const data = await apiClient.getMessages(s.id);
+                        if (data && data.messages) {
+                            // 转换后端消息格式到前端 state 格式
+                            s.response = '';
+                            s.phases = [];
+                            s.orphanEvents = [];
+                            s.actions = [];
+
+                            data.messages.forEach(msg => {
+                                if (msg.role === 'user') {
+                                    // 更新 Prompt（如果有的话）
+                                    const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
+                                    if (userText) s.prompt = userText;
+                                } else {
+                                    msg.parts?.forEach(part => {
+                                        if (part.type === 'text') {
+                                            s.response += (part.content?.text || part.text || '');
+                                        } else if (part.type === 'tool' || part.type === 'action') {
+                                            const toolContent = part.content || part;
+                                            const toolEv = {
+                                                type: 'action',
+                                                id: part.id,
+                                                data: {
+                                                    tool_name: toolContent.tool || toolContent.tool_name,
+                                                    input: toolContent.input || toolContent.state?.input,
+                                                    output: toolContent.output || toolContent.state?.output,
+                                                    status: toolContent.status || toolContent.state?.status
+                                                }
+                                            };
+                                            s.orphanEvents.push(toolEv);
+                                            s.actions.push(toolEv);
+                                        }
+                                    });
+                                }
+                            });
+                            console.log('[History] Deep load complete for:', s.id);
+
+                            // 保存到localStorage，下次无需重新加载
+                            saveState();
+                        }
+                    } catch (e) {
+                        console.warn('[History] Failed to fetch session messages:', e);
+                        console.error('无法加载历史任务，请检查网络连接或刷新页面重试');
+                    } finally {
+                        s._isLoading = false;
                     }
                 }
 
-                // 隐藏 file editor
-                if (window.rightPanelManager.fileEditorContainer) {
-                    window.rightPanelManager.fileEditorContainer.classList.add('hidden');
+                // 清空右侧面板内容，避免显示旧会话的内容
+                if (window.rightPanelManager) {
+                    // 重置预览状态
+                    window.rightPanelManager.currentMode = null;
+                    window.rightPanelManager.currentFilename = null;
+
+                    // 清空文件编辑器内容
+                    const contentDiv = document.getElementById('file-editor-content');
+                    if (contentDiv) {
+                        contentDiv.innerHTML = `
+                            <div class="text-gray-400 dark:text-gray-500 text-center py-8 text-sm">
+                                等待文件操作...
+                            </div>
+                        `;
+                    }
+
+                    // 隐藏 web preview
+                    if (window.rightPanelManager.webPreviewContainer) {
+                        window.rightPanelManager.webPreviewContainer.classList.add('hidden');
+                        const iframe = document.getElementById('web-preview-iframe');
+                        if (iframe) {
+                            iframe.src = 'about:blank';
+                        }
+                    }
+
+                    // 隐藏 file editor
+                    if (window.rightPanelManager.fileEditorContainer) {
+                        window.rightPanelManager.fileEditorContainer.classList.add('hidden');
+                    }
+
+                    // 隐藏 VNC iframe（如果存在）
+                    const vncIframe = document.getElementById('uvn-frame');
+                    if (vncIframe) {
+                        vncIframe.style.display = 'none';
+                    }
+
+                    // 隐藏右侧面板
+                    window.rightPanelManager.hide();
                 }
 
-                // 隐藏 VNC iframe（如果存在）
-                const vncIframe = document.getElementById('uvn-frame');
-                if (vncIframe) {
-                    vncIframe.style.display = 'none';
-                }
-
-                // 隐藏右侧面板
-                window.rightPanelManager.hide();
-            }
-
-            renderAll();
-            saveState();
-        };
-        list.appendChild(item);
-    });
+                renderAll();
+                saveState();
+            };
+            list.appendChild(item);
+        });
+    }
 }
 
 function deleteSession(sessionId) {
@@ -951,11 +1269,14 @@ function renderResults() {
 
     // Use enhanced task panel if available
     if (typeof renderEnhancedTaskPanel === 'function') {
+        console.log('[OpenCode] Using enhanced task panel');
         const enhancedPanel = renderEnhancedTaskPanel(s);
         convo.appendChild(enhancedPanel);
         const area = el('#chat-scroll-area');
         area.scrollTop = area.scrollHeight;
         return;
+    } else {
+        console.warn('[OpenCode] Enhanced task panel not available, using fallback rendering');
     }
 
     if (s.prompt) {
@@ -2030,6 +2351,103 @@ function bindUI() {
 }
 
 
+// 新建项目相关函数
+function showNewProjectModal() {
+    const modal = el('#new-project-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        const input = el('#project-name-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+}
+
+function hideNewProjectModal() {
+    const modal = el('#new-project-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+async function createNewProject() {
+    const input = el('#project-name-input');
+    const name = input ? input.value.trim() : '';
+    
+    if (!name) {
+        alert('请输入项目名称');
+        return;
+    }
+    
+    try {
+        const project = await window.apiClient.createProject(name);
+        console.log('[Project] Created:', project);
+        
+        // 添加到本地 state
+        window.state.projects.unshift(project);
+        window.state.activeProjectId = project.id;
+        
+        // 保存状态
+        saveState();
+        
+        // 关闭弹窗
+        hideNewProjectModal();
+        
+        // 重新渲染侧边栏
+        renderSidebar();
+    } catch (e) {
+        console.error('[Project] Create failed:', e);
+        alert('创建项目失败: ' + e.message);
+    }
+}
+
+// 绑定事件
+function initProjectModal() {
+    // 新建项目按钮
+    const newProjectBtn = el('#new-project');
+    if (newProjectBtn) {
+        newProjectBtn.onclick = showNewProjectModal;
+    }
+    
+    // 取消按钮
+    const cancelBtn = el('#cancel-project-btn');
+    if (cancelBtn) {
+        cancelBtn.onclick = hideNewProjectModal;
+    }
+    
+    // 确认按钮
+    const confirmBtn = el('#confirm-project-btn');
+    if (confirmBtn) {
+        confirmBtn.onclick = createNewProject;
+    }
+    
+    // 点击遮罩关闭
+    const modal = el('#new-project-modal');
+    if (modal) {
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                hideNewProjectModal();
+            }
+        };
+    }
+    
+    // 回车创建
+    const input = el('#project-name-input');
+    if (input) {
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                createNewProject();
+            } else if (e.key === 'Escape') {
+                hideNewProjectModal();
+            }
+        };
+    }
+}
+
+
 function init() {
     // Theme initialization
     const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -2038,6 +2456,7 @@ function init() {
 
     loadState();
     bindUI();
+    initProjectModal();
     renderAll();
 
     // Auto-resume if active session exists

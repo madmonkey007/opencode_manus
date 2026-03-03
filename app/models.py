@@ -7,6 +7,18 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Union
 from enum import Enum
 import time
+from datetime import datetime
+import random
+import string
+
+
+# ====================================================================
+# Helper Functions
+# ====================================================================
+
+def random_id(length: int = 8) -> str:
+    """生成随机ID"""
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
 
 # ====================================================================
@@ -47,6 +59,14 @@ class ToolStatus(str, Enum):
 # Session Models
 # ====================================================================
 
+class Project(BaseModel):
+    """项目"""
+    id: str = Field(default_factory=lambda: f"proj_{random_id(9)}")
+    name: str
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
 class SessionTime(BaseModel):
     """会话时间戳"""
     created: int = Field(default_factory=lambda: int(time.time()))
@@ -61,6 +81,7 @@ class Session(BaseModel):
     time: SessionTime = Field(default_factory=SessionTime, description="时间戳")
     status: SessionStatus = Field(default=SessionStatus.ACTIVE, description="会话状态")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="会话元数据")
+    project_id: Optional[str] = Field(default="proj_default", description="所属项目ID，null=默认项目")
 
     class Config:
 

@@ -842,11 +842,12 @@
         if (!existing || isWelcome) {
             // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
             const mode = window._currentMode || DEFAULT_MODE;
-            console.log('[NewAPI] Creating new session with mode:', mode);
+            const projectId = window.state.activeProjectId || null;  // 获取当前选中项目
+            console.log('[NewAPI] Creating new session with mode:', mode, 'project:', projectId);
             
             let session;
             try {
-                session = await window.apiClient.createSession(prompt, mode);
+                session = await window.apiClient.createSession(prompt, mode, '1.0.0', projectId);
                 console.log('[NewAPI] Session created successfully:', session);
 
                 if (!session || !session.id) {

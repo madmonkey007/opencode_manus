@@ -8,6 +8,8 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("opencode.history")
 
+DEFAULT_PROJECT_ID = "proj_default"
+
 class HistoryService:
     def __init__(self, db_path: str = "history.db"):
         self.db_path = db_path
@@ -19,6 +21,15 @@ class HistoryService:
     def _init_db(self):
         with self._get_connection() as conn:
             cursor = conn.cursor()
+            # 项目表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS projects (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
             # 会话表 - 添加title和mode字段
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -27,7 +38,8 @@ class HistoryService:
                     title TEXT,
                     mode TEXT DEFAULT 'auto',
                     start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    status TEXT DEFAULT 'active'
+                    status TEXT DEFAULT 'active',
+                    project_id TEXT DEFAULT 'proj_default'
                 )
             """)
             # 步骤表 (工具调用)
@@ -95,8 +107,25 @@ class HistoryService:
 
             try:
                 cursor.execute("ALTER TABLE sessions ADD COLUMN mode TEXT DEFAULT 'auto'")
-            except:
-                pass  # 列已存在
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" not in str(e).lower():
+                    logger.warning(f"Failed to add column: {e}")
+
+            # 添加 project_id 列（如果不存在）
+            try:
+                cursor.execute("ALTER TABLE sessions ADD COLUMN project_id TEXT DEFAULT 'proj_default'")
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" not in str(e).lower():
+                    logger.warning(f"Failed to add project_id column: {e}")
+
+            # 初始化默认项目（如果不存在）
+            cursor.execute("SELECT id FROM projects WHERE id = ?", (DEFAULT_PROJECT_ID,))
+            if not cursor.fetchone():
+                now = datetime.now().isoformat()
+                cursor.execute(
+                    "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                    (DEFAULT_PROJECT_ID, "默认项目", now, now)
+                )
 
             conn.commit()
 
@@ -408,6 +437,80 @@ class HistoryService:
         except Exception as e:
             logger.error(f"Error getting message parts: {e}")
             return []
+    # Project Methods
+
+    @property
+    def db(self):
+        """获取数据库连接"""
+        return self._get_connection()
+
+    async def create_project(self, project_id: str, name: str) -> dict:
+        """创建项目"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now().isoformat()
+            cursor.execute(
+                "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (project_id, name, now, now)
+            )
+            conn.commit()
+            return {"id": project_id, "name": name, "created_at": now, "updated_at": now}
+
+    async def list_projects(self) -> list:
+        """获取所有项目"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, created_at, updated_at FROM projects ORDER BY created_at DESC")
+            return [{"id": r[0], "name": r[1], "created_at": r[2], "updated_at": r[3]} for r in cursor.fetchall()]
+
+    async def get_project(self, project_id: str) -> Optional[dict]:
+        """获取项目详情"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, created_at, updated_at FROM projects WHERE id = ?", (project_id,))
+            r = cursor.fetchone()
+            return {"id": r[0], "name": r[1], "created_at": r[2], "updated_at": r[3]} if r else None
+
+    async def update_project(self, project_id: str, name: str) -> Optional[dict]:
+        """更新项目"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now().isoformat()
+            cursor.execute("UPDATE projects SET name = ?, updated_at = ? WHERE id = ?", (name, now, project_id))
+            conn.commit()
+            return await self.get_project(project_id)
+
+    async def delete_project(self, project_id: str):
+        """删除项目（将关联会话移到默认项目）"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 不允许删除默认项目
+            if project_id == DEFAULT_PROJECT_ID:
+                raise ValueError("Cannot delete default project")
+            
+            # 将关联会话移到默认项目
+            cursor.execute(
+                "UPDATE sessions SET project_id = ? WHERE project_id = ?",
+                (DEFAULT_PROJECT_ID, project_id)
+            )
+            
+            # 删除项目
+            cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+            conn.commit()
+            logger.info(f"Deleted project {project_id}, moved sessions to {DEFAULT_PROJECT_ID}")
+            logger.info(f"Deleted project {project_id}, moved sessions to {DEFAULT_PROJECT_ID}")
+
+    async def get_project_sessions(self, project_id: str) -> list:
+        """获取项目下的会话列表"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT session_id, prompt, title, mode, status FROM sessions WHERE project_id = ? ORDER BY start_time DESC",
+                (project_id,)
+            )
+            return [{"id": r[0], "prompt": r[1], "title": r[2], "mode": r[3], "status": r[4]} for r in cursor.fetchall()]
+
 
 _instance = None
 def get_history_service():

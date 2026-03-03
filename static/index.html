@@ -821,6 +821,14 @@
                     </button>
                 </div>
 
+                <!-- 新建项目按钮 -->
+                <button id="new-project" class="w-full flex items-center gap-2 px-3 py-2 
+                       text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 
+                       rounded-lg transition-colors mb-2">
+                    <span class="material-symbols-outlined text-[18px]">create_new_folder</span>
+                    <span>新建项目</span>
+                </button>
+
                 <!-- 历史记录按钮（收起时显示） -->
                 <button id="history-btn"
                     class="hidden w-full flex items-center justify-center p-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors rounded-lg"
@@ -1316,6 +1324,28 @@
         })();
     </script>
     <script src="/static/history-fix.js?v=2"></script>
+
+    <!-- 新建项目弹窗 -->
+    <div id="new-project-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-96 p-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">新建项目</h3>
+            <input type="text" id="project-name-input" 
+                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="输入项目名称" maxlength="50">
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="cancel-project-btn"
+                    class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    取消
+                </button>
+                <button id="confirm-project-btn"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    创建
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

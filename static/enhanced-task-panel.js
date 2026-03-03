@@ -1021,3 +1021,6 @@ document.addEventListener('click', (e) => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { renderEnhancedTaskPanel };
 }
+
+// 挂载到全局作用域，确保其他脚本可以访问（浏览器环境）
+window.renderEnhancedTaskPanel = renderEnhancedTaskPanel;
