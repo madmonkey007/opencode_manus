@@ -2005,6 +2005,18 @@ function bindUI() {
         }
     };
 
+    // ✅ v=38.3.1修复：为欢迎页输入框添加Enter键支持
+    const promptWelcome = el('#prompt-welcome');
+    if (promptWelcome) {
+        promptWelcome.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const rsWelcome = el('#runStream-welcome');
+                if (rsWelcome) rsWelcome.click();
+            }
+        };
+    }
+
     els('.tab-btn').forEach(btn => {
         btn.onclick = () => {
             els('.tab-btn').forEach(b => b.classList.remove('active-tab'));
