@@ -552,8 +552,29 @@ class OpenCodeClient:
                     # 继续作为文本处理
         
         # 过滤噪音
+        # ✅ 修复：特殊处理数据库迁移消息（即使包含ANSI序列也要显示）
+        if "database migration" in text.lower():
+            # 清理ANSI转义序列但保留消息
+            import re as _re
+            cleaned_text = _re.sub(r'\[[?0-9;]+[a-zA-Z]', '', text)
+            if cleaned_text.strip():
+                yield {
+                    "type": "message.part.updated",
+                    "properties": {
+                        "part": {
+                            "id": generate_part_id("text"),
+                            "session_id": session_id,
+                            "message_id": message_id,
+                            "type": "text",
+                            "content": {"text": cleaned_text.strip() + " "},
+                            "time": {"start": int(datetime.now().timestamp())},
+                        }
+                    },
+                }
+            return
+
         # 先检查 ANSI 颜色代码和 CLI 警告（使用原始文本）
-        if any(pattern in text for pattern in ["[0m", "[93m", "[1m", "\x1b["]):
+        if any(pattern in text for pattern in ["[0m", "[93m", "[1m", "\x1b[", "[?25"]):
             logger.debug(f"[_process_line] Filtered ANSI color code line")
             return
 

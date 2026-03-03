@@ -41,6 +41,31 @@
     const RENDER_THROTTLE_MS = 250; // ✅ P0-5: renderResults节流间隔提高到250ms，减少渲染频率
     const TYPING_EFFECT_TIMEOUT_MS = 30000; // ✅ P0-1: 打字机效果超时时间（30秒）
 
+    // ✅ 安全错误消息常量（不暴露后端错误详情）
+    const ERROR_MESSAGES = {
+        SESSION_CREATE_FAILED: '创建会话失败，请稍后重试',
+        NETWORK_ERROR: '网络连接失败，请检查网络设置',
+        SUBMISSION_FAILED: '提交任务失败，请稍后重试',
+        SERVER_ERROR: '服务器错误，请稍后重试'
+    };
+
+    // ✅ 根据错误对象返回安全的用户提示消息
+    function getUserSafeErrorMessage(error, defaultMessage = ERROR_MESSAGES.SERVER_ERROR) {
+        console.error('[NewAPI] Error details:', error);
+
+        // 根据错误类型返回安全的用户提示
+        if (error.message && (
+            error.message.includes('network') ||
+            error.message.includes('fetch') ||
+            error.message.includes('ECONNREFUSED') ||
+            error.message.includes('ERR_CONNECTION')
+        )) {
+            return ERROR_MESSAGES.NETWORK_ERROR;
+        }
+
+        return defaultMessage;
+    }
+
     // ✅ v=29: 防止重复显示同一个文件的预览
     // ✅ v=30: 修复内存泄漏 - 使用LRU策略限制Map大小
     const _recentlyPreviewedFiles = new Map(); // path -> timestamp
@@ -797,6 +822,12 @@
     /**
      * 准备并切换 Session
      */
+    /**
+     * 准备或创建 session
+     * @param {string} prompt - 用户输入的提示词
+     * @param {boolean} isWelcome - 是否来自欢迎页
+     * @returns {Promise<Object|null>} session 对象，如果创建失败则返回 null
+     */
     async function prepareSession(prompt, isWelcome) {
         // 尝试从本地状态查找（如果已经点击过侧边栏切换）
         let existing = window.state.sessions.find(s => s.id === window.state.activeId);
@@ -812,7 +843,27 @@
             // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
             const mode = window._currentMode || DEFAULT_MODE;
             console.log('[NewAPI] Creating new session with mode:', mode);
-            const session = await window.apiClient.createSession(prompt, mode);
+            
+            let session;
+            try {
+                session = await window.apiClient.createSession(prompt, mode);
+                console.log('[NewAPI] Session created successfully:', session);
+
+                if (!session || !session.id) {
+                    throw new Error('Invalid session response from server');
+                }
+            } catch (err) {
+                const safeMessage = getUserSafeErrorMessage(err, ERROR_MESSAGES.SESSION_CREATE_FAILED);
+                console.error('[NewAPI] Failed to create session:', err);
+                
+                // 使用非阻塞的 UI 提示（如果存在 showNotification 函数）
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification(safeMessage, 'error');
+                } else {
+                    alert(safeMessage);
+                }
+                return null;
+            }
 
             existing = {
                 id: session.id,
@@ -859,6 +910,15 @@
         try {
             // 准备 Session
             const s = await prepareSession(promptValue, isWelcome);
+            
+            // ✅ 修复：检查 prepareSession 返回值
+            if (!s) {
+                console.error('[NewAPI] prepareSession returned null, aborting submission');
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined !text-white dark:!text-black">arrow_upward</span>';
+                return;
+            }
+            
             // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
             const mode = s.mode || window._currentMode || DEFAULT_MODE;
             console.log(`[NewAPI] Connecting to events... (Mode: ${mode})`);
@@ -871,7 +931,15 @@
             if (secondaryInput) secondaryInput.value = '';
         } catch (err) {
             console.error('[NewAPI] Submission sequence failed:', err);
-            alert('服务器响应异常: ' + (err.message || 'Error occurred'));
+            const safeMessage = getUserSafeErrorMessage(err, ERROR_MESSAGES.SUBMISSION_FAILED);
+            
+            // 使用非阻塞的 UI 提示
+            if (typeof window.showNotification === 'function') {
+                window.showNotification(safeMessage, 'error');
+            } else {
+                alert(safeMessage);
+            }
+            
             const runBtn = document.getElementById('runStream');
             if (runBtn) {
                 runBtn.disabled = false;
