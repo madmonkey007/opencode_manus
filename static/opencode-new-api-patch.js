@@ -39,7 +39,7 @@
     // 子会话配置常量
     const CHILD_SESSION_CLEANUP_DELAY_MS = 5000; // 子会话完成后的清理延迟（毫秒）
     const RENDER_THROTTLE_MS = 250; // ✅ P0-5: renderResults节流间隔提高到250ms，减少渲染频率
-    const TYPING_EFFECT_TIMEOUT_MS = 30000; // ✅ P0-1: 打字机效果超时时间（30秒）
+    const TYPING_EFFECT_TIMEOUT_MS = 5000; // ✅ 修复：降低超时时间到5秒，防止UI被阻塞太久
 
     // ✅ 安全错误消息常量（不暴露后端错误详情）
     const ERROR_MESSAGES = {
