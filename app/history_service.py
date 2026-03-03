@@ -219,6 +219,44 @@ class HistoryService:
             logger.error(f"Error saving message: {e}")
             return False
 
+    async def get_session_messages(self, session_id: str) -> List[dict]:
+        """
+        获取会话的所有消息（从数据库）
+        用于刷新后恢复
+
+        Args:
+            session_id: 会话ID
+
+        Returns:
+            消息字典列表，包含message_id, role, created_at等
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT message_id, session_id, role, created_at, completed_at
+                    FROM messages
+                    WHERE session_id = ?
+                    ORDER BY created_at ASC
+                """, (session_id,))
+
+                messages = []
+                for row in cursor.fetchall():
+                    message_id, sess_id, role, created_at, completed_at = row
+                    messages.append({
+                        "id": message_id,
+                        "session_id": sess_id,
+                        "role": role,
+                        "created_at": created_at,
+                        "completed_at": completed_at
+                    })
+
+                logger.debug(f"Retrieved {len(messages)} messages for session: {session_id}")
+                return messages
+        except Exception as e:
+            logger.error(f"Error getting session messages: {e}")
+            return []
+
     async def save_part(self, session_id: str, message_id: str, part: dict) -> bool:
         """
         保存message part到数据库（工具调用、文本等）

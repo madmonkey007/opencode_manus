@@ -63,6 +63,16 @@ function getFileTypeCategory(ext) {
     return 'default';
 }
 
+// 安全解析 JSON，防止解析失败导致整个加载失败
+function safeParseJSON(str, fallback = {}) {
+    try {
+        return str ? JSON.parse(str) : fallback;
+    } catch (e) {
+        console.warn('[safeParseJSON] JSON parse error:', e.message, '| input:', str);
+        return fallback;
+    }
+}
+
 function renderAll() {
     console.log('🔄 renderAll 被调用');
     console.log('  - sessions 数量:', state.sessions.length);
@@ -442,7 +452,7 @@ async function loadState() {
                                                     id: step.step_id,
                                                     data: {
                                                         tool_name: step.tool_name,
-                                                        input: step.tool_input ? JSON.parse(step.tool_input) : {},
+                                                        input: safeParseJSON(step.tool_input, {}),
                                                         output: null, // steps表没有output字段
                                                         status: 'completed',
                                                         action_type: step.action_type,

@@ -544,6 +544,38 @@ async def process_log_line(text: str, sid: str = None):
                     if output:
                         yield format_sse({"type": "answer_chunk", "text": f"\n`{tool_name}` output:\n{output}\n"})
 
+                    # ✅ v=38.2长期方案：直接保存tool part到message_parts表
+                    if history_service and sid:
+                        try:
+                            # 使用session_id作为message_id（简化方案）
+                            assistant_message_id = f"msg_{sid}"
+
+                            # 先保存message（如果不存在）
+                            await history_service.save_message(sid, assistant_message_id, "assistant")
+
+                            # 保存tool part
+                            part_dict = {
+                                "id": f"part_{step_id}",
+                                "type": "tool",
+                                "content": {
+                                    "tool": tool_name,
+                                    "tool_name": display_type,
+                                    "call_id": step_id,
+                                    "state": {
+                                        "status": status,
+                                        "output": output
+                                    },
+                                    "input": input_data,
+                                    "output": output,
+                                    "text": output
+                                }
+                            }
+                            success = await history_service.save_part(sid, assistant_message_id, part_dict)
+                            if success:
+                                logger.debug(f"Saved tool part to message_parts: {tool_name} for session {sid}")
+                        except Exception as save_err:
+                            logger.warning(f"Failed to save tool part for {sid}: {save_err}")
+
             elif event_type == "text":
                 chunk = event.get("part", {}).get("text", "")
                 if chunk: yield format_sse({"type": "answer_chunk", "text": chunk})

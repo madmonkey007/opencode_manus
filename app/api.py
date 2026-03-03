@@ -220,12 +220,25 @@ async def recover_session_from_disk(session_id: str) -> bool:
 
     try:
         logger.info(f"[Session Recovery] Attempting to recover session {session_id} from disk")
-        # 重新初始化session
-        await session_manager.create_session(
-            session_id=session_id,
+        # ✅ 修复：使用message_store.initialize_session
+        await session_manager.message_store.initialize_session(session_id)
+
+        # 创建session对象并添加到sessions字典
+        from .models import Session, SessionTime, SessionStatus
+        import time
+        recovered_session = Session(
+            id=session_id,
             title=f"Recovered: {session_id}",
-            version="1.0.0"
+            version="1.0.0",
+            time=SessionTime(
+                created=int(time.time()),
+                updated=int(time.time())
+            ),
+            status=SessionStatus.ACTIVE
         )
+        session_manager.sessions[session_id] = recovered_session
+
+        logger.info(f"[Session Recovery] Successfully recovered session {session_id}")
         return True
     except Exception as e:
         logger.error(f"[Session Recovery] Failed to recover {session_id}: {e}")
@@ -255,13 +268,56 @@ async def get_messages(session_id: str):
     # 尝试从内存/数据库获取
     messages = await session_manager.get_messages(session_id)
 
-    # 如果内存中没有，尝试从磁盘恢复
+    # 如果内存中没有，尝试从数据库加载
+    if not messages:
+        # ✅ v=38.2增强：从数据库加载消息
+        try:
+            from .history_service import get_history_service
+            history_svc = get_history_service()
+            db_messages = await history_svc.get_session_messages(session_id)
+
+            if db_messages:
+                # ✅ 先初始化session存储
+                await session_manager.message_store.initialize_session(session_id)
+
+                # 从数据库恢复消息到内存
+                from .models import Message, MessageTime, MessageRole
+                import time
+
+                for msg_data in db_messages:
+                    # 处理时间戳（可能是字符串或整数）
+                    created_ts = msg_data['created_at']
+                    if isinstance(created_ts, str):
+                        # 字符串格式时间戳，直接使用当前时间作为fallback
+                        created_ts = int(time.time())
+                    elif created_ts is None:
+                        created_ts = int(time.time())
+
+                    msg = Message(
+                        id=msg_data['id'],
+                        session_id=msg_data['session_id'],
+                        role=MessageRole.USER if msg_data['role'] == 'user' else MessageRole.ASSISTANT,
+                        time=MessageTime(created=created_ts)
+                    )
+                    # ✅ 使用setdefault安全添加到SessionManager
+                    session_manager.message_store.messages.setdefault(session_id, {})[msg.id] = msg
+                    session_manager.message_store.message_order.setdefault(session_id, []).append(msg.id)
+                    # ✅ 同时初始化parts字典（避免get_messages时的KeyError）
+                    session_manager.message_store.parts.setdefault(session_id, {}).setdefault(msg.id, {})
+
+                # 重新从内存获取
+                messages = await session_manager.get_messages(session_id)
+                logger.info(f"[v38.2] Loaded {len(messages)} messages from database for session: {session_id}")
+        except Exception as db_err:
+            logger.warning(f"[v38.2] Failed to load messages from database: {db_err}")
+
+    # 如果仍然没有，尝试从磁盘恢复
     if not messages:
         # ✅ E1: 缓存磁盘检查结果
         cache_key = f"checked:{session_id}"
         if not _recovery_cache.get(cache_key, False):
             _recovery_cache[cache_key] = True
-            
+
             if await recover_session_from_disk(session_id):
                 # 重新获取messages
                 messages = await session_manager.get_messages(session_id)
@@ -269,6 +325,52 @@ async def get_messages(session_id: str):
     # 如果仍然找不到，返回404
     if not messages:
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+
+    # ✅ v=38.2增强：从数据库加载tool parts（补充内存中可能缺失的parts）
+    try:
+        from .history_service import get_history_service
+        history_svc = get_history_service()
+
+        # 为每个消息添加数据库中的parts
+        for msg in messages:
+            # ✅ MessageWithParts对象需要通过info.id访问消息ID
+            message_id = msg.info.id
+            logger.info(f"[v38.2] Processing message: {message_id}, current parts count: {len(msg.parts)}")
+
+            # 查询该消息的所有parts
+            db_parts = await history_svc.get_message_parts(session_id, message_id)
+            logger.info(f"[v38.2] DB returned {len(db_parts)} parts for message: {message_id}")
+
+            if db_parts:
+                # 将数据库中的parts添加到消息中
+                for part_data in db_parts:
+                    # 检查是否已存在（避免重复）
+                    existing_part_ids = {p.id for p in msg.parts}
+                    part_id = part_data.get('id')
+                    logger.info(f"[v38.2] Checking part: {part_id}, existing: {existing_part_ids}")
+
+                    if part_id not in existing_part_ids:
+                        from .models import Part, PartTime, PartType, PartContent
+                        import time
+
+                        # 创建Part对象
+                        part = Part(
+                            id=part_id or '',
+                            session_id=session_id,
+                            message_id=message_id,
+                            type=PartType.TOOL if part_data.get('type') == 'tool' else PartType.TEXT,
+                            content=PartContent(
+                                tool=part_data.get('content', {}).get('tool'),
+                                call_id=part_data.get('content', {}).get('call_id'),
+                                state=part_data.get('content', {}).get('state'),
+                                text=part_data.get('content', {}).get('text'),
+                            ),
+                            time=PartTime(start=int(time.time())),
+                        )
+                        msg.parts.append(part)
+                        logger.info(f"[v38.2] Loaded part from DB: {part.id} for message: {message_id}, total parts: {len(msg.parts)}")
+    except Exception as db_err:
+        logger.error(f"[v38.2] Failed to load parts from database for {session_id}: {db_err}", exc_info=True)
 
     return {
         "session_id": session_id,
