@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+import sqlite3  # ✅ P1-3修复：导入sqlite3用于细化异常处理
 from .models import MessageTime
 import time
 from datetime import datetime
@@ -225,14 +226,14 @@ async def recover_session_from_disk(session_id: str) -> bool:
 
         # 创建session对象并添加到sessions字典
         from .models import Session, SessionTime, SessionStatus
-        import time
+        import time as time_module  # ✅ 避免命名冲突
         recovered_session = Session(
             id=session_id,
             title=f"Recovered: {session_id}",
             version="1.0.0",
             time=SessionTime(
-                created=int(time.time()),
-                updated=int(time.time())
+                created=int(time_module.time()),
+                updated=int(time_module.time())
             ),
             status=SessionStatus.ACTIVE
         )
@@ -285,11 +286,18 @@ async def get_messages(session_id: str):
                 import time
 
                 for msg_data in db_messages:
-                    # 处理时间戳（可能是字符串或整数）
+                    # ✅ P0-1修复：正确解析SQLite时间戳格式
                     created_ts = msg_data['created_at']
                     if isinstance(created_ts, str):
-                        # 字符串格式时间戳，直接使用当前时间作为fallback
-                        created_ts = int(time.time())
+                        # 解析SQLite时间戳格式 "YYYY-MM-DD HH:MM:SS"
+                        try:
+                            from datetime import datetime
+                            dt = datetime.strptime(created_ts, '%Y-%m-%d %H:%M:%S')
+                            created_ts = int(dt.timestamp())
+                        except ValueError:
+                            # 如果解析失败，使用当前时间
+                            logger.warning(f"[v38.2] Failed to parse timestamp: {created_ts}, using current time")
+                            created_ts = int(time.time())
                     elif created_ts is None:
                         created_ts = int(time.time())
 
@@ -307,9 +315,20 @@ async def get_messages(session_id: str):
 
                 # 重新从内存获取
                 messages = await session_manager.get_messages(session_id)
-                logger.info(f"[v38.2] Loaded {len(messages)} messages from database for session: {session_id}")
-        except Exception as db_err:
-            logger.warning(f"[v38.2] Failed to load messages from database: {db_err}")
+                # ✅ P1-2修复：数据库加载详情用debug级别
+                logger.debug(f"[v38.2] Loaded {len(messages)} messages from database for session: {session_id}")
+        # ✅ P1-3修复：细化异常处理
+        except ValueError as ve:
+            # 参数验证错误，不可恢复
+            logger.error(f"[v38.2] Validation error loading messages: {ve}")
+            raise HTTPException(status_code=400, detail=str(ve))
+        except sqlite3.Error as sqlite_err:
+            # 数据库错误，可恢复（返回空或尝试其他方式）
+            logger.warning(f"[v38.2] Database error loading messages for {session_id}: {sqlite_err}")
+        except Exception as e:
+            # 未预期的错误，记录并向上抛出
+            logger.error(f"[v38.2] Unexpected error loading messages: {e}", exc_info=True)
+            raise  # 重新抛出让上层处理
 
     # 如果仍然没有，尝试从磁盘恢复
     if not messages:
@@ -327,48 +346,67 @@ async def get_messages(session_id: str):
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
 
     # ✅ v=38.2增强：从数据库加载tool parts（补充内存中可能缺失的parts）
+    # ✅ P0-2修复：创建新对象而不是就地修改
+    # ✅ P1-1优化：批量查询解决N+1问题
     try:
         from .history_service import get_history_service
         history_svc = get_history_service()
 
-        # 为每个消息添加数据库中的parts
-        for msg in messages:
-            # ✅ MessageWithParts对象需要通过info.id访问消息ID
-            message_id = msg.info.id
-            logger.info(f"[v38.2] Processing message: {message_id}, current parts count: {len(msg.parts)}")
+        # ✅ P1-1优化：一次性获取session的所有parts（1次查询代替N次）
+        all_parts_by_message = await history_svc.get_all_parts_for_session(session_id)
 
-            # 查询该消息的所有parts
-            db_parts = await history_svc.get_message_parts(session_id, message_id)
-            logger.info(f"[v38.2] DB returned {len(db_parts)} parts for message: {message_id}")
+        if all_parts_by_message:
+            # ✅ P1-2修复：批量加载是重要优化，使用info级别
+            logger.info(f"[v38.2] Batch loaded {len(all_parts_by_message)} messages with parts in 1 query")
 
-            if db_parts:
-                # 将数据库中的parts添加到消息中
-                for part_data in db_parts:
-                    # 检查是否已存在（避免重复）
-                    existing_part_ids = {p.id for p in msg.parts}
-                    part_id = part_data.get('id')
-                    logger.info(f"[v38.2] Checking part: {part_id}, existing: {existing_part_ids}")
+            # 收集需要更新的消息索引
+            updated_messages = []
 
-                    if part_id not in existing_part_ids:
-                        from .models import Part, PartTime, PartType, PartContent
-                        import time
+            for idx, msg in enumerate(messages):
+                message_id = msg.info.id
+                db_parts = all_parts_by_message.get(message_id, [])
 
-                        # 创建Part对象
-                        part = Part(
-                            id=part_id or '',
-                            session_id=session_id,
-                            message_id=message_id,
-                            type=PartType.TOOL if part_data.get('type') == 'tool' else PartType.TEXT,
-                            content=PartContent(
-                                tool=part_data.get('content', {}).get('tool'),
-                                call_id=part_data.get('content', {}).get('call_id'),
-                                state=part_data.get('content', {}).get('state'),
-                                text=part_data.get('content', {}).get('text'),
-                            ),
-                            time=PartTime(start=int(time.time())),
-                        )
-                        msg.parts.append(part)
-                        logger.info(f"[v38.2] Loaded part from DB: {part.id} for message: {message_id}, total parts: {len(msg.parts)}")
+                if db_parts:
+                    logger.debug(f"[v38.2] Message {message_id} has {len(db_parts)} parts in DB")
+
+                    # 创建新的parts列表（复制现有parts）
+                    new_parts = list(msg.parts)
+                    existing_part_ids = {p.id for p in new_parts}
+
+                    # 添加数据库中的新parts
+                    for part_data in db_parts:
+                        part_id = part_data.get('id')
+                        if part_id and part_id not in existing_part_ids:
+                            from .models import Part, PartTime, PartType, PartContent
+
+                            # 创建Part对象
+                            part = Part(
+                                id=part_id,
+                                session_id=session_id,
+                                message_id=message_id,
+                                type=PartType.TOOL if part_data.get('type') == 'tool' else PartType.TEXT,
+                                content=PartContent(
+                                    tool=part_data.get('content', {}).get('tool'),
+                                    call_id=part_data.get('content', {}).get('call_id'),
+                                    state=part_data.get('content', {}).get('state'),
+                                    text=part_data.get('content', {}).get('text'),
+                                ),
+                                time=PartTime(start=int(time.time())),  # ✅ 使用顶部导入的time模块
+                            )
+                            new_parts.append(part)
+                            existing_part_ids.add(part_id)
+                            logger.debug(f"[v38.2] Loaded part from DB: {part.id} for message: {message_id}")
+
+                    # 创建新的MessageWithParts对象
+                    from .models import MessageWithParts
+                    updated_msg = MessageWithParts(info=msg.info, parts=new_parts)
+                    updated_messages.append((idx, updated_msg))
+                    logger.info(f"[v38.2] Updated message {message_id} with {len(new_parts)} total parts")
+
+            # 应用更新
+            for idx, updated_msg in updated_messages:
+                messages[idx] = updated_msg
+
     except Exception as db_err:
         logger.error(f"[v38.2] Failed to load parts from database for {session_id}: {db_err}", exc_info=True)
 

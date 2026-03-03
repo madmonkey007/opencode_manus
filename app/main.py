@@ -572,7 +572,8 @@ async def process_log_line(text: str, sid: str = None):
                             }
                             success = await history_service.save_part(sid, assistant_message_id, part_dict)
                             if success:
-                                logger.debug(f"Saved tool part to message_parts: {tool_name} for session {sid}")
+                                # ✅ P1-2修复：数据库保存是重要业务操作，使用info级别
+                                logger.info(f"Saved tool part to DB: {tool_name} for session {sid}")
                         except Exception as save_err:
                             logger.warning(f"Failed to save tool part for {sid}: {save_err}")
 

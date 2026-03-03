@@ -230,6 +230,12 @@ class HistoryService:
         Returns:
             消息字典列表，包含message_id, role, created_at等
         """
+        # ✅ P0-3修复：验证session_id格式
+        import re
+        if not re.match(r'^[a-zA-Z0-9_]+$', session_id):
+            logger.error(f"Invalid session_id format: {session_id}")
+            raise ValueError(f"Invalid session_id format: {session_id}. Only alphanumeric and underscore allowed.")
+
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -307,6 +313,60 @@ class HistoryService:
         except Exception as e:
             logger.error(f"Error saving part: {e}")
             return False
+
+    async def get_all_parts_for_session(self, session_id: str) -> Dict[str, List[dict]]:
+        """
+        ✅ P1-1优化：批量获取会话的所有parts（解决N+1查询问题）
+
+        Args:
+            session_id: 会话ID
+
+        Returns:
+            字典：{message_id: [part_dict, ...]}
+        """
+        # ✅ P0-3修复：验证session_id格式
+        import re
+        if not re.match(r'^[a-zA-Z0-9_]+$', session_id):
+            logger.error(f"Invalid session_id format: {session_id}")
+            raise ValueError(f"Invalid session_id format: {session_id}. Only alphanumeric and underscore allowed.")
+
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                # 一次性查询session的所有parts
+                cursor.execute("""
+                    SELECT part_id, message_id, part_type, content_json
+                    FROM message_parts
+                    WHERE message_id IN (
+                        SELECT message_id FROM messages WHERE session_id = ?
+                    )
+                    ORDER BY created_at ASC
+                """, (session_id,))
+
+                # 按message_id分组
+                parts_by_message = {}
+                for row in cursor.fetchall():
+                    part_id, message_id, part_type, content_json = row
+                    try:
+                        content = json.loads(content_json) if content_json else {}
+                        part_dict = {
+                            "id": part_id,
+                            "message_id": message_id,
+                            "type": part_type,
+                            "content": content
+                        }
+
+                        if message_id not in parts_by_message:
+                            parts_by_message[message_id] = []
+                        parts_by_message[message_id].append(part_dict)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse part content: {e}")
+
+                logger.debug(f"Retrieved {len(parts_by_message)} messages with parts for session: {session_id}")
+                return parts_by_message
+        except Exception as e:
+            logger.error(f"Error getting all parts for session: {e}")
+            return {}
 
     async def get_message_parts(self, session_id: str, message_id: str) -> List[dict]:
         """
