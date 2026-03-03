@@ -2122,5 +2122,17 @@
     window.loadSessionTimeline = loadSessionTimeline;
     window.handleHistorySessionClick = handleHistorySessionClick;
     window.ChildSessionManager = ChildSessionManager;
+    
+    // ✅ 修复 UI 提交流程：暴露关键函数到全局作用域
+    // handleGlobalClick 需要调用这些函数，必须在全局作用域可访问
+    window.prepareSession = prepareSession;
+    window.executeSubmission = executeSubmission;
+    window.handleNewAPIConnection = handleNewAPIConnection;
+    
+    console.log('[NewAPI] Core functions exposed to global scope:', {
+        prepareSession: typeof window.prepareSession,
+        executeSubmission: typeof window.executeSubmission,
+        handleNewAPIConnection: typeof window.handleNewAPIConnection
+    });
     console.log('[NewAPI] ChildSessionManager exposed to global scope');
 })();
