@@ -2005,8 +2005,8 @@ function bindUI() {
         }
     };
 
-    // ✅ v=38.3.1修复：为欢迎页输入框添加Enter键支持
-    const promptWelcome = el('#prompt-welcome');
+    // ✅ v=38.3.3修复：为欢迎页输入框添加Enter键支持
+    // 使用已声明的promptWelcome变量（在函数开头声明）
     if (promptWelcome) {
         promptWelcome.onkeydown = (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -2064,4 +2064,6 @@ if (document.readyState === 'loading') {
 } else {
     init();
 }
-// Version 7 - 1770561617
+// Version 38.3.4 - Fixed promptWelcome duplicate declaration issue
+// Build timestamp: 1770561617
+console.log('[OpenCode] Loaded opencode.js v38.3.4');

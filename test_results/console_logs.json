@@ -1,0 +1,327 @@
+[
+  {
+    "type": "warning",
+    "text": "cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+    "timestamp": "2026-03-03T12:18:57.130665"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Initializing V2.8 Patch (Advanced UI Mode)...",
+    "timestamp": "2026-03-03T12:18:57.760104"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Welcome mode selector initialized with default mode: build",
+    "timestamp": "2026-03-03T12:18:57.764104"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] V2.8 Advanced UI active",
+    "timestamp": "2026-03-03T12:18:57.764104"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] ChildSessionManager exposed to global scope",
+    "timestamp": "2026-03-03T12:18:57.764104"
+  },
+  {
+    "type": "log",
+    "text": "[OpenCode] Loaded opencode.js v38.3.4",
+    "timestamp": "2026-03-03T12:18:57.806828"
+  },
+  {
+    "type": "log",
+    "text": "[History Fix v2] Loading...",
+    "timestamp": "2026-03-03T12:18:57.822532"
+  },
+  {
+    "type": "log",
+    "text": "[History Fix v2] ✓ Global functions loaded",
+    "timestamp": "2026-03-03T12:18:57.822532"
+  },
+  {
+    "type": "log",
+    "text": "[History Fix v2] typeof window.loadSessionTimeline: function",
+    "timestamp": "2026-03-03T12:18:57.823533"
+  },
+  {
+    "type": "log",
+    "text": "[loadState] Loading state...",
+    "timestamp": "2026-03-03T12:18:57.869239"
+  },
+  {
+    "type": "log",
+    "text": "🔄 renderAll 被调用",
+    "timestamp": "2026-03-03T12:18:57.874239"
+  },
+  {
+    "type": "log",
+    "text": "  - sessions 数量: 0",
+    "timestamp": "2026-03-03T12:18:57.874747"
+  },
+  {
+    "type": "log",
+    "text": "  - activeId: null",
+    "timestamp": "2026-03-03T12:18:57.875763"
+  },
+  {
+    "type": "log",
+    "text": "[RightPanelManager] Clearing preview...",
+    "timestamp": "2026-03-03T12:18:57.875763"
+  },
+  {
+    "type": "log",
+    "text": "[updateInterfaceMode] 调试信息:",
+    "timestamp": "2026-03-03T12:18:57.879275"
+  },
+  {
+    "type": "log",
+    "text": "  - activeId: null",
+    "timestamp": "2026-03-03T12:18:57.879275"
+  },
+  {
+    "type": "log",
+    "text": "  - sessions 数量: 0",
+    "timestamp": "2026-03-03T12:18:57.880272"
+  },
+  {
+    "type": "log",
+    "text": "  - activeSession: undefined",
+    "timestamp": "2026-03-03T12:18:57.880272"
+  },
+  {
+    "type": "log",
+    "text": "  - hasMessages: undefined",
+    "timestamp": "2026-03-03T12:18:57.880766"
+  },
+  {
+    "type": "log",
+    "text": "  - prompt: undefined",
+    "timestamp": "2026-03-03T12:18:57.880766"
+  },
+  {
+    "type": "log",
+    "text": "  - response: undefined",
+    "timestamp": "2026-03-03T12:18:57.881274"
+  },
+  {
+    "type": "log",
+    "text": "✓ 切换到欢迎模式",
+    "timestamp": "2026-03-03T12:18:57.881274"
+  },
+  {
+    "type": "log",
+    "text": "[Sync] Found 1 sessions from backend",
+    "timestamp": "2026-03-03T12:18:57.938161"
+  },
+  {
+    "type": "log",
+    "text": "[Sync] Adding new session ses_9f34ffdc",
+    "timestamp": "2026-03-03T12:18:57.938161"
+  },
+  {
+    "type": "log",
+    "text": "[Sync] Total sessions after merge: 1",
+    "timestamp": "2026-03-03T12:18:57.939163"
+  },
+  {
+    "type": "log",
+    "text": "[Sync] Deep loading 1 new sessions...",
+    "timestamp": "2026-03-03T12:18:57.939163"
+  },
+  {
+    "type": "log",
+    "text": "🔄 renderAll 被调用",
+    "timestamp": "2026-03-03T12:18:57.950434"
+  },
+  {
+    "type": "log",
+    "text": "  - sessions 数量: 1",
+    "timestamp": "2026-03-03T12:18:57.950434"
+  },
+  {
+    "type": "log",
+    "text": "  - activeId: null",
+    "timestamp": "2026-03-03T12:18:57.951435"
+  },
+  {
+    "type": "log",
+    "text": "[RightPanelManager] Clearing preview...",
+    "timestamp": "2026-03-03T12:18:57.951435"
+  },
+  {
+    "type": "log",
+    "text": "[updateInterfaceMode] 调试信息:",
+    "timestamp": "2026-03-03T12:18:57.951435"
+  },
+  {
+    "type": "log",
+    "text": "  - activeId: null",
+    "timestamp": "2026-03-03T12:18:57.951435"
+  },
+  {
+    "type": "log",
+    "text": "  - sessions 数量: 1",
+    "timestamp": "2026-03-03T12:18:57.951435"
+  },
+  {
+    "type": "log",
+    "text": "  - activeSession: undefined",
+    "timestamp": "2026-03-03T12:18:57.952944"
+  },
+  {
+    "type": "log",
+    "text": "  - hasMessages: undefined",
+    "timestamp": "2026-03-03T12:18:57.952944"
+  },
+  {
+    "type": "log",
+    "text": "  - prompt: undefined",
+    "timestamp": "2026-03-03T12:18:57.952944"
+  },
+  {
+    "type": "log",
+    "text": "  - response: undefined",
+    "timestamp": "2026-03-03T12:18:57.953627"
+  },
+  {
+    "type": "log",
+    "text": "✓ 切换到欢迎模式",
+    "timestamp": "2026-03-03T12:18:57.953627"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Successfully hijacked updateInterfaceMode for panel clearing",
+    "timestamp": "2026-03-03T12:18:57.992611"
+  },
+  {
+    "type": "log",
+    "text": "[Sync] Deep load complete for: ses_9f34ffdc ( 0 actions)",
+    "timestamp": "2026-03-03T12:18:58.005248"
+  },
+  {
+    "type": "log",
+    "text": "[Sync] Saving state after deep loads",
+    "timestamp": "2026-03-03T12:18:58.946186"
+  },
+  {
+    "type": "log",
+    "text": "[saveState] Saved 1 sessions (0.00MB)",
+    "timestamp": "2026-03-03T12:18:59.049817"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Global Intercept: runStream-welcome clicked",
+    "timestamp": "2026-03-03T12:19:05.770745"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Processing submission... {isWelcome: true, promptLength: 19}",
+    "timestamp": "2026-03-03T12:19:05.772743"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Creating new session with mode: build",
+    "timestamp": "2026-03-03T12:19:05.772743"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Session created successfully: {id: ses_e4ee579a, title: New Session, version: 1.0.0, time: Object, status: active}",
+    "timestamp": "2026-03-03T12:19:05.798284"
+  },
+  {
+    "type": "log",
+    "text": "[prepareSession] Saving new session to localStorage",
+    "timestamp": "2026-03-03T12:19:05.798284"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Connecting to events... (Mode: build)",
+    "timestamp": "2026-03-03T12:19:05.798284"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Establishing SSE for: ses_e4ee579a isNewSubmission: true",
+    "timestamp": "2026-03-03T12:19:05.799283"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Right panel auto-expanded (isNewSubmission: true , isRunning: false )",
+    "timestamp": "2026-03-03T12:19:05.799283"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Sending user message to backend (Mode: build , Turn: 2 )",
+    "timestamp": "2026-03-03T12:19:05.800282"
+  },
+  {
+    "type": "log",
+    "text": "🔄 renderAll 被调用",
+    "timestamp": "2026-03-03T12:19:05.852908"
+  },
+  {
+    "type": "log",
+    "text": "  - sessions 数量: 2",
+    "timestamp": "2026-03-03T12:19:05.852908"
+  },
+  {
+    "type": "log",
+    "text": "  - activeId: ses_e4ee579a",
+    "timestamp": "2026-03-03T12:19:05.853759"
+  },
+  {
+    "type": "log",
+    "text": "[updateInterfaceMode] 调试信息:",
+    "timestamp": "2026-03-03T12:19:05.865127"
+  },
+  {
+    "type": "log",
+    "text": "  - activeId: ses_e4ee579a",
+    "timestamp": "2026-03-03T12:19:05.866135"
+  },
+  {
+    "type": "log",
+    "text": "  - sessions 数量: 2",
+    "timestamp": "2026-03-03T12:19:05.866679"
+  },
+  {
+    "type": "log",
+    "text": "  - activeSession: {id: ses_e4ee579a, title: New Session, prompt: 写一个简单的hello world网页, response: , phases: Array(0)}",
+    "timestamp": "2026-03-03T12:19:05.867186"
+  },
+  {
+    "type": "log",
+    "text": "  - hasMessages: 写一个简单的hello world网页",
+    "timestamp": "2026-03-03T12:19:05.867186"
+  },
+  {
+    "type": "log",
+    "text": "  - prompt: 写一个简单的hello world网页",
+    "timestamp": "2026-03-03T12:19:05.867186"
+  },
+  {
+    "type": "log",
+    "text": "  - response: ",
+    "timestamp": "2026-03-03T12:19:05.867186"
+  },
+  {
+    "type": "log",
+    "text": "✓ 切换到聊天模式",
+    "timestamp": "2026-03-03T12:19:05.868194"
+  },
+  {
+    "type": "log",
+    "text": "[NewAPI] Mode selector updated to: build for session: ses_e4ee579a",
+    "timestamp": "2026-03-03T12:19:05.868194"
+  },
+  {
+    "type": "log",
+    "text": "[SSE] Connected to session: ses_e4ee579a",
+    "timestamp": "2026-03-03T12:19:05.893399"
+  },
+  {
+    "type": "log",
+    "text": "[saveState] Saved 2 sessions (0.00MB)",
+    "timestamp": "2026-03-03T12:19:05.956830"
+  }
+]

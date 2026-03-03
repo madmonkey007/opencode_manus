@@ -22,6 +22,43 @@ class EventAdapter {
             return null;
         }
 
+        // ✅ 修复：处理后端直接发送的 tool_use 事件
+        // 后端格式：{"type":"tool_use","part":{...},"sessionID":"ses_..."}
+        if (eventType === 'tool_use') {
+            const part = newEvent.part;
+            if (!part) {
+                console.warn('[EventAdapter] tool_use event missing part data:', newEvent);
+                return null;
+            }
+
+            console.log('[EventAdapter] Adapting tool_use event:', part);
+            const adapted = this.adaptPartEvent(part, session, options);
+
+            // 如果是工具调用，添加到 actions 数组
+            if (adapted && adapted.type === 'action') {
+                console.log('[EventAdapter] Adding tool_use to actions:', adapted);
+                if (!session.actions) {
+                    session.actions = [];
+                }
+                session.actions.push(adapted);
+            }
+
+            return adapted;
+        }
+
+        // ✅ 修复：处理后端直接发送的 text 事件
+        // 后端格式：{"type":"text","part":{...},"sessionID":"ses_..."}
+        if (eventType === 'text') {
+            const part = newEvent.part;
+            if (!part) {
+                console.warn('[EventAdapter] text event missing part data:', newEvent);
+                return null;
+            }
+
+            console.log('[EventAdapter] Adapting text event:', part);
+            return this.adaptPartEvent(part, session, options);
+        }
+
         // 连接建立事件
         if (eventType === 'connection.established') {
             return {
@@ -295,7 +332,7 @@ class EventAdapter {
 
             const adaptedEvent = {
                 id: part.id,
-                type: 'action',
+                type: toolType,  // ✅ 修复：使用实际的工具类型（write/bash/terminal等）
                 data: {
                     id: part.id,
                     tool: toolType,

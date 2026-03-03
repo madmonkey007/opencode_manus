@@ -1,0 +1,197 @@
+[
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/",
+    "resource_type": "document"
+  },
+  {
+    "method": "GET",
+    "url": "https://cdn.tailwindcss.com/?plugins=forms,typography",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap",
+    "resource_type": "stylesheet"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
+    "resource_type": "stylesheet"
+  },
+  {
+    "method": "GET",
+    "url": "https://cdn.jsdelivr.net/npm/marked/marked.min.js",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/tool-icons.js?v=7",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/preview-config.js?v=2",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/code-preview-enhanced.js?v=1",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/timeline-progress.js?v=2",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/enhanced-task-panel.js?v=18",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/right-panel-manager.js?v=10",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/api-client.js?v=2",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/event-adapter.js?v=4",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/opencode-new-api-patch.js?v=38.3.6",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/opencode.js?v=38.3.5",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/static/history-fix.js?v=2",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,typography@0.5.16",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/materialsymbolsoutlined/v316/kJEhBvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oFsI.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.119.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.118.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.117.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.116.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.115.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.114.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.113.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.107.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.112.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.111.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css",
+    "resource_type": "stylesheet"
+  },
+  {
+    "method": "GET",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js",
+    "resource_type": "script"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/opencode/sessions",
+    "resource_type": "fetch"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/opencode/session/ses_9f34ffdc/messages",
+    "resource_type": "fetch"
+  },
+  {
+    "method": "POST",
+    "url": "http://localhost:8089/opencode/session",
+    "resource_type": "fetch"
+  },
+  {
+    "method": "POST",
+    "url": "http://localhost:8089/opencode/session/ses_e4ee579a/message",
+    "resource_type": "fetch"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/opencode/events?session_id=ses_e4ee579a",
+    "resource_type": "eventsource"
+  },
+  {
+    "method": "GET",
+    "url": "http://localhost:8089/opencode/list_session_files?sid=ses_e4ee579a",
+    "resource_type": "fetch"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.110.woff2",
+    "resource_type": "font"
+  },
+  {
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/notosanssc/v40/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.103.woff2",
+    "resource_type": "font"
+  }
+]
