@@ -792,6 +792,12 @@ function renderResults() {
     const convo = el('#chat-messages'); if (!convo) return;
     const s = state.sessions.find(x => x.id === state.activeId);
     convo.innerHTML = '';
+    
+    // 欢迎页面时清空右侧预览面板，避免显示旧会话的内容
+    if (!s && window.rightPanelManager) {
+        window.rightPanelManager.clearPreview && window.rightPanelManager.clearPreview();
+    }
+    
     if (!s) { return; }
 
     // Use enhanced task panel if available

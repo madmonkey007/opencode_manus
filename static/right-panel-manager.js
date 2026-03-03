@@ -171,6 +171,19 @@ class RightPanelManager {
         }
     }
 
+    // 清空网页预览（用于欢迎页面时）
+    clearPreview() {
+        console.log('[RightPanelManager] Clearing preview...');
+        const iframe = document.getElementById('web-preview-iframe');
+        if (iframe) {
+            iframe.src = 'about:blank';
+        }
+        // 同时隐藏 web preview container
+        if (this.webPreviewContainer) {
+            this.webPreviewContainer.classList.add('hidden');
+        }
+    }
+
     // Show file editor mode
     showFileEditor(filename, content = '') {
         this.show();
