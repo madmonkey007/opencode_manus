@@ -794,6 +794,12 @@
         // 尝试从本地状态查找（如果已经点击过侧边栏切换）
         let existing = window.state.sessions.find(s => s.id === window.state.activeId);
 
+        // ✅ 从已存在的 session 恢复 turnIndex
+        if (existing && existing.turnIndex !== undefined) {
+            window._turnIndex = existing.turnIndex;
+            console.log('[NewAPI] Restored turnIndex from session:', window._turnIndex);
+        }
+
         // 如果是新任务，或者当前没有活跃 ID，则创建
         if (!existing || isWelcome) {
             // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
@@ -812,9 +818,12 @@
                 deliverables: [],
                 status: 'active',
                 mode: mode,
+                turnIndex: 1,        // ✅ 初始化 turnIndex，从1开始
                 _version: 1,          // ✅ 添加版本号用于数据迁移
                 _createdTime: Date.now()  // ✅ 添加创建时间，用于宽限期判断
             };
+            // ✅ 从 session 恢复 turnIndex
+            window._turnIndex = existing.turnIndex || 1;
             window.state.sessions.unshift(existing);
             window.state.activeId = existing.id;  // ✅ 立即更新activeId，防止临时session被误删
 
@@ -987,7 +996,12 @@
         );
 
         if (isNewSubmission) {
-            window._turnIndex = (window._turnIndex || 0) + 1; // 每一轮新对话增加索引
+            // ✅ 每一轮新对话增加索引，并持久化到 session
+            window._turnIndex = (window._turnIndex || 0) + 1;
+            // ✅ 将 turnIndex 同步到 session 对象，确保刷新后能恢复
+            if (s) {
+                s.turnIndex = window._turnIndex;
+            }
             const currentPrompt = s.prompt.split('\n\n---\n\n').pop();
             console.log('[NewAPI] Sending user message to backend (Mode:', window._currentMode, ', Turn:', window._turnIndex, ')');
             await window.apiClient.sendTextMessage(s.id, currentPrompt, { mode: window._currentMode });

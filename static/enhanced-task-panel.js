@@ -87,11 +87,19 @@ function renderEnhancedTaskPanel(session) {
 
         // 2. 任务阶段卡片 - 仅显示属于该对话轮次 (turn_index === i + 1) 的 phases
         // 注意：turnIndex 是从 1 开始计数的（在 patch.js 中初始化为 1）
-        const turnPhases = session.phases ? session.phases.filter(p => (p.turn_index === i + 1)) : [];
+        // ✅ 修复：使用 parseInt 确保类型一致，避免字符串与数字比较失败
+        const turnPhases = session.phases ? session.phases.filter(p => {
+            const phaseTurn = parseInt(p.turn_index, 10);
+            return phaseTurn === i + 1;
+        }) : [];
         
         // 兜底：如果是最后一轮且没找到匹配的 turn_index，显示所有未关联的 phases
+        // ✅ 修复：使用 parseInt 确保类型一致
         if (i === turnsCount - 1 && turnPhases.length === 0 && session.phases && session.phases.length > 0) {
-            const unassociatedPhases = session.phases.filter(p => !p.turn_index || p.turn_index >= i + 1);
+            const unassociatedPhases = session.phases.filter(p => {
+                const phaseTurn = parseInt(p.turn_index, 10);
+                return !p.turn_index || phaseTurn >= i + 1;
+            });
             if (unassociatedPhases.length > 0) {
                 const phasesCard = createPhasesCard(unassociatedPhases, session.currentPhase);
                 turnContainer.appendChild(phasesCard);
