@@ -213,12 +213,83 @@ async def get_log(sid: str, offset: int = 0):
 
 # Global Session Manager
 class SessionManager:
+    """会话管理器，负责管理OpenCode会话的生命周期和持久化"""
+
+    # 常量定义
+    DB_PATH = "/app/opencode/workspace/history.db"  # ✅ 与Go CLI保持一致
+    SESSION_ID_PREFIX = "ses_"
+    SESSION_ID_LENGTH = 9
+
     def __init__(self):
         self.sessions: Dict[str, Dict[str, Any]] = {}
+        self.db_path = self.DB_PATH
+
+    def _write_session_to_db(self, sid: str, prompt: str):
+        """
+        ✅ v=38.4.2修复：将session写入数据库，同时兼容Python和Go CLI的schema
+
+        修复说明：
+        1. 数据库路径统一为 /app/opencode/workspace/history.db
+        2. 同时填充旧列（prompt, status, workspace_path）和新列（title, message_count等）
+        3. 使用Unix时间戳与Go CLI保持一致
+
+        Schema兼容性：
+        - Python使用: prompt, status, workspace_path
+        - Go CLI使用: title, message_count, prompt_tokens, completion_tokens, cost
+        - 修复方案：同时写入两组列，确保兼容性
+        """
+        try:
+            import sqlite3
+            import time
+
+            now = int(time.time())
+            title = prompt[:100] if len(prompt) > 100 else prompt
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            # ✅ 同时填充旧列和新列，确保兼容性
+            cursor.execute("""
+                INSERT INTO sessions (
+                    -- 旧列（Python使用）
+                    id, prompt, status, workspace_path,
+                    -- 新列（Go CLI使用）
+                    title, message_count, prompt_tokens, completion_tokens, cost,
+                    -- 时间戳
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0.0, ?, ?)
+            """, (sid, prompt, "running", f"/app/opencode/workspace/{sid}",
+                   title, now, now))
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"[DB] Session {sid} written to database (dual-schema compatible)")
+        except sqlite3.IntegrityError as e:
+            # Session ID已存在，更新时间戳
+            logger.warning(f"[DB] Session {sid} already exists, updating timestamp")
+            try:
+                import time
+                now = int(time.time())
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute("UPDATE sessions SET updated_at = ? WHERE id = ?", (now, sid))
+                conn.commit()
+                conn.close()
+            except Exception as e2:
+                logger.error(f"[DB] Failed to update session {sid}: {e2}")
+        except Exception as e:
+            logger.error(f"[DB] Failed to write session {sid} to database: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     async def create_session(self, sid: str, prompt: str, mode: str = "auto"):
         if sid in self.sessions:
             return self.sessions[sid]
+
+        # 1. 写入数据库（让Go CLI可以查询）
+        self._write_session_to_db(sid, prompt)
 
         self.sessions[sid] = {
             "queues": [],  # List of queues for connected clients
