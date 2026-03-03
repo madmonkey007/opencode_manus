@@ -1325,7 +1325,7 @@
             // ====================================================================
             // 子会话事件处理 - 检测并自动订阅子session
             // ====================================================================
-            if (adapted.type === 'action' && adapted.data && adapted.data.tool_name === 'task') {
+            if (adapted.data && adapted.data.tool_name === 'task') {
                 console.log('[ChildSession] Detected task tool event');
 
                 // Parse, Don't Validate: 在边界处解析子session ID
