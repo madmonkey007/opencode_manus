@@ -102,7 +102,7 @@ class OpenCodeClient:
         assistant_message_id: str,
         user_prompt: str,
         mode: str = "auto",
-        model_id: str = "new-api/gemini-3-flash-preview",
+        model_id: str = "new-api/glm-4.7",
     ):
         """
         执行单条消息（调用 CLI 并广播事件）

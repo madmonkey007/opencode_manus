@@ -327,7 +327,7 @@ class SessionManager:
                 "opencode",
                 "run",
                 "--model",
-                "new-api/gemini-3-flash-preview",
+                "new-api/glm-4.7",
                 "--format",
                 "json",
             ]
