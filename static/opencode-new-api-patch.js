@@ -1795,6 +1795,19 @@
                 s.actions.push(actionEvent);
                 s.orphanEvents.push(actionEvent);
 
+                // ✅ 修复：将 actionEvent 关联到当前 phase
+                // 这样增强任务面板就能显示工具调用记录
+                if (s.currentPhase && s.phases) {
+                    const currentPhase = s.phases.find(p => p.id === s.currentPhase);
+                    if (currentPhase) {
+                        if (!currentPhase.events) currentPhase.events = [];
+                        currentPhase.events.push(actionEvent);
+                        console.log('[NewAPI] Associated action to phase:', currentPhase.id, 'event:', actionEvent.data.tool_name);
+                    } else {
+                        console.warn('[NewAPI] Current phase not found:', s.currentPhase);
+                    }
+                }
+
                 console.log('[NewAPI] Added action to session:', actionEvent.data.tool_name, 'total actions:', s.actions.length);
             }
 
