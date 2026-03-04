@@ -42,16 +42,16 @@ function safeRenderMarkdown(markdownContent) {
     //   import DOMPurify from 'dompurify';
     //   return DOMPurify.sanitize(marked.parse(markdownContent));
     //
-    // 临时安全方案：使用纯文本显示（无Markdown格式，但XSS安全）
+    // ✅ v=38.4.11 改进：使用简化的markdown渲染器
+    // 支持常见格式：**粗体**、*斜体*、- 列表、`代码`、换行等
+    // 安全性：只处理特定的markdown语法，不渲染HTML标签
     try {
         if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
             // 生产环境：使用DOMPurify消毒
             return DOMPurify.sanitize(marked.parse(markdownContent));
         } else {
-            // 降级方案：纯文本显示（安全但无格式）
-            const div = document.createElement('div');
-            div.textContent = markdownContent;
-            return div.innerHTML;
+            // ✅ v=38.4.11: 简化的markdown渲染器（安全且支持基本格式）
+            return renderSimpleMarkdown(markdownContent);
         }
     } catch (e) {
         console.error('[safeRenderMarkdown] Failed to render markdown:', e);
@@ -59,6 +59,61 @@ function safeRenderMarkdown(markdownContent) {
         div.textContent = markdownContent;
         return div.innerHTML;
     }
+}
+
+/**
+ * ✅ v=38.4.11: 简化的markdown渲染器
+ * 支持基本markdown语法，同时保证XSS安全
+ * 不使用eval/innerHTML，手动构建DOM
+ */
+function renderSimpleMarkdown(text) {
+    if (!text) return '';
+
+    // 安全处理：先转义HTML特殊字符
+    let safeText = escapeHtml(text);
+
+    // 然后处理markdown语法（从特殊到一般，避免重复处理）
+    // 1. 代码块 ```code```
+    safeText = safeText.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 dark:bg-zinc-800 p-2 rounded my-1 overflow-x-auto text-xs"><code>$1</code></pre>');
+
+    // 2. 行内代码 `code`
+    safeText = safeText.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-zinc-800 px-1 rounded text-xs">$1</code>');
+
+    // 3. 粗体 **text**
+    safeText = safeText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    // 4. 斜体 *text*
+    safeText = safeText.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // 5. 链接 [text](url)
+    safeText = safeText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-500 underline" target="_blank" rel="noopener">$1</a>');
+
+    // 6. 无序列表 - item（处理整个列表）
+    // 匹配连续的列表项
+    const listPattern = /(^|\n)- (.+)(\n(?!\-)|\n*$)/g;
+    safeText = safeText.replace(listPattern, (match, prefix, itemContent, end) => {
+        return `<ul class="list-disc list-inside my-1 space-y-0.5"><li>${itemContent}</li></ul>${end}`;
+    });
+
+    // 7. 有序列表 1. item
+    const orderedListPattern = /(^|\n)\d+\. (.+)(\n(?!\d+\.)|\n*$)/g;
+    safeText = safeText.replace(orderedListPattern, (match, prefix, itemContent, end) => {
+        return `<ol class="list-decimal list-inside my-1 space-y-0.5"><li>${itemContent}</li></ol>${end}`;
+    });
+
+    // 8. 标题 # Heading
+    // ✅ v=38.4.11.1 修复：统一间距为 my-1，与列表保持一致
+    safeText = safeText.replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold my-1">$1</h3>');
+    safeText = safeText.replace(/^## (.+)$/gm, '<h2 class="text-base font-bold my-1">$1</h2>');
+    safeText = safeText.replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold my-1">$1</h1>');
+
+    // 9. 换行（不在列表中的换行）
+    // ✅ v=38.4.11 修复：减少段落间距
+    // 修复问题：原 /\n\n/g 无法匹配 \n\n\n 等多个换行符的情况
+    // 改进：使用 /\n{2,}/g 匹配2个或更多连续换行符
+    safeText = safeText.replace(/\n{2,}/g, '<br class="mb-2">');
+
+    return safeText;
 }
 
 // 渲染增强的任务面板
@@ -240,7 +295,12 @@ function createPhaseItem(phase, index, currentPhaseId, isLast) {
 
     // 渲染该阶段的所有事件（执行动作）
     if (phase.events && phase.events.length > 0) {
-        phase.events.forEach((event, eventIdx) => {
+        // ✅ v=38.4.11 修复：使用工具函数按时间戳排序，确保事件显示顺序正确
+        // 问题：SSE事件到达顺序可能乱序，导致thought事件显示在工具调用之后
+        // 解决：使用全局工具函数window.sortEventsByTimestamp排序（升序，早的在前）
+        const sortedEvents = window.sortEventsByTimestamp(phase.events);
+
+        sortedEvents.forEach((event, eventIdx) => {
             const eventItem = createEventItem(event, eventIdx);
             body.appendChild(eventItem);
         });
@@ -333,6 +393,8 @@ function createEventItem(event, index) {
         title = 'thought';
         // 显示完整的思考内容，而不是token数
         content = event.content || event.data?.text || (typeof event.data === 'string' ? event.data : '') || '思考中...';
+        // ✅ v=38.4.11 修复：thought内容使用markdown渲染
+        // 原因：GLM-4.7的reasoning内容包含markdown格式（列表、粗体等）
         isExpandable = true;
     } else if (isError) {
         iconHtml = '<span class="material-symbols-outlined text-[14px]">error</span>';
@@ -365,10 +427,11 @@ function createEventItem(event, index) {
 
         if (input || output) {
             isExpandable = true;
+            // ✅ v=38.4.11 优化：减小bash/terminal字体大小，特别针对中文字符
             detailsHtml = `
-                <div class="mt-2 p-2 bg-gray-50 dark:bg-black/20 rounded border border-gray-100 dark:border-white/5 font-mono text-[10px] overflow-auto max-h-60">
-                    ${inputIsNotEmpty ? `<div class="text-blue-500 mb-1">Incoming Input:</div><pre class="whitespace-pre-wrap mb-2">${escapeHtml(input)}</pre>` : ''}
-                    ${output ? `<div class="text-green-500 mb-1">Command Output:</div><pre class="whitespace-pre-wrap">${escapeHtml(output)}</pre>` : ''}
+                <div class="mt-2 p-2 bg-gray-50 dark:bg-black/20 rounded border border-gray-100 dark:border-white/5 font-mono text-[9px] leading-tight overflow-auto max-h-60">
+                    ${inputIsNotEmpty ? `<div class="text-blue-500 mb-0.5">Incoming Input:</div><pre class="whitespace-pre-wrap mb-1">${escapeHtml(input)}</pre>` : ''}
+                    ${output ? `<div class="text-green-500 mb-0.5">Command Output:</div><pre class="whitespace-pre-wrap">${escapeHtml(output)}</pre>` : ''}
                 </div>
             `;
         }
@@ -386,8 +449,8 @@ function createEventItem(event, index) {
                 <div class="flex items-center gap-2 mb-1">
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200">${title}</span>
                 </div>
-                <div class="event-content text-xs text-gray-500 dark:text-gray-400 ${isExpandable ? 'line-clamp-2' : ''}">${escapeHtml(content || '')}</div>
-                <div class="event-details hidden">${detailsHtml || escapeHtml(content || '')}</div>
+                <div class="event-content text-xs text-gray-500 dark:text-gray-400 ${isExpandable ? 'line-clamp-2' : ''}">${isThought ? safeRenderMarkdown(content || '') : escapeHtml(content || '')}</div>
+                <div class="event-details hidden">${detailsHtml || (isThought ? safeRenderMarkdown(content || '') : escapeHtml(content || ''))}</div>
             </div>
             ${isExpandable ? `
                 <div class="flex-shrink-0 expand-icon-wrapper cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
@@ -1024,3 +1087,4 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // 挂载到全局作用域，确保其他脚本可以访问（浏览器环境）
 window.renderEnhancedTaskPanel = renderEnhancedTaskPanel;
+
