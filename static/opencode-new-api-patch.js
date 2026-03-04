@@ -1521,6 +1521,23 @@
                     if (typeof window.addSystemMessage === 'function') {
                         window.addSystemMessage(`[Timeline] ${title}`, 'info');
                     }
+
+                    // ✅ v=38.4.12: 关联 timeline_event 到 phase.events
+                    // 这样增强任务面板也能显示 timeline 事件
+                    if (s.currentPhase && s.phases) {
+                        const currentPhase = s.phases.find(p => p.id === s.currentPhase);
+                        if (currentPhase) {
+                            if (!currentPhase.events) currentPhase.events = [];
+                            currentPhase.events.push({
+                                type: 'timeline_event',
+                                title: title,
+                                content: content,
+                                step: step,
+                                timestamp: Date.now()
+                            });
+                            console.log('[NewAPI] Associated timeline_event to phase:', currentPhase.id);
+                        }
+                    }
                 }
 
                 return;
@@ -1795,18 +1812,9 @@
                 s.actions.push(actionEvent);
                 s.orphanEvents.push(actionEvent);
 
-                // ✅ 修复：将 actionEvent 关联到当前 phase
-                // 这样增强任务面板就能显示工具调用记录
-                if (s.currentPhase && s.phases) {
-                    const currentPhase = s.phases.find(p => p.id === s.currentPhase);
-                    if (currentPhase) {
-                        if (!currentPhase.events) currentPhase.events = [];
-                        currentPhase.events.push(actionEvent);
-                        console.log('[NewAPI] Associated action to phase:', currentPhase.id, 'event:', actionEvent.data.tool_name);
-                    } else {
-                        console.warn('[NewAPI] Current phase not found:', s.currentPhase);
-                    }
-                }
+                // ✅ v=38.4.12: 删除重复关联 - 统一使用第1929行的通用处理器
+                // 避免同一个事件被添加两次到 phase.events
+                // 通用处理器已经有完整的去重和更新逻辑（第1942-1961行）
 
                 console.log('[NewAPI] Added action to session:', actionEvent.data.tool_name, 'total actions:', s.actions.length);
             }
