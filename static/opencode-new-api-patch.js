@@ -39,7 +39,7 @@
     // 子会话配置常量
     const CHILD_SESSION_CLEANUP_DELAY_MS = 5000; // 子会话完成后的清理延迟（毫秒）
     const RENDER_THROTTLE_MS = 250; // ✅ P0-5: renderResults节流间隔提高到250ms，减少渲染频率
-    const TYPING_EFFECT_TIMEOUT_MS = 5000; // ✅ 修复：降低超时时间到5秒，防止UI被阻塞太久
+    const TYPING_EFFECT_TIMEOUT_MS = 30000; // ✅ P0-1: 打字机效果超时时间（30秒）
 
     // ✅ 安全错误消息常量（不暴露后端错误详情）
     const ERROR_MESSAGES = {
@@ -86,15 +86,16 @@
                 count++;
                 console.log(`[TypingEffectManager] Start (count: ${count}, reason: ${reason})`);
 
-                // ✅ v=30: 修复并发bug - 只在第一个打字机效果开始时设置超时
-                // 防止"永远不超时"的问题（如果持续调用start会不断重置超时）
-                if (count === 1 && !timeout) {
-                    timeout = setTimeout(() => {
-                        console.warn(`[TypingEffectManager] ⚠️ Timeout after ${TYPING_EFFECT_TIMEOUT_MS}ms, auto-resetting`);
-                        this.reset('timeout');
-                    }, TYPING_EFFECT_TIMEOUT_MS);
-                    console.log(`[TypingEffectManager] Timeout timer set for ${TYPING_EFFECT_TIMEOUT_MS}ms`);
+                // ✅ v=29: 每次start都重置超时定时器（防止Query气泡抖动）
+                // ✅ v=30: 修复并发bug - 防止"永远不超时"的问题
+                if (timeout) {
+                    clearTimeout(timeout);
                 }
+                timeout = setTimeout(() => {
+                    console.warn(`[TypingEffectManager] ⚠️ Timeout after ${TYPING_EFFECT_TIMEOUT_MS}ms, auto-resetting`);
+                    this.reset('timeout');
+                }, TYPING_EFFECT_TIMEOUT_MS);
+                console.log(`[TypingEffectManager] Timeout timer reset for ${TYPING_EFFECT_TIMEOUT_MS}ms`);
             },
 
             /**
