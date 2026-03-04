@@ -338,6 +338,12 @@ async function loadState() {
                     return false;
                 }
 
+                // ✅ 修复：确保所有session都有project_id
+                if (!s.project_id) {
+                    s.project_id = 'proj_default';
+                    repairedCount++;
+                }
+
                 // ✅ 修复C2竞态条件: 添加宽限期，清理真正的旧空session
                 const now = Date.now();
                 const GRACE_PERIOD_MS = 5 * 60 * 1000;  // 5分钟宽限期
@@ -614,6 +620,9 @@ async function renameProject(projectId, currentName) {
     const savedActiveProjectId = localStorage.getItem('opencode_activeProjectId');
     if (savedActiveProjectId) {
         state.activeProjectId = savedActiveProjectId;
+    } else {
+        // ✅ 修复：默认选中proj_default项目，确保历史记录能显示
+        state.activeProjectId = 'proj_default';
     }
 
     // 从后端同步 Session 列表
@@ -647,6 +656,7 @@ async function renameProject(projectId, currentName) {
                             actions: [],
                             orphanEvents: [],
                             mode: bs.mode || null,
+                            project_id: bs.project_id || 'proj_default',  // ✅ 修复：确保project_id有默认值
                             _version: 1,
                             _createdTime: Date.now()  // ✅ 添加创建时间，用于宽限期判断
                         });
@@ -792,7 +802,8 @@ function renderSidebar() {
     if (projects && projects.length > 0) {
         projects.forEach(project => {
             // 获取该项目下的会话
-            const projectSessions = sessions.filter(s => s.project_id === project.id);
+            // ✅ 修复：兼容没有project_id的旧session，默认分配到proj_default
+            const projectSessions = sessions.filter(s => (s.project_id || 'proj_default') === project.id);
             
             // 创建项目分组
             const projectItem = document.createElement('div');
