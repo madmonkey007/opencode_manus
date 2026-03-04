@@ -499,7 +499,6 @@ class HistoryService:
             cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
             conn.commit()
             logger.info(f"Deleted project {project_id}, moved sessions to {DEFAULT_PROJECT_ID}")
-            logger.info(f"Deleted project {project_id}, moved sessions to {DEFAULT_PROJECT_ID}")
 
     async def get_project_sessions(self, project_id: str) -> list:
         """获取项目下的会话列表"""
