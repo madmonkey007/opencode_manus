@@ -885,18 +885,18 @@
                     <span class="material-symbols-outlined text-gray-400 text-sm">expand_more</span>
                 </div>
             </div>
-            <div class="flex items-center gap-4">
-                <!-- 文件和预览按钮 -->
-                <div class="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl shadow-inner">
-                    <button id="toggle-files-panel" class="top-action-btn text-gray-500" data-panel="files">
-                        <span class="material-symbols-outlined text-[16px]">description</span>
-                        <span class="ml-1">文件</span>
-                    </button>
-                    <button id="toggle-preview-panel" class="top-action-btn active text-gray-500" data-panel="preview">
-                        <span class="material-symbols-outlined text-[16px]">visibility</span>
-                        <span class="ml-1">预览</span>
-                    </button>
-                </div>
+             <div class="flex items-center gap-4">
+                 <!-- 文件和预览按钮（仅在任务页显示） -->
+                 <div id="files-preview-buttons" class="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl shadow-inner hidden">
+                     <button id="toggle-files-panel" class="top-action-btn text-gray-500" data-panel="files">
+                         <span class="material-symbols-outlined text-[16px]">description</span>
+                         <span class="ml-1">文件</span>
+                     </button>
+                     <button id="toggle-preview-panel" class="top-action-btn active text-gray-500" data-panel="preview">
+                         <span class="material-symbols-outlined text-[16px]">visibility</span>
+                         <span class="ml-1">预览</span>
+                     </button>
+                 </div>
                 <div class="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
                 <div
                     class="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full text-[12px] border border-border-light dark:border-white/10 transition-colors">

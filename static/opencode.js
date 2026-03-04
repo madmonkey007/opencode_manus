@@ -1579,6 +1579,11 @@ function bindUI() {
         if (bottomInputContainer) {
             bottomInputContainer.classList.remove('hidden');
         }
+        // 显示文件和预览按钮
+        const filesPreviewButtons = el('#files-preview-buttons');
+        if (filesPreviewButtons) {
+            filesPreviewButtons.classList.remove('hidden');
+        }
     }
 
     // Function to switch back to welcome mode
@@ -1586,6 +1591,11 @@ function bindUI() {
         if (welcomeInterface) welcomeInterface.classList.remove('hidden');
         if (chatMessages) chatMessages.classList.add('hidden');
         if (bottomInputContainer) bottomInputContainer.classList.add('hidden');
+        // 隐藏文件和预览按钮
+        const filesPreviewButtons = el('#files-preview-buttons');
+        if (filesPreviewButtons) {
+            filesPreviewButtons.classList.add('hidden');
+        }
     }
 
     // Task Tag Selection Logic
