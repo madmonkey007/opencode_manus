@@ -240,7 +240,6 @@
         }
 
         .tab-btn.active {
-            background: rgba(59, 130, 246, 0.1);
             color: #3b82f6;
         }
 
@@ -1107,9 +1106,18 @@
         <div
             class="h-14 border-b border-border-light dark:border-border-dark flex items-center px-4 justify-between bg-white dark:bg-surface-dark shrink-0 transition-theme">
             <div class="flex items-center gap-4">
-                <button class="tab-btn text-sm font-medium px-2 py-4 text-gray-500 dark:text-gray-400" data-tab="preview">Manus's
-                    Computer</button>
-                <button class="tab-btn active-tab text-sm font-medium px-2 py-4" data-tab="files">Files</button>
+                <button class="tab-btn text-sm font-medium px-2 py-4 text-gray-500 dark:text-gray-400" data-tab="preview">
+                    <span class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">computer</span>
+                        <span>Manus's Computer</span>
+                    </span>
+                </button>
+                <button class="tab-btn active-tab text-sm font-medium px-2 py-4" data-tab="files">
+                    <span class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">folder</span>
+                        <span>Files</span>
+                    </span>
+                </button>
             </div>
             <button id="close-vm-panel" class="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors"
                 title="Close">
