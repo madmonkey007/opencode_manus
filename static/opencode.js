@@ -164,12 +164,12 @@ function _executeSave(retryCount = 0) {
                 // 检查是否在宽限期内（最近创建或正在加载的session）
                 const sessionAge = now - (s._createdTime || now);
                 if (sessionAge < GRACE_PERIOD_MS) {
-                    console.log(`[saveState] Grace period active for ${s.id} (${Math.round(sessionAge/1000)}s old), skipping cleanup`);
+                    console.log(`[saveState] Grace period active for ${s.id} (${Math.round(sessionAge / 1000)}s old), skipping cleanup`);
                     return true;  // 保留，在宽限期内
                 }
 
                 // 超过宽限期且确实为空，清理
-                console.log('[saveState] Cleaning up truly empty session:', s.id, `(${Math.round(sessionAge/1000/60)}min old)`);
+                console.log('[saveState] Cleaning up truly empty session:', s.id, `(${Math.round(sessionAge / 1000 / 60)}min old)`);
                 return false;
             }
             return true;
@@ -277,7 +277,7 @@ function _executeSave(retryCount = 0) {
                 name: p.name
             }));
             localStorage.setItem('opencode_projects', JSON.stringify(projectData));
-            
+
             // 保存 activeProjectId
             if (state.activeProjectId) {
                 localStorage.setItem('opencode_activeProjectId', state.activeProjectId);
@@ -363,7 +363,7 @@ async function loadState() {
                     }
 
                     // 超过宽限期且确实为空，清理
-                    console.log('[loadState] Cleaning up truly empty session:', s.id, `(${Math.round(sessionAge/1000/60)}min old)`);
+                    console.log('[loadState] Cleaning up truly empty session:', s.id, `(${Math.round(sessionAge / 1000 / 60)}min old)`);
                     cleanedCount++;
                     return false;
                 }
@@ -459,66 +459,66 @@ async function loadState() {
                                         if (state.activeId === s.id && typeof renderAll === 'function') {
                                             console.log('[loadState] Refreshing UI for current session');
                                             renderAll();
-}
+                                        }
 
 
-// 项目删除和重命名功能
-async function confirmDeleteProject(projectId, projectName) {
-    const confirmed = confirm(`确定要删除项目"${projectName}"吗？\n\n项目下的所有任务将被移到"默认项目"中。`);
-    if (!confirmed) return;
-    
-    try {
-        await window.apiClient.deleteProject(projectId);
-        console.log('[Project] Deleted:', projectId);
-        
-        // 从本地 state 移除
-        window.state.projects = window.state.projects.filter(p => p.id !== projectId);
-        
-        // 如果删除的是当前选中项目，切换到默认项目
-        if (window.state.activeProjectId === projectId) {
-            window.state.activeProjectId = null;
-        }
-        
-        // 重新加载会话列表（更新 project_id）
-        if (typeof apiClient !== 'undefined') {
-            try {
-                const sessions = await apiClient.listSessions();
-                window.state.sessions = sessions;
-            } catch (e) {
-                console.warn('[Project] Failed to reload sessions:', e);
-            }
-        }
-        
-        saveState();
-        renderSidebar();
-    } catch (e) {
-        console.error('[Project] Delete failed:', e);
-        alert('删除项目失败: ' + e.message);
-    }
-}
+                                        // 项目删除和重命名功能
+                                        async function confirmDeleteProject(projectId, projectName) {
+                                            const confirmed = confirm(`确定要删除项目"${projectName}"吗？\n\n项目下的所有任务将被移到"默认项目"中。`);
+                                            if (!confirmed) return;
 
-async function renameProject(projectId, currentName) {
-    const newName = prompt('请输入新的项目名称:', currentName);
-    if (!newName || newName.trim() === '') return;
-    if (newName === currentName) return;
-    
-    try {
-        const updated = await window.apiClient.updateProject(projectId, newName.trim());
-        console.log('[Project] Renamed:', updated);
-        
-        // 更新本地 state
-        const project = window.state.projects.find(p => p.id === projectId);
-        if (project) {
-            project.name = updated.name;
-        }
-        
-        saveState();
-        renderSidebar();
-    } catch (e) {
-        console.error('[Project] Rename failed:', e);
-        alert('重命名项目失败: ' + e.message);
-    }
-}
+                                            try {
+                                                await window.apiClient.deleteProject(projectId);
+                                                console.log('[Project] Deleted:', projectId);
+
+                                                // 从本地 state 移除
+                                                window.state.projects = window.state.projects.filter(p => p.id !== projectId);
+
+                                                // 如果删除的是当前选中项目，切换到默认项目
+                                                if (window.state.activeProjectId === projectId) {
+                                                    window.state.activeProjectId = null;
+                                                }
+
+                                                // 重新加载会话列表（更新 project_id）
+                                                if (typeof apiClient !== 'undefined') {
+                                                    try {
+                                                        const sessions = await apiClient.listSessions();
+                                                        window.state.sessions = sessions;
+                                                    } catch (e) {
+                                                        console.warn('[Project] Failed to reload sessions:', e);
+                                                    }
+                                                }
+
+                                                saveState();
+                                                renderSidebar();
+                                            } catch (e) {
+                                                console.error('[Project] Delete failed:', e);
+                                                alert('删除项目失败: ' + e.message);
+                                            }
+                                        }
+
+                                        async function renameProject(projectId, currentName) {
+                                            const newName = prompt('请输入新的项目名称:', currentName);
+                                            if (!newName || newName.trim() === '') return;
+                                            if (newName === currentName) return;
+
+                                            try {
+                                                const updated = await window.apiClient.updateProject(projectId, newName.trim());
+                                                console.log('[Project] Renamed:', updated);
+
+                                                // 更新本地 state
+                                                const project = window.state.projects.find(p => p.id === projectId);
+                                                if (project) {
+                                                    project.name = updated.name;
+                                                }
+
+                                                saveState();
+                                                renderSidebar();
+                                            } catch (e) {
+                                                console.error('[Project] Rename failed:', e);
+                                                alert('重命名项目失败: ' + e.message);
+                                            }
+                                        }
 
 
                                         // ✅ 修复C1: 成功后才设置_deepLoaded
@@ -795,20 +795,20 @@ async function renameProject(projectId, currentName) {
 function renderSidebar() {
     const list = el('#session-list'); if (!list) return;
     list.innerHTML = '';
-    
+
     const { sessions, projects, activeId, activeProjectId } = state;
-    
+
     // 如果有项目，按项目分组显示
     if (projects && projects.length > 0) {
         projects.forEach(project => {
             // 获取该项目下的会话
             // ✅ 修复：兼容没有project_id的旧session，默认分配到proj_default
             const projectSessions = sessions.filter(s => (s.project_id || 'proj_default') === project.id);
-            
+
             // 创建项目分组
             const projectItem = document.createElement('div');
             projectItem.className = 'project-group mb-2';
-            
+
             // 项目标题
             const projectHeader = document.createElement('div');
             projectHeader.className = `project-header group flex items-center gap-2 px-3 py-2 
@@ -839,21 +839,21 @@ function renderSidebar() {
                     ` : ''}
                 </div>
             `;
-            
+
             // 点击项目展开/折叠
             projectHeader.onclick = () => {
                 state.activeProjectId = state.activeProjectId === project.id ? null : project.id;
                 saveState();
                 renderSidebar();
             };
-            
+
             projectItem.appendChild(projectHeader);
-            
+
             // 如果项目展开，显示会话列表
             if (activeProjectId === project.id || project.id === 'proj_default') {
                 const sessionList = document.createElement('div');
                 sessionList.className = 'session-list ml-4 mt-1';
-                
+
                 if (projectSessions.length === 0) {
                     sessionList.innerHTML = '<div class="text-xs text-gray-400 px-3 py-2">暂无任务</div>';
                 } else {
@@ -987,10 +987,10 @@ function renderSidebar() {
                         sessionList.appendChild(item);
                     });
                 }
-                
+
                 projectItem.appendChild(sessionList);
             }
-            
+
             list.appendChild(projectItem);
         });
     } else {
@@ -1270,12 +1270,12 @@ function renderResults() {
     const convo = el('#chat-messages'); if (!convo) return;
     const s = state.sessions.find(x => x.id === state.activeId);
     convo.innerHTML = '';
-    
+
     // 欢迎页面时清空右侧预览面板，避免显示旧会话的内容
     if (!s && window.rightPanelManager) {
         window.rightPanelManager.clearPreview && window.rightPanelManager.clearPreview();
     }
-    
+
     if (!s) { return; }
 
     // Use enhanced task panel if available
@@ -1295,7 +1295,7 @@ function renderResults() {
         const prompts = s.prompt.split(pSep);
         prompts.forEach(p => {
             const m = document.createElement('div');
-            m.className = 'message-bubble user-bubble animate-fade-in self-end mb-6 text-sm shadow-md';
+            m.className = 'message-bubble user-bubble self-end mb-6 text-sm shadow-md';
             m.textContent = p;
             convo.appendChild(m);
         });
@@ -2069,7 +2069,7 @@ function bindUI() {
         // 且不会在 sessions 列表中产生空 session，直到用户真正提交任务
         state.activeId = null;
         renderAll();
-        
+
         // 切换到侧边栏显示状态（如果之前是折叠的）
         if (sidebar && sidebar.classList.contains('collapsed') && expandSidebarBtn) {
             expandSidebarBtn.click();
@@ -2397,26 +2397,26 @@ function hideNewProjectModal() {
 async function createNewProject() {
     const input = el('#project-name-input');
     const name = input ? input.value.trim() : '';
-    
+
     if (!name) {
         alert('请输入项目名称');
         return;
     }
-    
+
     try {
         const project = await window.apiClient.createProject(name);
         console.log('[Project] Created:', project);
-        
+
         // 添加到本地 state
         window.state.projects.unshift(project);
         window.state.activeProjectId = project.id;
-        
+
         // 保存状态
         saveState();
-        
+
         // 关闭弹窗
         hideNewProjectModal();
-        
+
         // 重新渲染侧边栏
         renderSidebar();
     } catch (e) {
@@ -2432,19 +2432,19 @@ function initProjectModal() {
     if (newProjectBtn) {
         newProjectBtn.onclick = showNewProjectModal;
     }
-    
+
     // 取消按钮
     const cancelBtn = el('#cancel-project-btn');
     if (cancelBtn) {
         cancelBtn.onclick = hideNewProjectModal;
     }
-    
+
     // 确认按钮
     const confirmBtn = el('#confirm-project-btn');
     if (confirmBtn) {
         confirmBtn.onclick = createNewProject;
     }
-    
+
     // 点击遮罩关闭
     const modal = el('#new-project-modal');
     if (modal) {
@@ -2454,7 +2454,7 @@ function initProjectModal() {
             }
         };
     }
-    
+
     // 回车创建
     const input = el('#project-name-input');
     if (input) {

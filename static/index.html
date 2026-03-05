@@ -884,18 +884,19 @@
                     <span class="material-symbols-outlined text-gray-400 text-sm">expand_more</span>
                 </div>
             </div>
-             <div class="flex items-center gap-4">
-                 <!-- 文件和预览按钮（仅在任务页显示） -->
-                 <div id="files-preview-buttons" class="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl shadow-inner hidden">
-                     <button id="toggle-files-panel" class="top-action-btn text-gray-500" data-panel="files">
-                         <span class="material-symbols-outlined text-[16px]">description</span>
-                         <span class="ml-1">文件</span>
-                     </button>
-                     <button id="toggle-preview-panel" class="top-action-btn active text-gray-500" data-panel="preview">
-                         <span class="material-symbols-outlined text-[16px]">visibility</span>
-                         <span class="ml-1">预览</span>
-                     </button>
-                 </div>
+            <div class="flex items-center gap-4">
+                <!-- 文件和预览按钮（仅在任务页显示） -->
+                <div id="files-preview-buttons"
+                    class="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl shadow-inner hidden">
+                    <button id="toggle-files-panel" class="top-action-btn text-gray-500" data-panel="files">
+                        <span class="material-symbols-outlined text-[16px]">description</span>
+                        <span class="ml-1">文件</span>
+                    </button>
+                    <button id="toggle-preview-panel" class="top-action-btn active text-gray-500" data-panel="preview">
+                        <span class="material-symbols-outlined text-[16px]">visibility</span>
+                        <span class="ml-1">预览</span>
+                    </button>
+                </div>
                 <div class="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
                 <div
                     class="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full text-[12px] border border-border-light dark:border-white/10 transition-colors">
@@ -919,22 +920,26 @@
                     <!-- Mode Selector for Welcome Page -->
                     <div class="w-full max-w-3xl mb-4">
                         <div class="flex justify-center">
-                            <div id="welcome-mode-selector" class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1">
-                                <button class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all"
+                            <div id="welcome-mode-selector"
+                                class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1">
+                                <button
+                                    class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all"
                                     data-mode="plan">
                                     <span class="flex items-center gap-2">
                                         <span class="material-symbols-outlined !text-[18px]">psychology</span>
                                         <span>Plan 分析</span>
                                     </span>
                                 </button>
-                                <button class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all bg-white dark:bg-gray-700 shadow"
+                                <button
+                                    class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all bg-white dark:bg-gray-700 shadow"
                                     data-mode="build">
                                     <span class="flex items-center gap-2">
                                         <span class="material-symbols-outlined !text-[18px]">build</span>
                                         <span>Build 开发</span>
                                     </span>
                                 </button>
-                                <button class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all"
+                                <button
+                                    class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all"
                                     data-mode="auto">
                                     <span class="flex items-center gap-2">
                                         <span class="material-symbols-outlined !text-[18px]">auto_awesome</span>
@@ -1106,7 +1111,8 @@
         <div
             class="h-14 border-b border-border-light dark:border-border-dark flex items-center px-4 justify-between bg-white dark:bg-surface-dark shrink-0 transition-theme">
             <div class="flex items-center gap-4">
-                <button class="tab-btn text-sm font-medium px-2 py-4 text-gray-500 dark:text-gray-400" data-tab="preview">
+                <button class="tab-btn text-sm font-medium px-2 py-4 text-gray-500 dark:text-gray-400"
+                    data-tab="preview">
                     <span class="flex items-center gap-1">
                         <span class="material-symbols-outlined text-[16px]">computer</span>
                         <span>Manus's Computer</span>
@@ -1204,18 +1210,18 @@
     <script src="/static/preview-config.js?v=2"></script>
     <script src="/static/code-preview-enhanced.js?v=1"></script>
     <script src="/static/timeline-progress.js?v=2"></script>
-    <script src="/static/enhanced-task-panel.js?v=22"></script>
+    <script src="/static/enhanced-task-panel.js?v=25"></script>
     <script src="/static/right-panel-manager.js?v=10"></script>
     <!-- 新架构 API 客户端和事件适配器 -->
     <script src="/static/api-client.js?v=2"></script>
-    <script src="/static/event-adapter.js?v=38.4.1"></script>
+    <script src="/static/event-adapter.js?v=38.4.2"></script>
     <!-- 新 API 扩展（Monkey patch submitTask）- 暂时禁用，因为找不到 submitTask 函数 -->
-    <script src="/static/opencode-new-api-patch.js?v=38.4.12"></script>
+    <script src="/static/opencode-new-api-patch.js?v=38.4.15"></script>
 
     <!-- Mock 数据：仅对 demo session 启用，真实 session 使用 API -->
     <!-- <script src="/static/mock-data.js?v=7"></script> -->
     <!-- <script src="/static/enable-mock.js?v=8"></script> -->
-    <script src="/static/opencode.js?v=38.5"></script>
+    <script src="/static/opencode.js?v=38.4.1"></script>
 
     <!-- 初始化时间轴和预览组件 -->
     <script>
@@ -1268,9 +1274,9 @@
 
     <!-- Material Symbols Icon Fallback -->
     <script>
-        (function() {
+        (function () {
             // 检测Material Symbols字体是否加载成功
-            setTimeout(function() {
+            setTimeout(function () {
                 const testElement = document.createElement('span');
                 testElement.style.fontFamily = 'Material Symbols Outlined';
                 testElement.textContent = 'test';
@@ -1337,18 +1343,15 @@
     <div id="new-project-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-96 p-6">
             <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">新建项目</h3>
-            <input type="text" id="project-name-input" 
-                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+            <input type="text" id="project-name-input" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
                        bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="输入项目名称" maxlength="50">
+                       focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="输入项目名称" maxlength="50">
             <div class="flex justify-end gap-3 mt-6">
                 <button id="cancel-project-btn"
                     class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                     取消
                 </button>
-                <button id="confirm-project-btn"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <button id="confirm-project-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                     创建
                 </button>
             </div>

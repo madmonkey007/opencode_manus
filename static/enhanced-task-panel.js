@@ -4,9 +4,19 @@
  */
 
 /**
+ * ✅ 辅助函数 - 按时间戳排序事件
+ */
+window.sortEventsByTimestamp = function (events) {
+    if (!Array.isArray(events)) return [];
+    return [...events].sort((a, b) => {
+        const timeA = a.timestamp || (a.data && a.data.timestamp) || a.time || 0;
+        const timeB = b.timestamp || (b.data && b.data.timestamp) || b.time || 0;
+        return timeA - timeB;
+    });
+};
+
+/**
  * ✅ 代码审查修复：辅助函数 - 从文件对象中提取文件名和扩展名
- * 消除重复代码，提升可维护性
- * 修复问题：Critical #2 - 文件分类逻辑重复
  */
 function extractFileInfo(file) {
     const fileName = typeof file === 'string' ? file : (file.name || file.path || '');
@@ -145,15 +155,19 @@ function renderEnhancedTaskPanel(session) {
         // ✅ 修复：使用 parseInt 确保类型一致，避免字符串与数字比较失败
         const turnPhases = session.phases ? session.phases.filter(p => {
             const phaseTurn = parseInt(p.turn_index, 10);
-            return phaseTurn === i + 1;
+            // ✅ v=38.4.12.2: 容错 - 允许上下 1 层的偏移，确保在轮次索引不完全对齐时也能显示内容
+            return phaseTurn === i + 1 ||
+                (i === 0 && phaseTurn === 2) || // 第一轮显示索引为 2 的内容
+                (i === turnsCount - 1 && phaseTurn === i); // 最后一轮补偿
         }) : [];
-        
+
         // 兜底：如果是最后一轮且没找到匹配的 turn_index，显示所有未关联的 phases
         // ✅ 修复：使用 parseInt 确保类型一致
         if (i === turnsCount - 1 && turnPhases.length === 0 && session.phases && session.phases.length > 0) {
+            // 兜底：如果是最后一轮且没有匹配特定 ID 的阶段，则显示所有阶段（或者是还没有被分配轮次的阶段）
             const unassociatedPhases = session.phases.filter(p => {
                 const phaseTurn = parseInt(p.turn_index, 10);
-                return !p.turn_index || phaseTurn >= i + 1;
+                return !p.turn_index || isNaN(phaseTurn) || phaseTurn <= i + 1;
             });
             if (unassociatedPhases.length > 0) {
                 const phasesCard = createPhasesCard(unassociatedPhases, session.currentPhase);
@@ -294,16 +308,28 @@ function createPhaseItem(phase, index, currentPhaseId, isLast) {
     body.className = 'phase-body hidden pl-9 pr-3 pt-2 pb-2 space-y-2';
 
     // 渲染该阶段的所有事件（执行动作）
-    if (phase.events && phase.events.length > 0) {
-        // ✅ v=38.4.11 修复：使用工具函数按时间戳排序，确保事件显示顺序正确
-        // 问题：SSE事件到达顺序可能乱序，导致thought事件显示在工具调用之后
-        // 解决：使用全局工具函数window.sortEventsByTimestamp排序（升序，早的在前）
+    // ✅ v=38.4.11 修复：使用工具函数按时间戳排序，确保事件显示顺序正确
+    // 问题：SSE事件到达顺序可能乱序，导致thought事件显示在工具调用之后
+    // 解决：使用全局工具函数window.sortEventsByTimestamp排序（升序，早的在前）
+    if (phase.events) {
         const sortedEvents = window.sortEventsByTimestamp(phase.events);
 
-        sortedEvents.forEach((event, eventIdx) => {
-            const eventItem = createEventItem(event, eventIdx);
-            body.appendChild(eventItem);
-        });
+        if (sortedEvents.length > 0) {
+            sortedEvents.forEach((event, eventIdx) => {
+                const eventItem = createEventItem(event, eventIdx);
+                body.appendChild(eventItem);
+            });
+        } else if (isActive) { // 如果是当前活动阶段但没有事件
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'text-xs text-gray-400 italic py-1 px-4 ml-6';
+            loadingMsg.textContent = '准备执行中...';
+            body.appendChild(loadingMsg);
+        } else { // 已完成或未开始但没有事件的阶段
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'text-xs text-gray-400 italic py-1 px-4 ml-6';
+            emptyMsg.textContent = '无关联事件';
+            body.appendChild(emptyMsg);
+        }
     } else {
         body.innerHTML = '<div class="text-xs text-gray-400 dark:text-gray-600 italic">暂无执行动作</div>';
     }
@@ -643,17 +669,17 @@ function createDeliverableCard(session) {
                 <div class="space-y-3">
                     <div class="grid grid-cols-1 gap-3" id="web-file-cards-${session.id}">
                         ${webFiles.map((file, idx) => {
-                            // ✅ 代码审查修复 #2: 使用辅助函数提取文件信息
-                            const { fileName, ext } = extractFileInfo(file);
-                            // ✅ 代码审查修复 #1: 添加文件路径验证
-                            if (!isValidFilePath(fileName)) {
-                                console.warn('[Security] Skipping invalid file path:', fileName);
-                                return '';
-                            }
-                            const previewUrl = `/opencode/preview_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`;
-                            const iconAndColor = getFileIconAndColor(ext);
+        // ✅ 代码审查修复 #2: 使用辅助函数提取文件信息
+        const { fileName, ext } = extractFileInfo(file);
+        // ✅ 代码审查修复 #1: 添加文件路径验证
+        if (!isValidFilePath(fileName)) {
+            console.warn('[Security] Skipping invalid file path:', fileName);
+            return '';
+        }
+        const previewUrl = `/opencode/preview_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`;
+        const iconAndColor = getFileIconAndColor(ext);
 
-                            return `
+        return `
                                 <div class="web-file-card flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-100 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all rounded-xl group cursor-pointer"
                                      data-file-name="${escapeHtml(fileName)}" data-preview-url="${previewUrl}">
                                     <div class="flex items-center gap-3 min-w-0">
@@ -675,7 +701,7 @@ function createDeliverableCard(session) {
                                     </button>
                                 </div>
                             `;
-                        }).join('')}
+    }).join('')}
                     </div>
                 </div>
             ` : ''}
@@ -684,16 +710,16 @@ function createDeliverableCard(session) {
                 <div class="space-y-3">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="doc-file-cards-${session.id}">
                         ${displayDocFiles.map((file, idx) => {
-                            // ✅ 代码审查修复 #2: 使用辅助函数提取文件信息
-                            const { fileName, ext } = extractFileInfo(file);
-                            // ✅ 代码审查修复 #1: 添加文件路径验证
-                            if (!isValidFilePath(fileName)) {
-                                console.warn('[Security] Skipping invalid file path:', fileName);
-                                return '';
-                            }
-                            const iconAndColor = getFileIconAndColor(ext);
+        // ✅ 代码审查修复 #2: 使用辅助函数提取文件信息
+        const { fileName, ext } = extractFileInfo(file);
+        // ✅ 代码审查修复 #1: 添加文件路径验证
+        if (!isValidFilePath(fileName)) {
+            console.warn('[Security] Skipping invalid file path:', fileName);
+            return '';
+        }
+        const iconAndColor = getFileIconAndColor(ext);
 
-                            return `
+        return `
                                 <div class="file-card flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all rounded-xl group relative"
                                      data-file-name="${escapeHtml(fileName)}" data-file-ext="${ext}">
                                     <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
@@ -724,7 +750,7 @@ function createDeliverableCard(session) {
                                     </div>
                                 </div>
                             `;
-                        }).join('')}
+    }).join('')}
                         ${showMoreDocFiles ? `
                             <div class="view-all-files flex items-center gap-3 p-3 bg-card-light dark:bg-card-dark border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer rounded-xl group md:col-span-2 md:max-w-sm">
                                 <div class="w-10 h-10 flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm">
@@ -750,7 +776,7 @@ function createDeliverableCard(session) {
         webFileCards.forEach(fileCard => {
             const previewUrl = fileCard.getAttribute('data-preview-url');
             const fileName = fileCard.getAttribute('data-file-name');
-            
+
             // 点击预览按钮
             const previewBtn = fileCard.querySelector('.preview-btn');
             if (previewBtn) {
@@ -762,7 +788,7 @@ function createDeliverableCard(session) {
                     }
                 });
             }
-            
+
             // 点击整个卡片也触发预览
             fileCard.addEventListener('click', (e) => {
                 if (e.target.closest('.preview-btn')) return;

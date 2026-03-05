@@ -27,7 +27,8 @@ RUN npm install -g opencode-ai
 RUN if [ ! -f /usr/share/novnc/vnc.html ] && [ -f /usr/share/novnc/vnc_lite.html ]; then \
     ln -s /usr/share/novnc/vnc_lite.html /usr/share/novnc/vnc.html; \
     fi && \
-    ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html
+    ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html && \
+    echo '{}' > /usr/share/novnc/package.json
 
 # 6. 安装 Python 环境 (使用镜像源以加速)
 RUN pip install --no-cache-dir uv -i https://pypi.tuna.tsinghua.edu.cn/simple

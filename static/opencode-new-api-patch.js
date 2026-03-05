@@ -38,7 +38,7 @@
     // ✅ 代码质量改进：提取魔法数字为常量
     // 子会话配置常量
     const CHILD_SESSION_CLEANUP_DELAY_MS = 5000; // 子会话完成后的清理延迟（毫秒）
-    const RENDER_THROTTLE_MS = 250; // ✅ P0-5: renderResults节流间隔提高到250ms，减少渲染频率
+    const RENDER_THROTTLE_MS = 500; // ✅ Round 4: 节流间隔提高到500ms，平衡响应性与性能
     const TYPING_EFFECT_TIMEOUT_MS = 30000; // ✅ P0-1: 打字机效果超时时间（30秒）
 
     // ✅ 安全错误消息常量（不暴露后端错误详情）
@@ -73,7 +73,7 @@
     const MAX_PREVIEW_CACHE_SIZE = 100; // 最多缓存100个文件路径
 
     // ✅ P0-1 & P0-4: 打字机效果管理器（防止UI抖动 + 并发保护 + 超时恢复）
-    const TypingEffectManager = (function() {
+    const TypingEffectManager = (function () {
         let count = 0; // 并发计数器（支持多文件同时写入）
         let timeout = null; // 超时定时器
 
@@ -162,7 +162,7 @@
             const patchedConnectSSE = function (s) {
                 if (!s) return;
                 // 仅对真实受控的 Session 进行劫持
-                if (s.id && s.id.startsWith('ses_') && s.id.length === 12) {
+                if (s.id && s.id.startsWith('ses_') && s.id.length >= 11) {
                     console.log('[NewAPI] Hijacking connectSSE for real session:', s.id);
                     return handleNewAPIConnection(s);
                 }
@@ -189,7 +189,7 @@
             if (typeof window.updateInterfaceMode === 'function' && !window.updateInterfaceMode._isPanelHijacked) {
                 clearInterval(hijackInterval);
                 const originalUpdateInterfaceMode = window.updateInterfaceMode;
-                window.updateInterfaceMode = function() {
+                window.updateInterfaceMode = function () {
                     // 调用原函数
                     const result = originalUpdateInterfaceMode.apply(this, arguments);
 
@@ -371,12 +371,12 @@
             // ✅ 修复：从当前session获取mode，如果没有则使用window._currentMode，最后默认为build
             const activeId = window.state?.activeId;
             const activeSession = window.state?.sessions?.find(s => s.id === activeId);
-             // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
+            // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
             const currentMode = activeSession?.mode || window._currentMode || DEFAULT_MODE;
 
-             const container = document.createElement('div');
-             container.className = 'mode-selector-container';
-             container.innerHTML = `
+            const container = document.createElement('div');
+            container.className = 'mode-selector-container';
+            container.innerHTML = `
                  <div class="mode-active-display" id="mode-trigger">
                      <span class="material-symbols-outlined !text-[16px]">${MODE_CONFIG[currentMode].icon}</span>
                      <span class="mode-label" id="active-mode-name">${MODE_CONFIG[currentMode].label}</span>
@@ -423,11 +423,11 @@
             dropdown.addEventListener('click', (e) => {
                 const option = e.target.closest('.mode-option');
                 if (!option) return;
-                
+
                 const mode = option.dataset.mode;
                 dropdown.querySelectorAll('.mode-option').forEach(o => o.classList.remove('active'));
                 option.classList.add('active');
-                
+
                 const labels = {
                     'plan': 'Plan (分析)',
                     'build': 'Build (开发)',
@@ -435,7 +435,7 @@
                 };
                 activeLabel.textContent = labels[mode];
                 window._currentMode = mode;
-                
+
                 dropdown.classList.remove('show');
                 trigger.classList.remove('open');
                 console.log('[NewAPI] Agent mode switched to:', mode);
@@ -505,7 +505,7 @@
             // ✅ 修复：验证缓存的元素是否仍在DOM中
             if (this.initialized) {
                 const stillInDOM = (this.modeLabel?.isConnected || document.contains(this.modeLabel)) &&
-                                  (this.modeTrigger?.isConnected || document.contains(this.modeTrigger));
+                    (this.modeTrigger?.isConnected || document.contains(this.modeTrigger));
                 if (stillInDOM) {
                     return; // 缓存仍然有效
                 }
@@ -557,7 +557,7 @@
      */
     function throttle(func, limit) {
         let inThrottle;
-        return function(...args) {
+        return function (...args) {
             if (!inThrottle) {
                 func.apply(this, args);
                 inThrottle = true;
@@ -783,11 +783,9 @@
      * 防止每次事件都触发完整的DOM重渲染，提升性能
      */
     const throttledRenderResults = throttle(() => {
-        // ✅ P0-3: 打字机效果期间跳过renderResults，防止UI抖动
-        if (TypingEffectManager.isActive()) {
-            console.log(`[NewAPI] Skipping renderResults during typing effect (active count: ${TypingEffectManager.getActiveCount()})`);
-            return;
-        }
+        // ✅ Round 4: 移除 TypingEffectManager.isActive() 检查
+        // 允许在打字机效果（如右侧写代码）期间，左侧任务面板也能实时更新进度
+        // 这解决了用户看到的“右侧写完很久左侧才出事件”的延迟感
 
         // ✅ P0-3: 添加错误处理，防止renderResults异常导致事件流中断
         try {
@@ -845,7 +843,7 @@
             const mode = window._currentMode || DEFAULT_MODE;
             const projectId = window.state.activeProjectId || null;  // 获取当前选中项目
             console.log('[NewAPI] Creating new session with mode:', mode, 'project:', projectId);
-            
+
             let session;
             try {
                 session = await window.apiClient.createSession(prompt, mode, '1.0.0', projectId);
@@ -857,7 +855,7 @@
             } catch (err) {
                 const safeMessage = getUserSafeErrorMessage(err, ERROR_MESSAGES.SESSION_CREATE_FAILED);
                 console.error('[NewAPI] Failed to create session:', err);
-                
+
                 // 使用非阻塞的 UI 提示（如果存在 showNotification 函数）
                 if (typeof window.showNotification === 'function') {
                     window.showNotification(safeMessage, 'error');
@@ -878,12 +876,12 @@
                 deliverables: [],
                 status: 'active',
                 mode: mode,
-                turnIndex: 1,        // ✅ 初始化 turnIndex，从1开始
+                turnIndex: 0,        // ✅ 修复：初始化为0，handleNewAPIConnection中会递增到1
                 _version: 1,          // ✅ 添加版本号用于数据迁移
                 _createdTime: Date.now()  // ✅ 添加创建时间，用于宽限期判断
             };
             // ✅ 从 session 恢复 turnIndex
-            window._turnIndex = existing.turnIndex || 1;
+            window._turnIndex = existing.turnIndex || 0;
             window.state.sessions.unshift(existing);
             window.state.activeId = existing.id;  // ✅ 立即更新activeId，防止临时session被误删
 
@@ -912,7 +910,7 @@
         try {
             // 准备 Session
             const s = await prepareSession(promptValue, isWelcome);
-            
+
             // ✅ 修复：检查 prepareSession 返回值
             if (!s) {
                 console.error('[NewAPI] prepareSession returned null, aborting submission');
@@ -920,7 +918,7 @@
                 btn.innerHTML = '<span class="material-symbols-outlined !text-white dark:!text-black">arrow_upward</span>';
                 return;
             }
-            
+
             // ✅ 修复可维护性：使用DEFAULT_MODE常量替代硬编码
             const mode = s.mode || window._currentMode || DEFAULT_MODE;
             console.log(`[NewAPI] Connecting to events... (Mode: ${mode})`);
@@ -934,14 +932,14 @@
         } catch (err) {
             console.error('[NewAPI] Submission sequence failed:', err);
             const safeMessage = getUserSafeErrorMessage(err, ERROR_MESSAGES.SUBMISSION_FAILED);
-            
+
             // 使用非阻塞的 UI 提示
             if (typeof window.showNotification === 'function') {
                 window.showNotification(safeMessage, 'error');
             } else {
                 alert(safeMessage);
             }
-            
+
             const runBtn = document.getElementById('runStream');
             if (runBtn) {
                 runBtn.disabled = false;
@@ -1024,10 +1022,10 @@
 
                 // ✅ 优化：使用防抖机制在关键事件后保存状态（避免频繁写入localStorage）
                 const shouldSave = adapted.type === 'answer_chunk' ||
-                                   adapted.type === 'action' ||
-                                   adapted.type === 'phases_init' ||
-                                   adapted.type === 'phase_update' ||
-                                   (adapted.type === 'status' && (adapted.value === 'done' || adapted.value === 'completed'));
+                    adapted.type === 'action' ||
+                    adapted.type === 'phases_init' ||
+                    adapted.type === 'phase_update' ||
+                    (adapted.type === 'status' && (adapted.value === 'done' || adapted.value === 'completed'));
 
                 if (shouldSave) {
                     debouncedSaveState();
@@ -1042,27 +1040,27 @@
                     if (runBtn) runBtn.classList.remove('hidden');
 
                     // ✅ 修复C7: 子会话完成清理 - 防止内存泄漏
-                // 当子会话完成时，延迟清理资源（给用户查看历史事件的时间）
-                if (adapted._isFromChildSession) {
-                    const childSessionId = adapted._childSessionId;
-                    console.log(`[ChildSession] ✅ Child session completed: ${childSessionId}`);
+                    // 当子会话完成时，延迟清理资源（给用户查看历史事件的时间）
+                    if (adapted._isFromChildSession) {
+                        const childSessionId = adapted._childSessionId;
+                        console.log(`[ChildSession] ✅ Child session completed: ${childSessionId}`);
 
-                    // 延迟清理：给用户时间查看子会话的历史事件
-                    // 防止频繁创建子会话导致内存泄漏
-                    setTimeout(() => {
-                        console.log(`[ChildSession] 🧹 Cleaning up completed child session: ${childSessionId}`);
+                        // 延迟清理：给用户时间查看子会话的历史事件
+                        // 防止频繁创建子会话导致内存泄漏
+                        setTimeout(() => {
+                            console.log(`[ChildSession] 🧹 Cleaning up completed child session: ${childSessionId}`);
 
-                        // 取消子会话的SSE订阅
-                        if (window.ChildSessionManager) {
-                            window.ChildSessionManager.unsubscribeFromChildSession(childSessionId);
-                        }
+                            // 取消子会话的SSE订阅
+                            if (window.ChildSessionManager) {
+                                window.ChildSessionManager.unsubscribeFromChildSession(childSessionId);
+                            }
 
-                        // 清理深度追踪
-                        eventDepthMap.delete(childSessionId);
+                            // 清理深度追踪
+                            eventDepthMap.delete(childSessionId);
 
-                        console.log(`[ChildSession] ✅ Cleanup complete for: ${childSessionId}`);
-                    }, CHILD_SESSION_CLEANUP_DELAY_MS);
-                }
+                            console.log(`[ChildSession] ✅ Cleanup complete for: ${childSessionId}`);
+                        }, CHILD_SESSION_CLEANUP_DELAY_MS);
+                    }
                 }
             },
             (err) => {
@@ -1107,7 +1105,7 @@
      * 2. Early Exit: 所有边界检查在函数顶部处理
      * 3. Atomic Predictability: 每个函数职责单一，行为可预测
      */
-    const ChildSessionManager = (function() {
+    const ChildSessionManager = (function () {
         // 核心数据结构
         const childSessions = new Map(); // mainSessionId -> Set<childSessionId>
         const eventSources = new Map();  // childSessionId -> EventSource
@@ -1387,72 +1385,72 @@
                 return;
             }
 
-        if (adapted.type === 'file_preview_delta') {
-            // ✅ 修复3：添加delta数据验证
-            if (!adapted.delta) {
-                console.error('[NewAPI] file_preview_delta missing delta:', adapted);
+            if (adapted.type === 'file_preview_delta') {
+                // ✅ 修复3：添加delta数据验证
+                if (!adapted.delta) {
+                    console.error('[NewAPI] file_preview_delta missing delta:', adapted);
+                    return;
+                }
+
+                // delta 是对象格式: {type: "insert", position: i, content: char}
+                const deltaContent = adapted.delta?.content !== undefined ? String(adapted.delta.content) : '';
+
+                // ✅ 修复3：使用节流版本更新UI状态，限制DOM更新频率（每500ms最多一次）
+                throttledSetFileStatus('正在写入...');
+
+                // 使用打字机效果追加内容
+                if (window.rightPanelManager && typeof window.rightPanelManager.typeAppendContent === 'function') {
+                    window.rightPanelManager.typeAppendContent(deltaContent);
+                } else if (window.rightPanelManager && typeof window.rightPanelManager.appendFileContent === 'function') {
+                    // 降级：直接追加（无打字机效果）
+                    window.rightPanelManager.appendFileContent(deltaContent);
+                }
                 return;
             }
 
-            // delta 是对象格式: {type: "insert", position: i, content: char}
-            const deltaContent = adapted.delta?.content !== undefined ? String(adapted.delta.content) : '';
+            if (adapted.type === 'file_preview_end') {
+                console.log('[NewAPI] File preview end:', adapted.file_path);
 
-            // ✅ 修复3：使用节流版本更新UI状态，限制DOM更新频率（每500ms最多一次）
-            throttledSetFileStatus('正在写入...');
+                // ✅ P0-1 & P0-4: 使用TypingEffectManager结束打字机效果，恢复renderResults
+                TypingEffectManager.end(`file_preview_end: ${adapted.file_path}`);
 
-            // 使用打字机效果追加内容
-            if (window.rightPanelManager && typeof window.rightPanelManager.typeAppendContent === 'function') {
-                window.rightPanelManager.typeAppendContent(deltaContent);
-            } else if (window.rightPanelManager && typeof window.rightPanelManager.appendFileContent === 'function') {
-                // 降级：直接追加（无打字机效果）
-                window.rightPanelManager.appendFileContent(deltaContent);
-            }
-            return;
-        }
-
-        if (adapted.type === 'file_preview_end') {
-            console.log('[NewAPI] File preview end:', adapted.file_path);
-
-            // ✅ P0-1 & P0-4: 使用TypingEffectManager结束打字机效果，恢复renderResults
-            TypingEffectManager.end(`file_preview_end: ${adapted.file_path}`);
-
-            // 更新状态为完成
-            if (window.rightPanelManager && typeof window.rightPanelManager.setFileStatus === 'function') {
-                window.rightPanelManager.setFileStatus('完成');
-            }
-
-            // ✅ P0-3: 触发一次UI更新以显示最终状态（带错误处理）
-            try {
-                if (typeof window.renderResults === 'function') {
-                    window.renderResults();
+                // 更新状态为完成
+                if (window.rightPanelManager && typeof window.rightPanelManager.setFileStatus === 'function') {
+                    window.rightPanelManager.setFileStatus('完成');
                 }
-            } catch (error) {
-                console.error('[NewAPI] Failed to render results after preview end:', error);
-            }
-            return;
-        }
 
-        // ✅ 修复：处理文件生成事件 - 更新文件列表
-        if (adapted.type === 'file_generated') {
-            console.log('[NewAPI] File generated:', adapted.file.path);
-
-            // 更新文件列表管理器
-            if (window.filesManager && typeof window.filesManager.addFile === 'function') {
-                window.filesManager.addFile(adapted.file);
+                // ✅ P0-3: 触发一次UI更新以显示最终状态（带错误处理）
+                try {
+                    if (typeof window.renderResults === 'function') {
+                        window.renderResults();
+                    }
+                } catch (error) {
+                    console.error('[NewAPI] Failed to render results after preview end:', error);
+                }
+                return;
             }
 
-            // 可选：也在右侧面板显示文件生成信息
-            const fileInfo = `文件: ${adapted.file.name}\n路径: ${adapted.file.path}\n类型: ${adapted.file.type}`;
-            if (window.rightPanelManager && typeof window.rightPanelManager.showFileEditor === 'function') {
-                // 如果文件编辑器已打开，更新内容
-                // 否则不强制显示，避免打扰用户
-                console.log('[NewAPI] File info:', fileInfo);
-            }
-            return;
-        }
+            // ✅ 修复：处理文件生成事件 - 更新文件列表
+            if (adapted.type === 'file_generated') {
+                console.log('[NewAPI] File generated:', adapted.file.path);
 
-        // 处理时间轴事件 - 更新右侧文件面板
-        if (adapted.type === 'timeline_event') {
+                // 更新文件列表管理器
+                if (window.filesManager && typeof window.filesManager.addFile === 'function') {
+                    window.filesManager.addFile(adapted.file);
+                }
+
+                // 可选：也在右侧面板显示文件生成信息
+                const fileInfo = `文件: ${adapted.file.name}\n路径: ${adapted.file.path}\n类型: ${adapted.file.type}`;
+                if (window.rightPanelManager && typeof window.rightPanelManager.showFileEditor === 'function') {
+                    // 如果文件编辑器已打开，更新内容
+                    // 否则不强制显示，避免打扰用户
+                    console.log('[NewAPI] File info:', fileInfo);
+                }
+                return;
+            }
+
+            // 处理时间轴事件 - 更新右侧文件面板
+            if (adapted.type === 'timeline_event') {
                 console.log('[NewAPI] Timeline event:', adapted);
 
                 // 渲染timeline事件到右侧面板
@@ -1543,461 +1541,478 @@
                 return;
             }
 
-        if (adapted.type === 'answer_chunk') {
-            // ✅ v=33: 精确过滤timeline事件 - 避免误报AI的正常回复
-            // 问题：后端可能错误地把timeline信息包装成answer_chunk
-            const text = adapted.text || '';
+            if (adapted.type === 'answer_chunk') {
+                // ✅ v=33: 精确过滤timeline事件 - 避免误报AI的正常回复
+                // 问题：后端可能错误地把timeline信息包装成answer_chunk
+                const text = adapted.text || '';
 
-            // ✅ 改进：使用结构化模式匹配，而不是简单的关键词搜索
-            // Timeline事件通常有以下特征：
-            // 1. 以"Step ID:"或"Timeline event:"开头
-            // 2. 包含结构化的字段（Action:, tool_input:, file_path:等）
-            // 3. 通常不在markdown代码块中（AI的正常代码会在```中）
-            const TIMELINE_PATTERNS = [
-                // 模式1: 完整的timeline事件格式
-                /^\s*Step ID:\s*[a-f0-9\-]+.*Action:\s*\w+.*$/mi,
-                // 模式2: Timeline event开头
-                /^\s*Timeline event:\s*\w+.*$/mi,
-                // 模式3: 多个timeline字段组合（至少2个）
-                /(?:Step ID:|Action:|tool_input:|file_path:|step_id:).*(?:Step ID:|Action:|tool_input:|file_path:)/mis
-            ];
+                // ✅ 改进：使用结构化模式匹配，而不是简单的关键词搜索
+                // Timeline事件通常有以下特征：
+                // 1. 以"Step ID:"或"Timeline event:"开头
+                // 2. 包含结构化的字段（Action:, tool_input:, file_path:等）
+                // 3. 通常不在markdown代码块中（AI的正常代码会在```中）
+                const TIMELINE_PATTERNS = [
+                    // 模式1: 完整的timeline事件格式
+                    /^\s*Step ID:\s*[a-f0-9\-]+.*Action:\s*\w+.*$/mi,
+                    // 模式2: Timeline event开头
+                    /^\s*Timeline event:\s*\w+.*$/mi,
+                    // 模式3: 多个timeline字段组合（至少2个）
+                    /(?:Step ID:|Action:|tool_input:|file_path:|step_id:).*(?:Step ID:|Action:|tool_input:|file_path:)/mis
+                ];
 
-            // ✅ 重要：如果文本在markdown代码块中，不应该被过滤
-            // AI的正常代码会包含"write"、"read"等，但会在```中
-            const isInCodeBlock = /```\s*(?:javascript|python|json|bash|shell)?[\s\S]*?```/.test(text) ||
-                                  text.trim().startsWith('```') ||
-                                  text.includes('```代码');
+                // ✅ 重要：如果文本在markdown代码块中，不应该被过滤
+                // AI的正常代码会包含"write"、"read"等，但会在```中
+                const isInCodeBlock = /```\s*(?:javascript|python|json|bash|shell)?[\s\S]*?```/.test(text) ||
+                    text.trim().startsWith('```') ||
+                    text.includes('```代码');
 
-            let isTimelineEvent = false;
-            if (!isInCodeBlock && text.length > 0) {
-                // 只有不在代码块中，才检查是否是timeline事件
-                isTimelineEvent = TIMELINE_PATTERNS.some(pattern => pattern.test(text));
-            }
-
-            if (isTimelineEvent) {
-                // ✅ 保存完整内容到debug变量，便于调试
-                if (!window._debugFilteredTimeline) {
-                    window._debugFilteredTimeline = [];
+                let isTimelineEvent = false;
+                if (!isInCodeBlock && text.length > 0) {
+                    // 只有不在代码块中，才检查是否是timeline事件
+                    isTimelineEvent = TIMELINE_PATTERNS.some(pattern => pattern.test(text));
                 }
-                window._debugFilteredTimeline.push({
-                    timestamp: Date.now(),
-                    content: text,
-                    preview: text.substring(0, 200)
+
+                if (isTimelineEvent) {
+                    // ✅ 保存完整内容到debug变量，便于调试
+                    if (!window._debugFilteredTimeline) {
+                        window._debugFilteredTimeline = [];
+                    }
+                    window._debugFilteredTimeline.push({
+                        timestamp: Date.now(),
+                        content: text,
+                        preview: text.substring(0, 200)
+                    });
+
+                    console.warn('[NewAPI] ⚠️ Filtered structured timeline event from answer_chunk');
+                    console.log('[NewAPI] Debug: Filtered content preview:', text.substring(0, 150));
+                    console.log('[NewAPI] Debug: Total filtered events:', window._debugFilteredTimeline.length);
+
+                    // 不添加到response中，跳过这段文本
+                    return;
+                }
+
+                // 支持多轮对话分隔符
+                const pSep = '\n\n---\n\n';
+                const rSep = '\n\n---\n\n**新的回答：**\n\n';
+                const pCount = (s.prompt || '').split(pSep).length - 1;
+                const rCount = (s.response || '').split(rSep).length - 1;
+                if (pCount > rCount) {
+                    s.response += rSep;
+                }
+                s.response += text;
+            } else if (adapted.type === 'phases_init') {
+                // 处理阶段初始化
+                const currentTurnIndex = window._turnIndex || 0;
+                const newPhases = (adapted.phases || []).map(p => {
+                    const existingPhase = s.phases?.find(sp => sp.id === p.id);
+                    return {
+                        ...p,
+                        events: existingPhase?.events || [],
+                        turn_index: existingPhase?.turn_index ?? currentTurnIndex // 关联到当前对话轮次
+                    };
                 });
 
-                console.warn('[NewAPI] ⚠️ Filtered structured timeline event from answer_chunk');
-                console.log('[NewAPI] Debug: Filtered content preview:', text.substring(0, 150));
-                console.log('[NewAPI] Debug: Total filtered events:', window._debugFilteredTimeline.length);
 
-                // 不添加到response中，跳过这段文本
-                return;
-            }
+                const phaseMap = new Map();
+                s.phases?.forEach(p => phaseMap.set(p.id, p));
 
-            // 支持多轮对话分隔符
-            const pSep = '\n\n---\n\n';
-            const rSep = '\n\n---\n\n**新的回答：**\n\n';
-            const pCount = (s.prompt || '').split(pSep).length - 1;
-            const rCount = (s.response || '').split(rSep).length - 1;
-            if (pCount > rCount) {
-                s.response += rSep;
-            }
-            s.response += text;
-        } else if (adapted.type === 'phases_init') {
-            // 处理阶段初始化
-            const currentTurnIndex = window._turnIndex || 0;
-            const newPhases = (adapted.phases || []).map(p => {
-                const existingPhase = s.phases?.find(sp => sp.id === p.id);
-                return { 
-                    ...p, 
-                    events: existingPhase?.events || [],
-                    turn_index: existingPhase?.turn_index ?? currentTurnIndex // 关联到当前对话轮次
-                };
-            });
-
-            
-            const phaseMap = new Map();
-            s.phases?.forEach(p => phaseMap.set(p.id, p));
-            
-            newPhases.forEach(p => {
-                const existing = phaseMap.get(p.id);
-                if (existing) {
-                    // 只有在现有状态是 pending 或者新状态不是 pending 时才更新状态
-                    if (p.status !== 'pending' || existing.status === 'pending') {
-                        existing.status = p.status;
-                    }
-                    if (p.title) existing.title = p.title;
-                    if (p.number !== undefined) existing.number = p.number;
-                } else {
-                    phaseMap.set(p.id, p);
-                }
-            });
-            
-            s.phases = Array.from(phaseMap.values()).sort((a, b) => (a.number || 0) - (b.number || 0));
-
-            // 自动清理临时的 Planning Phase
-            const hasDynamicPhases = s.phases.some(p => p.id?.startsWith('phase_') && p.id !== 'phase_planning');
-            if (hasDynamicPhases) {
-                s.phases = s.phases.filter(p => p.id !== 'phase_planning');
-            }
-            
-            s.currentPhase = adapted.phases.find(p => p.status === 'active')?.id || s.currentPhase;
-
-            // ✅ v=33: 强制更新phase UI - 即使在打字机效果期间也要显示loading状态和完成标签
-            // 注意：直接调用renderResults而不是不存在的renderPhases函数
-            try {
-                // 强制调用renderResults确保UI更新（不受打字机效果限制）
-                if (typeof window.renderResults === 'function') {
-                    window.renderResults();
-                } else if (typeof window.renderEnhancedTaskPanel === 'function') {
-                    // ✅ v=33: 修复DOM累积 - 清空旧内容后再追加新面板
-                    try {
-                        const s = state.sessions.find(x => x.id === state.activeId);
-                        if (s) {
-                            const convo = document.querySelector('#chat-messages');
-                            if (convo) {
-                                // 清空旧内容，防止DOM节点累积
-                                convo.innerHTML = '';
-                                const panel = window.renderEnhancedTaskPanel(s);
-                                convo.appendChild(panel);
-                                console.log('[NewAPI] Fallback: Used renderEnhancedTaskPanel');
-                            }
+                newPhases.forEach(p => {
+                    const existing = phaseMap.get(p.id);
+                    if (existing) {
+                        // 只有在现有状态是 pending 或者新状态不是 pending 时才更新状态
+                        if (p.status !== 'pending' || existing.status === 'pending') {
+                            existing.status = p.status;
                         }
-                    } catch (fallbackError) {
-                        console.error('[NewAPI] Fallback renderEnhancedTaskPanel failed:', fallbackError);
-                        // 降级方案失败，至少不会中断事件流
-                    }
-                }
-
-                console.log('[NewAPI] Phase UI updated for phases:', adapted.phases.map(p => `${p.id}:${p.status}`).join(', '));
-            } catch (error) {
-                console.error('[NewAPI] Failed to render phases:', error);
-                // 不中断事件流，继续处理
-            }
-        } else if (adapted.type === 'deliverables') {
-            s.deliverables = adapted.items || [];
-        } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
-            // 标记当前活跃阶段为完成，不应盲目标记所有阶段
-            const isError = adapted.value === 'error' || adapted.status === 'error';
-            if (s.phases) {
-                s.phases.forEach(p => {
-                    if (p.status === 'active') {
-                        p.status = isError ? 'error' : 'completed';
-                    }
-                });
-            }
-            document.getElementById('stopStream')?.classList.add('hidden');
-            document.getElementById('runStream')?.classList.remove('hidden');
-            console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}`);
-
-            // ✅ v=33: 修复总结不显示 - 强制刷新UI确保总结可见（绕过节流）
-            if (!isError) {
-                // 双重检查：防止标志位丢失或response已包含总结
-                const SUMMARY_MARKER = '**✅ 任务完成**';
-                const hasSummaryInResponse = s.response && s.response.includes(SUMMARY_MARKER);
-                const hasSummaryFlag = s._hasCompletionSummary;
-
-                // 只在两种情况都不存在时才添加总结
-                if (!hasSummaryInResponse && !hasSummaryFlag) {
-                    // 计算任务统计信息
-                    const totalActions = s.actions ? s.actions.length : 0;
-                    const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
-
-                    // 添加总结到response末尾
-                    const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
-                    s.response += summary;
-                    s._hasCompletionSummary = true; // 设置标志位
-
-                    console.log('[NewAPI] Task summary added:', summary.trim());
-
-                    // 显示系统消息
-                    if (typeof window.addSystemMessage === 'function') {
-                        window.addSystemMessage(`✅ 任务完成 - 完成${completedPhases}个阶段，执行${totalActions}次工具调用`, 'success');
-                    }
-
-                    // ✅ v=33: 强制刷新UI，绕过节流确保总结立即显示
-                    try {
-                        // 检查是否有原始的renderResults（非节流版本）
-                        if (typeof window._originalRenderResults === 'function') {
-                            window._originalRenderResults();
-                            console.log('[NewAPI] UI refreshed with _originalRenderResults (no throttle)');
-                        } else if (typeof window.renderResults === 'function') {
-                            window.renderResults();
-                            console.log('[NewAPI] UI refreshed with renderResults');
-                        }
-                        console.log('[NewAPI] UI refreshed to show summary');
-                    } catch (error) {
-                        console.error('[NewAPI] Failed to refresh UI after summary:', error);
-                    }
-                } else {
-                    if (hasSummaryInResponse && hasSummaryFlag) {
-                        console.log('[NewAPI] Task summary already exists (both flag and response)');
-                    } else if (hasSummaryInResponse) {
-                        console.log('[NewAPI] Task summary exists in response but flag is missing, fixing flag');
-                        s._hasCompletionSummary = true;
-                        if (typeof window.saveState === 'function') {
-                            window.saveState();
-                        }
+                        if (p.title) existing.title = p.title;
+                        if (p.number !== undefined) existing.number = p.number;
                     } else {
-                        console.log('[NewAPI] Task summary flag exists but response missing summary, recreating...');
+                        phaseMap.set(p.id, p);
+                    }
+                });
+
+                s.phases = Array.from(phaseMap.values()).sort((a, b) => (a.number || 0) - (b.number || 0));
+
+                // 自动清理临时的 Planning Phase
+                const hasDynamicPhases = s.phases.some(p => p.id?.startsWith('phase_') && p.id !== 'phase_planning');
+                if (hasDynamicPhases) {
+                    s.phases = s.phases.filter(p => p.id !== 'phase_planning');
+                }
+
+                s.currentPhase = adapted.phases.find(p => p.status === 'active')?.id || s.currentPhase;
+
+                // ✅ v=33: 强制更新phase UI - 即使在打字机效果期间也要显示loading状态和完成标签
+                // 注意：直接调用renderResults而不是不存在的renderPhases函数
+                try {
+                    // 强制调用renderResults确保UI更新（不受打字机效果限制）
+                    if (typeof window.renderResults === 'function') {
+                        window.renderResults();
+                    } else if (typeof window.renderEnhancedTaskPanel === 'function') {
+                        // ✅ v=33: 修复DOM累积 - 清空旧内容后再追加新面板
+                        try {
+                            const s = state.sessions.find(x => x.id === state.activeId);
+                            if (s) {
+                                const convo = document.querySelector('#chat-messages');
+                                if (convo) {
+                                    // 清空旧内容，防止DOM节点累积
+                                    convo.innerHTML = '';
+                                    const panel = window.renderEnhancedTaskPanel(s);
+                                    convo.appendChild(panel);
+                                    console.log('[NewAPI] Fallback: Used renderEnhancedTaskPanel');
+                                }
+                            }
+                        } catch (fallbackError) {
+                            console.error('[NewAPI] Fallback renderEnhancedTaskPanel failed:', fallbackError);
+                            // 降级方案失败，至少不会中断事件流
+                        }
+                    }
+
+                    console.log('[NewAPI] Phase UI updated for phases:', adapted.phases.map(p => `${p.id}:${p.status}`).join(', '));
+                } catch (error) {
+                    console.error('[NewAPI] Failed to render phases:', error);
+                    // 不中断事件流，继续处理
+                }
+            } else if (adapted.type === 'deliverables') {
+                s.deliverables = adapted.items || [];
+            } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
+                // ✅ Round 4: 改进完成逻辑 - 确保所有阶段和状态都正确更新
+                const isError = adapted.value === 'error' || adapted.status === 'error';
+                const isDone = adapted.value === 'done' || adapted.value === 'completed' || (adapted.type === 'message_updated' && adapted.time?.completed);
+
+                if (isDone || isError) {
+                    if (s.phases) {
+                        s.phases.forEach(p => {
+                            if (p.status === 'active' || p.status === 'pending') {
+                                p.status = isError ? 'error' : 'completed';
+                            }
+                        });
+                    }
+                    s.status = isError ? 'error' : 'completed';
+                    s.currentPhase = null;
+
+                    const stopBtn = document.getElementById('stopStream');
+                    const runBtn = document.getElementById('runStream');
+                    if (stopBtn) stopBtn.classList.add('hidden');
+                    if (runBtn) runBtn.classList.remove('hidden');
+
+                    console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}, all phases cleaned up.`);
+                }
+
+                // ✅ v=33: 修复总结不显示 - 强制刷新UI确保总结可见（绕过节流）
+                if (!isError) {
+                    // 双重检查：防止标志位丢失或response已包含总结
+                    const SUMMARY_MARKER = '**✅ 任务完成**';
+                    const hasSummaryInResponse = s.response && s.response.includes(SUMMARY_MARKER);
+                    const hasSummaryFlag = s._hasCompletionSummary;
+
+                    // 只在两种情况都不存在时才添加总结
+                    if (!hasSummaryInResponse && !hasSummaryFlag) {
+                        // 计算任务统计信息
                         const totalActions = s.actions ? s.actions.length : 0;
                         const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
-                        const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
-                        s.response = (s.response || '') + summary;
 
-                        // ✅ v=33: 重建总结后也要刷新UI（绕过节流）
+                        // 添加总结到response末尾
+                        const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
+                        s.response += summary;
+                        s._hasCompletionSummary = true; // 设置标志位
+
+                        console.log('[NewAPI] Task summary added:', summary.trim());
+
+                        // 显示系统消息
+                        if (typeof window.addSystemMessage === 'function') {
+                            window.addSystemMessage(`✅ 任务完成 - 完成${completedPhases}个阶段，执行${totalActions}次工具调用`, 'success');
+                        }
+
+                        // ✅ v=33: 强制刷新UI，绕过节流确保总结立即显示
                         try {
+                            // 检查是否有原始的renderResults（非节流版本）
                             if (typeof window._originalRenderResults === 'function') {
                                 window._originalRenderResults();
+                                console.log('[NewAPI] UI refreshed with _originalRenderResults (no throttle)');
                             } else if (typeof window.renderResults === 'function') {
                                 window.renderResults();
+                                console.log('[NewAPI] UI refreshed with renderResults');
                             }
+                            console.log('[NewAPI] UI refreshed to show summary');
                         } catch (error) {
-                            console.error('[NewAPI] Failed to refresh UI after recreating summary:', error);
+                            console.error('[NewAPI] Failed to refresh UI after summary:', error);
                         }
-
-                        if (typeof window.saveState === 'function') {
-                            window.saveState();
-                        }
-                    }
-                }
-            } else {
-                // 错误总结
-                if (typeof window.addSystemMessage === 'function') {
-                    window.addSystemMessage('❌ 任务执行失败', 'error');
-                }
-            }
-
-        } else if (adapted.type === 'phase_start') {
-            // 停用当前活跃 Phase
-            if (s.currentPhase) {
-                const prevPhase = s.phases.find(p => p.id === s.currentPhase);
-                if (prevPhase) prevPhase.status = 'completed';
-            }
-
-            let phase = s.phases.find(p => p.id === adapted.phase_id);
-            if (!phase) {
-                phase = {
-                    id: adapted.phase_id,
-                    title: adapted.title || '正在执行',
-                    description: adapted.description || '',
-                    status: 'active',
-                    events: []
-                };
-                s.phases.push(phase);
-            } else {
-                phase.status = 'active';
-                // 如果后端提供了更具体的标题，更新它
-                if (adapted.title && adapted.title !== 'Executing') {
-                    phase.title = adapted.title;
-                }
-            }
-            s.currentPhase = phase.id;
-        } else if (adapted.type === 'phase_finish') {
-            const phase = s.phases.find(p => p.id === adapted.phase_id);
-            if (phase) phase.status = 'completed';
-        } else if (adapted.type === 'action' || adapted.type === 'thought' || adapted.type === 'error') {
-            // ✅ 修复：更新 session 的 actions 和 orphanEvents 数组
-            if (adapted.type === 'action') {
-                const actionEvent = {
-                    type: 'action',
-                    id: adapted.id || adapted.call_id,
-                    data: adapted.data || {}
-                };
-
-                // 确保 actions 和 orphanEvents 数组存在
-                if (!s.actions) s.actions = [];
-                if (!s.orphanEvents) s.orphanEvents = [];
-
-                // 添加到数组
-                s.actions.push(actionEvent);
-                s.orphanEvents.push(actionEvent);
-
-                // ✅ v=38.4.12: 删除重复关联 - 统一使用第1929行的通用处理器
-                // 避免同一个事件被添加两次到 phase.events
-                // 通用处理器已经有完整的去重和更新逻辑（第1942-1961行）
-
-                console.log('[NewAPI] Added action to session:', actionEvent.data.tool_name, 'total actions:', s.actions.length);
-            }
-
-            // 实时显示到右侧面板
-            if (window.rightPanelManager) {
-                const data = adapted.data || {};
-                const toolName = data.tool_name || adapted.tool || '';
-
-                // 确保右侧面板展开并切换到预览标签页
-                if (typeof window.rightPanelManager.show === 'function') {
-                    window.rightPanelManager.show();
-                }
-                if (typeof window.rightPanelManager.switchTab === 'function') {
-                    window.rightPanelManager.switchTab('preview');
-                }
-
-                // 判断事件类型并显示
-                if (adapted.type === 'thought') {
-                    // ✅ v=35: 思考内容立即显示在主聊天区域（XSS安全）
-                    const content = adapted.content || adapted.data?.text || '';
-
-                    // ✅ v=35: 改进日志 - 显示完整长度信息
-                    const preview = content.length > 100
-                        ? content.substring(0, 100) + `... (${content.length} chars)`
-                        : content;
-                    console.log('[NewAPI] Thought event received:', preview);
-
-                    // ✅ v=35: 立即显示，不受打字机效果限制
-                    if (typeof window.addSystemMessage === 'function') {
-                        window.addSystemMessage(`💭 ${content}`, 'thought');
-                        console.log('[NewAPI] ✅ Thought displayed immediately');
                     } else {
-                        console.error('[NewAPI] ❌ addSystemMessage not available!');
-                    }
+                        if (hasSummaryInResponse && hasSummaryFlag) {
+                            console.log('[NewAPI] Task summary already exists (both flag and response)');
+                        } else if (hasSummaryInResponse) {
+                            console.log('[NewAPI] Task summary exists in response but flag is missing, fixing flag');
+                            s._hasCompletionSummary = true;
+                            if (typeof window.saveState === 'function') {
+                                window.saveState();
+                            }
+                        } else {
+                            console.log('[NewAPI] Task summary flag exists but response missing summary, recreating...');
+                            const totalActions = s.actions ? s.actions.length : 0;
+                            const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
+                            const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
+                            s.response = (s.response || '') + summary;
 
-                    // ✅ v=35: 同时添加到orphanEvents，确保在历史记录中可见
-                    if (!s.orphanEvents) s.orphanEvents = [];
-                    s.orphanEvents.push({
-                        type: 'thought',
-                        content: content,
-                        timestamp: Date.now()
-                    });
-                    console.log('[NewAPI] Thought added to orphanEvents, total:', s.orphanEvents.length);
-
-                    // 不在右侧面板显示，避免覆盖文件预览
-                    return;
-                } else if (adapted.type === 'action') {
-                    // 显示工具操作
-                    const output = data.output || '';
-                    const toolLower = toolName.toLowerCase();
-
-                    if (toolLower === 'read') {
-                        // read 工具 - 显示文件内容
-                        const input = data.input || {};
-                        const filePath = input.path || input.file_path || 'unknown';
-                        console.log('[NewAPI] 显示read文件内容:', filePath);
-                        window.rightPanelManager.showFileEditor(filePath, output);
-                    } else if (toolLower === 'bash' || toolLower === 'grep') {
-                        // bash/grep - 显示命令输出
-                        const input = data.input || {};
-                        const command = input.command || input.pattern || '';
-                        const title = command ? `${toolName}: ${command}` : `${toolName} 输出`;
-                        console.log('[NewAPI] 显示终端输出:', title);
-                        window.rightPanelManager.showFileEditor(title, output);
-                    } else if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
-                        // write/edit - 显示正在写入
-                        const input = data.input || {};
-                        const filePath = input.path || input.file_path || 'unknown';
-                        const content = input.content || '';
-
-                        console.log('[NewAPI] 显示写入文件:', filePath);
-                        window.rightPanelManager.showFileEditor(filePath, '正在写入...');
-
-                        // 如果有内容，使用打字机效果
-                        if (content && typeof content === 'string') {
-                            setTimeout(() => {
-                                if (window.rightPanelManager.fileEditorContainer) {
-                                    window.rightPanelManager.fileEditorContainer.classList.remove('hidden');
-                                    const pre = document.getElementById('file-code-content');
-                                    if (pre) {
-                                        pre.textContent = '';
-                                        // 打字机效果
-                                        let i = 0;
-                                        const typeWriter = () => {
-                                            if (i < content.length) {
-                                                pre.textContent += content.charAt(i);
-                                                i++;
-                                                setTimeout(typeWriter, 5); // 5ms 打字速度
-                                            }
-                                        };
-                                        typeWriter();
-                                    }
+                            // ✅ v=33: 重建总结后也要刷新UI（绕过节流）
+                            try {
+                                if (typeof window._originalRenderResults === 'function') {
+                                    window._originalRenderResults();
+                                } else if (typeof window.renderResults === 'function') {
+                                    window.renderResults();
                                 }
-                            }, 100);
+                            } catch (error) {
+                                console.error('[NewAPI] Failed to refresh UI after recreating summary:', error);
+                            }
+
+                            if (typeof window.saveState === 'function') {
+                                window.saveState();
+                            }
                         }
-                    } else if (toolLower === 'browser' || toolLower.includes('web')) {
-                        // browser 工具 - 显示浏览器操作
-                        const input = data.input || {};
-                        const action = data.action || toolName;
-                        const details = Object.entries(input).map(([k, v]) => `${k}: ${v}`).join('\n');
-                        console.log('[NewAPI] 显示浏览器操作:', action);
-                        window.rightPanelManager.showFileEditor(`🌐 ${action}`, details || '浏览器操作中...');
-                    } else {
-                        // 其他工具 - 显示通用信息
-                        const input = data.input || {};
-                        const title = `🔧 ${toolName}`;
-                        const details = Object.entries(input).map(([k, v]) => `${k}: ${v}`).join('\n');
-                        console.log('[NewAPI] 显示工具操作:', toolName);
-                        window.rightPanelManager.showFileEditor(title, details || '工具执行中...');
-                    }
-                } else if (adapted.type === 'error') {
-                    // 显示错误信息
-                    const errorMsg = adapted.message || adapted.content || '未知错误';
-                    console.log('[NewAPI] 显示错误信息:', errorMsg);
-                    window.rightPanelManager.showFileEditor('❌ 错误', errorMsg);
-                }
-            }
-
-            // 处理 action/thought/error
-            if (!s.phases || s.phases.length === 0) {
-                s.phases = [{ id: 'phase_executing', title: '🚀 任务执行中', status: 'active', events: [] }];
-                s.currentPhase = 'phase_executing';
-            }
-
-            const targetPhase = s.phases.find(p => p.id === s.currentPhase) || s.phases[s.phases.length - 1];
-            if (targetPhase) {
-                if (!targetPhase.events) targetPhase.events = [];
-
-                const eventId = adapted.id || (adapted.data && (adapted.data.id || adapted.data.call_id)) || adapted.message_id;
-
-                // ✅ 修复：统一的事件更新逻辑（删除了冗余的去重检查）
-                let existingEventIndex = -1;
-
-                if (eventId) {
-                    existingEventIndex = targetPhase.events.findIndex(e => {
-                        const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;
-                        return eId === eventId;
-                    });
-                }
-
-                if (existingEventIndex > -1) {
-                    // 更新现有事件
-                    const existing = targetPhase.events[existingEventIndex];
-                    if (adapted.type === 'action' && existing.type === 'action') {
-                        existing.data = { ...existing.data, ...adapted.data };
-                    } else {
-                        targetPhase.events[existingEventIndex] = adapted;
                     }
                 } else {
-                    // 只有在新事件时才追加
-                    targetPhase.events.push(adapted);
+                    // 错误总结
+                    if (typeof window.addSystemMessage === 'function') {
+                        window.addSystemMessage('❌ 任务执行失败', 'error');
+                    }
+                }
 
-                    // 文件收集：如果是write/edit/file_editor工具，将文件添加到deliverables
-                    if (adapted.type === 'action' && adapted.data) {
-                        const toolName = adapted.data.tool_name || adapted.data.tool || '';
+            } else if (adapted.type === 'phase_start') {
+                // 停用当前活跃 Phase
+                if (s.currentPhase) {
+                    const prevPhase = s.phases.find(p => p.id === s.currentPhase);
+                    if (prevPhase) prevPhase.status = 'completed';
+                }
+
+                let phase = s.phases.find(p => p.id === adapted.phase_id);
+                if (!phase) {
+                    phase = {
+                        id: adapted.phase_id,
+                        title: adapted.title || '正在执行',
+                        description: adapted.description || '',
+                        status: 'active',
+                        events: [],
+                        turn_index: window._turnIndex || 0 // ✅ v=38.4.12.1: 关联到当前轮次
+                    };
+                    s.phases.push(phase);
+                } else {
+                    phase.status = 'active';
+                    // 如果后端提供了更具体的标题，更新它
+                    if (adapted.title && adapted.title !== 'Executing') {
+                        phase.title = adapted.title;
+                    }
+                }
+                s.currentPhase = phase.id;
+            } else if (adapted.type === 'phase_finish') {
+                const phase = s.phases.find(p => p.id === adapted.phase_id);
+                if (phase) phase.status = 'completed';
+            } else if (adapted.type === 'action' || adapted.type === 'thought' || adapted.type === 'error') {
+                // ✅ 修复：更新 session 的 actions 和 orphanEvents 数组
+                if (adapted.type === 'action') {
+                    const actionEvent = {
+                        type: 'action',
+                        id: adapted.id || adapted.call_id,
+                        data: adapted.data || {}
+                    };
+
+                    // 确保 actions 和 orphanEvents 数组存在
+                    if (!s.actions) s.actions = [];
+                    if (!s.orphanEvents) s.orphanEvents = [];
+
+                    // 添加到数组
+                    s.actions.push(actionEvent);
+                    s.orphanEvents.push(actionEvent);
+
+                    // ✅ v=38.4.12: 删除重复关联 - 统一使用第1929行的通用处理器
+                    // 避免同一个事件被添加两次到 phase.events
+                    // 通用处理器已经有完整的去重和更新逻辑（第1942-1961行）
+
+                    console.log('[NewAPI] Added action to session:', actionEvent.data.tool_name, 'total actions:', s.actions.length);
+                }
+
+                // 实时显示到右侧面板
+                if (window.rightPanelManager) {
+                    const data = adapted.data || {};
+                    const toolName = data.tool_name || adapted.tool || '';
+
+                    // 确保右侧面板展开并切换到预览标签页
+                    if (typeof window.rightPanelManager.show === 'function') {
+                        window.rightPanelManager.show();
+                    }
+                    if (typeof window.rightPanelManager.switchTab === 'function') {
+                        window.rightPanelManager.switchTab('preview');
+                    }
+
+                    // 判断事件类型并显示
+                    if (adapted.type === 'thought') {
+                        // ✅ v=35: 思考内容立即显示在主聊天区域（XSS安全）
+                        const content = adapted.content || adapted.data?.text || '';
+
+                        // ✅ v=35: 改进日志 - 显示完整长度信息
+                        const preview = content.length > 100
+                            ? content.substring(0, 100) + `... (${content.length} chars)`
+                            : content;
+                        console.log('[NewAPI] Thought event received:', preview);
+
+                        // ✅ v=35: 立即显示，不受打字机效果限制
+                        if (typeof window.addSystemMessage === 'function') {
+                            window.addSystemMessage(`💭 ${content}`, 'thought');
+                            console.log('[NewAPI] ✅ Thought displayed immediately');
+                        } else {
+                            console.error('[NewAPI] ❌ addSystemMessage not available!');
+                        }
+
+                        // ✅ v=35: 同时添加到orphanEvents，确保在历史记录中可见
+                        if (!s.orphanEvents) s.orphanEvents = [];
+                        s.orphanEvents.push({
+                            type: 'thought',
+                            content: content,
+                            timestamp: Date.now()
+                        });
+                        console.log('[NewAPI] Thought added to orphanEvents, total:', s.orphanEvents.length);
+
+                        // 不在右侧面板显示，避免覆盖文件预览
+                        return;
+                    } else if (adapted.type === 'action') {
+                        // 显示工具操作
+                        const output = data.output || '';
                         const toolLower = toolName.toLowerCase();
 
-                        // 判断是否为文件写入类工具
-                        if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
-                            const input = adapted.data.input || {};
-                            const filePath = input.path || input.file_path || input.file;
+                        if (toolLower === 'read') {
+                            // read 工具 - 显示文件内容
+                            const input = data.input || {};
+                            const filePath = input.path || input.file_path || 'unknown';
+                            console.log('[NewAPI] 显示read文件内容:', filePath);
+                            window.rightPanelManager.showFileEditor(filePath, output);
+                        } else if (toolLower === 'bash' || toolLower === 'grep') {
+                            // bash/grep - 显示命令输出
+                            const input = data.input || {};
+                            const command = input.command || input.pattern || '';
+                            const title = command ? `${toolName}: ${command}` : `${toolName} 输出`;
+                            console.log('[NewAPI] 显示终端输出:', title);
+                            window.rightPanelManager.showFileEditor(title, output);
+                        } else if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
+                            // write/edit - 显示正在写入
+                            const input = data.input || {};
+                            const filePath = input.path || input.file_path || 'unknown';
+                            const content = input.content || '';
 
-                            if (filePath) {
-                                // 初始化deliverables数组
-                                if (!s.deliverables) s.deliverables = [];
+                            console.log('[NewAPI] 显示写入文件:', filePath);
+                            window.rightPanelManager.showFileEditor(filePath, '正在写入...');
 
-                                // 检查文件是否已存在（避免重复）
-                                const exists = s.deliverables.some(d => {
-                                    const dPath = typeof d === 'string' ? d : (d.name || d.path);
-                                    return dPath === filePath;
-                                });
+                            // 如果有内容，使用打字机效果
+                            if (content && typeof content === 'string') {
+                                setTimeout(() => {
+                                    if (window.rightPanelManager.fileEditorContainer) {
+                                        window.rightPanelManager.fileEditorContainer.classList.remove('hidden');
+                                        const pre = document.getElementById('file-code-content');
+                                        if (pre) {
+                                            pre.textContent = '';
+                                            // 打字机效果
+                                            let i = 0;
+                                            const typeWriter = () => {
+                                                if (i < content.length) {
+                                                    pre.textContent += content.charAt(i);
+                                                    i++;
+                                                    setTimeout(typeWriter, 5); // 5ms 打字速度
+                                                }
+                                            };
+                                            typeWriter();
+                                        }
+                                    }
+                                }, 100);
+                            }
+                        } else if (toolLower === 'browser' || toolLower.includes('web')) {
+                            // browser 工具 - 显示浏览器操作
+                            const input = data.input || {};
+                            const action = data.action || toolName;
+                            const details = Object.entries(input).map(([k, v]) => `${k}: ${v}`).join('\n');
+                            console.log('[NewAPI] 显示浏览器操作:', action);
+                            window.rightPanelManager.showFileEditor(`🌐 ${action}`, details || '浏览器操作中...');
+                        } else {
+                            // 其他工具 - 显示通用信息
+                            const input = data.input || {};
+                            const title = `🔧 ${toolName}`;
+                            const details = Object.entries(input).map(([k, v]) => `${k}: ${v}`).join('\n');
+                            console.log('[NewAPI] 显示工具操作:', toolName);
+                            window.rightPanelManager.showFileEditor(title, details || '工具执行中...');
+                        }
+                    } else if (adapted.type === 'error') {
+                        // 显示错误信息
+                        const errorMsg = adapted.message || adapted.content || '未知错误';
+                        console.log('[NewAPI] 显示错误信息:', errorMsg);
+                        window.rightPanelManager.showFileEditor('❌ 错误', errorMsg);
+                    }
+                }
 
-                                if (!exists) {
-                                    s.deliverables.push(filePath);
-                                    console.log('[NewAPI] 文件已添加到deliverables:', filePath);
+                // 处理 action/thought/error
+                if (!s.phases || s.phases.length === 0) {
+                    s.phases = [{
+                        id: 'phase_executing',
+                        title: '🚀 任务执行中',
+                        status: 'active',
+                        events: [],
+                        turn_index: window._turnIndex || 0 // ✅ v=38.4.12.1: 关联到当前轮次
+                    }];
+                    s.currentPhase = 'phase_executing';
+                }
+
+                const targetPhase = s.phases.find(p => p.id === s.currentPhase) || s.phases[s.phases.length - 1];
+                if (targetPhase) {
+                    if (!targetPhase.events) targetPhase.events = [];
+
+                    const eventId = adapted.id || (adapted.data && (adapted.data.id || adapted.data.call_id)) || adapted.message_id;
+
+                    // ✅ 修复：统一的事件更新逻辑（删除了冗余的去重检查）
+                    let existingEventIndex = -1;
+
+                    if (eventId) {
+                        existingEventIndex = targetPhase.events.findIndex(e => {
+                            const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;
+                            return eId === eventId;
+                        });
+                    }
+
+                    if (existingEventIndex > -1) {
+                        // 更新现有事件
+                        const existing = targetPhase.events[existingEventIndex];
+                        if (adapted.type === 'action' && existing.type === 'action') {
+                            existing.data = { ...existing.data, ...adapted.data };
+                        } else {
+                            targetPhase.events[existingEventIndex] = adapted;
+                        }
+                    } else {
+                        // 只有在新事件时才追加
+                        targetPhase.events.push(adapted);
+
+                        // 文件收集：如果是write/edit/file_editor工具，将文件添加到deliverables
+                        if (adapted.type === 'action' && adapted.data) {
+                            const toolName = adapted.data.tool_name || adapted.data.tool || '';
+                            const toolLower = toolName.toLowerCase();
+
+                            // 判断是否为文件写入类工具
+                            if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
+                                const input = adapted.data.input || {};
+                                const filePath = input.path || input.file_path || input.file;
+
+                                if (filePath) {
+                                    // 初始化deliverables数组
+                                    if (!s.deliverables) s.deliverables = [];
+
+                                    // 检查文件是否已存在（避免重复）
+                                    const exists = s.deliverables.some(d => {
+                                        const dPath = typeof d === 'string' ? d : (d.name || d.path);
+                                        return dPath === filePath;
+                                    });
+
+                                    if (!exists) {
+                                        s.deliverables.push(filePath);
+                                        console.log('[NewAPI] 文件已添加到deliverables:', filePath);
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
         } catch (error) {
             // ✅ 修复C5: 错误处理 - 标记session可能处于不一致状态
             console.error('[processEvent] Error processing event:', adapted.type, error);
@@ -2053,7 +2068,7 @@
 
                 // ✅ 修复：sessions是数组，使用find查找
                 const session = window.state.sessions ?
-                               window.state.sessions.find(s => s.id === sessionId) : null;
+                    window.state.sessions.find(s => s.id === sessionId) : null;
                 if (session) {
                     processEvent(session, adapted);
                 }
@@ -2145,13 +2160,13 @@
     window.loadSessionTimeline = loadSessionTimeline;
     window.handleHistorySessionClick = handleHistorySessionClick;
     window.ChildSessionManager = ChildSessionManager;
-    
+
     // ✅ 修复 UI 提交流程：暴露关键函数到全局作用域
     // handleGlobalClick 需要调用这些函数，必须在全局作用域可访问
     window.prepareSession = prepareSession;
     window.executeSubmission = executeSubmission;
     window.handleNewAPIConnection = handleNewAPIConnection;
-    
+
     console.log('[NewAPI] Core functions exposed to global scope:', {
         prepareSession: typeof window.prepareSession,
         executeSubmission: typeof window.executeSubmission,

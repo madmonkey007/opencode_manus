@@ -114,7 +114,7 @@ class EventAdapter {
                 return {
                     type: 'file_preview_delta',
                     step_id: newEvent.step_id,
-                    delta: {type: 'insert', content: '', position: 0}
+                    delta: { type: 'insert', content: '', position: 0 }
                 };
             }
 
@@ -332,7 +332,7 @@ class EventAdapter {
 
             const adaptedEvent = {
                 id: part.id,
-                type: toolType,  // ✅ 修复：使用实际的工具类型（write/bash/terminal等）
+                type: 'action',  // ✅ 修复：统一使用 'action' 类型，确保被 session.actions 捕获
                 data: {
                     id: part.id,
                     tool: toolType,
@@ -455,9 +455,9 @@ class EventAdapter {
     static messageToSendRequest(text, options = {}) {
         // ✅ 修复：添加 apiClient 依赖验证，防止未定义时崩溃
         const messageId = options.messageId ||
-                         (typeof apiClient !== 'undefined' && apiClient.generateMessageId ?
-                          apiClient.generateMessageId() :
-                          `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+            (typeof apiClient !== 'undefined' && apiClient.generateMessageId ?
+                apiClient.generateMessageId() :
+                `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
 
         return {
             message_id: messageId,
