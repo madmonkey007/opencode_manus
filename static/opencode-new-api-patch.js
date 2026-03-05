@@ -911,6 +911,9 @@
             // 准备 Session
             const s = await prepareSession(promptValue, isWelcome);
 
+            // ✅ 立即切换到聊天界面，消除欢迎页 15s 延迟感
+            forceChatMode();
+
             // ✅ 修复：检查 prepareSession 返回值
             if (!s) {
                 console.error('[NewAPI] prepareSession returned null, aborting submission');

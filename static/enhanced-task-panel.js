@@ -202,7 +202,7 @@ function renderEnhancedTaskPanel(session) {
 // 创建用户输入卡片
 function createUserPromptCard(prompt) {
     const card = document.createElement('div');
-    card.className = 'message-bubble user-bubble animate-fade-in text-sm';
+    card.className = 'message-bubble user-bubble text-sm';
     card.style.cssText = 'margin-left: auto; margin-right: 0; width: fit-content; max-width: 85%;';
     card.textContent = prompt;
     return card;

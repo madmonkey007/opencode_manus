@@ -189,7 +189,9 @@ function _executeSave(retryCount = 0) {
                     id: p.id,
                     title: p.title,
                     status: p.status,
-                    number: p.number
+                    number: p.number,
+                    events: p.events || [],        // ✅ Round 5 Fix: Preserve history events
+                    turn_index: p.turn_index       // ✅ Round 5 Fix: Preserve turn index
                 })),
                 response: s.response || '',
                 deliverables: s.deliverables || [],
