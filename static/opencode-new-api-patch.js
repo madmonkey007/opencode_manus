@@ -1001,6 +1001,35 @@ window.Logger = {
                 console.log('[prepareSession] Saving new session to localStorage');
                 window.saveState();
             }
+        } else {
+            // ✅ P0修复：追问场景 - 追加新的prompt到现有session
+            //
+            // 说明：
+            // - 使用分隔符 '\n\n---\n\n' 追加prompt
+            // - renderResults会根据分隔符split渲染多个query气泡
+            // - turnIndex由handleNewAPIConnection负责递增，不要在这里修改！
+            //
+            const pSep = '\n\n---\n\n';
+
+            // 验证prompt参数
+            if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+                console.error('[NewAPI] Invalid prompt for follow-up:', typeof prompt);
+                return existing;
+            }
+
+            // 追加prompt
+            existing.prompt = existing.prompt ?
+                existing.prompt + pSep + prompt :
+                prompt;
+
+            console.log('[NewAPI] Follow-up: appended prompt to session');
+            console.log('[NewAPI] Updated prompt length:', existing.prompt.length);
+            console.log('[NewAPI] Total prompts:', existing.prompt.split(pSep).length);
+
+            // ✅ 保存更新后的session到localStorage
+            if (typeof window.saveState === 'function') {
+                window.saveState();
+            }
         }
         return existing;
     }
