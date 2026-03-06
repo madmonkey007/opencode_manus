@@ -145,8 +145,9 @@ class RightPanelManager {
     }
 
     // Show web preview mode
-    showWebPreview(url) {
-        console.log('Showing web preview:', url);
+    // ✅ P0修复: 修改方法签名，使用正确的API端点
+    showWebPreview(sessionId, filePath) {
+        console.log('[RightPanelManager] Showing web preview:', { sessionId, filePath });
         this.show();
         this.switchTab('preview');
         this.currentMode = 'web-preview';
@@ -165,8 +166,52 @@ class RightPanelManager {
             this.webPreviewContainer.classList.remove('hidden');
             const iframe = document.getElementById('web-preview-iframe');
             if (iframe) {
-                iframe.src = url;
-                console.log('Web preview iframe loaded:', url);
+                // ✅ 使用正确的API端点 /opencode/read_file
+                const apiUrl = `/opencode/read_file?session_id=${encodeURIComponent(sessionId)}&file_path=${encodeURIComponent(filePath)}`;
+                console.log('[RightPanelManager] Fetching file content from:', apiUrl);
+
+                fetch(apiUrl)
+                    .then(async res => {
+                        if (!res.ok) {
+                            const errorText = await res.text();
+                            console.error('[RightPanelManager] Failed to fetch file:', {
+                                status: res.status,
+                                statusText: res.statusText,
+                                errorBody: errorText,
+                                sessionId,
+                                filePath
+                            });
+                            throw new Error(`HTTP ${res.status}: ${errorText}`);
+                        }
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (data.status === 'success' && data.content) {
+                            // ✅ 创建blob URL用于HTML预览
+                            const blob = new Blob([data.content], {type: 'text/html'});
+                            const blobUrl = URL.createObjectURL(blob);
+                            iframe.src = blobUrl;
+                            console.log('[RightPanelManager] Web preview loaded via blob URL');
+                        } else {
+                            throw new Error(data.message || 'Failed to get file content');
+                        }
+                    })
+                    .catch(err => {
+                        console.error('[RightPanelManager] Error loading web preview:', err);
+                        // 显示错误信息到iframe
+                        const errorHtml = `
+                            <html>
+                            <body style="font-family: Arial, sans-serif; padding: 20px; color: #666;">
+                                <h2 style="color: #e74c3c;">⚠️ 无法加载预览</h2>
+                                <p><strong>错误信息:</strong> ${err.message}</p>
+                                <p><strong>文件:</strong> ${filePath}</p>
+                                <p><strong>Session:</strong> ${sessionId}</p>
+                            </body>
+                            </html>
+                        `;
+                        const blob = new Blob([errorHtml], {type: 'text/html'});
+                        iframe.src = URL.createObjectURL(blob);
+                    });
             }
         }
     }

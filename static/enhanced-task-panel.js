@@ -365,15 +365,10 @@ function createPhaseItem(phase, index, currentPhaseId, isLast) {
 function getToolSummary(toolType, input, output) {
     const tool = toolType.toLowerCase();
 
-    // 提取最有意义的字段作为摘要
+    // === 基础文件操作 ===
     if (tool === 'read') {
         const path = input.path || input.file_path || input.file;
         return path ? `读取文件: ${path}` : '读取文件';
-    }
-
-    if (tool === 'bash' || tool === 'terminal' || tool === 'execute') {
-        const cmd = input.command || input.cmd;
-        return cmd ? `执行命令: ${cmd}` : '执行命令';
     }
 
     if (tool === 'write') {
@@ -387,6 +382,12 @@ function getToolSummary(toolType, input, output) {
         return path ? `编辑文件: ${path}` : '编辑文件';
     }
 
+    // === 命令行工具 ===
+    if (tool === 'bash' || tool === 'terminal' || tool === 'execute') {
+        const cmd = input.command || input.cmd;
+        return cmd ? `执行命令: ${cmd}` : '执行命令';
+    }
+
     if (tool === 'grep') {
         const pattern = input.pattern || input.regex || input.search;
         const path = input.path || input.file_path || input.file;
@@ -394,6 +395,57 @@ function getToolSummary(toolType, input, output) {
             return `搜索: ${pattern} 在 ${path}`;
         }
         return pattern ? `搜索: ${pattern}` : '搜索';
+    }
+
+    // === 子agent工具 ===
+    if (tool === 'subagent_explore' || tool === 'explore') {
+        const query = input.query || input.description || input.task;
+        return query ? `探索: ${query}` : '探索任务';
+    }
+
+    if (tool === 'subagent_coder' || tool === 'coder') {
+        const task = input.task || input.description || input.instruction;
+        return task ? `代码生成: ${task}` : '代码生成';
+    }
+
+    if (tool === 'subagent_delegate' || tool === 'delegate_task') {
+        const category = input.category || input.subagent_type;
+        const task = input.task || input.description;
+        if (category && task) {
+            return `委托${category}: ${task}`;
+        }
+        return task ? `委托任务: ${task}` : '委托任务';
+    }
+
+    if (tool === 'todos' || tool === 'todowrite') {
+        const todoCount = input.todos ? input.todos.length : 0;
+        return todoCount > 0 ? `更新任务列表 (${todoCount}项)` : '更新任务列表';
+    }
+
+    if (tool === 'skill') {
+        const skillName = input.name || input.skill;
+        return skillName ? `加载技能: ${skillName}` : '加载技能';
+    }
+
+    // === 网络工具 ===
+    if (tool === 'browser') {
+        const action = input.action || input.url;
+        return action ? `浏览器操作: ${action}` : '浏览器操作';
+    }
+
+    if (tool === 'web_search' || tool === 'search') {
+        const query = input.query || input.q;
+        return query ? `搜索: ${query}` : '搜索';
+    }
+
+    // === 其他工具 ===
+    if (tool === 'system') {
+        return '系统操作';
+    }
+
+    if (tool === 'database') {
+        const action = input.mode || input.action;
+        return action ? `数据库操作: ${action}` : '数据库操作';
     }
 
     // 默认返回工具名称
