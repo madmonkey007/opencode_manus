@@ -101,9 +101,21 @@ function renderSimpleMarkdown(text) {
     // 安全处理：先转义HTML特殊字符
     let safeText = escapeHtml(text);
 
+    // ✅ 优化1：移除统计信息行（完成阶段、工具调用等）
+    safeText = safeText.replace(/^[\s]*(完成阶段|阶段).*[:].*$/gm, '');
+    safeText = safeText.replace(/^[\s]*工具调用.*[:].*$/gm, '');
+    safeText = safeText.replace(/^[\s]*\*.*完成阶段.*$/gm, '');
+    safeText = safeText.replace(/^[\s]*\*.*工具调用.*$/gm, '');
+
+    // ✅ 优化2：移除emoji（包括带 ✅ 等标记的行）
+    // 移除行首的emoji和标记（如 ✅、❌、⚠️ 等）
+    safeText = safeText.replace(/^[\s]*[✅❌⚠️🔧📝💡🎯📊⭐]+[\s]*/gm, '');
+    // 移除行中的emoji
+    safeText = safeText.replace(/[✅❌⚠️🔧📝💡🎯📊⭐]/g, '');
+
     // 然后处理markdown语法（从特殊到一般，避免重复处理）
     // 1. 代码块 ```code```
-    safeText = safeText.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 dark:bg-zinc-800 p-2 rounded my-1 overflow-x-auto text-xs"><code>$1</code></pre>');
+    safeText = safeText.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 dark:bg-zinc-800 p-2 rounded my-2 overflow-x-auto text-xs"><code>$1</code></pre>');
 
     // 2. 行内代码 `code`
     safeText = safeText.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-zinc-800 px-1 rounded text-xs">$1</code>');
@@ -117,30 +129,36 @@ function renderSimpleMarkdown(text) {
     // 5. 链接 [text](url)
     safeText = safeText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-500 underline" target="_blank" rel="noopener">$1</a>');
 
-    // 6. 无序列表 - item（处理整个列表）
-    // 匹配连续的列表项
-    const listPattern = /(^|\n)- (.+)(\n(?!\-)|\n*$)/g;
-    safeText = safeText.replace(listPattern, (match, prefix, itemContent, end) => {
-        return `<ul class="list-disc list-inside my-1 space-y-0.5"><li>${itemContent}</li></ul>${end}`;
+    // ✅ 优化3：处理分隔符 --- 作为段落分隔（换行显示）
+    safeText = safeText.replace(/^---+$/gm, '<hr class="my-4 border-gray-300 dark:border-zinc-700">');
+
+    // ✅ 优化4：改进无序列表处理 - 每个列表项单独成行
+    // 匹配连续的列表项，并为每个创建独立的段落
+    const listPattern = /(^|\n)- (.+?)(?=\n- |\n\n|\n\d+\. |\n*$)/g;
+    safeText = safeText.replace(listPattern, (match, prefix, itemContent) => {
+        // 移除列表项中的emoji
+        const cleanContent = itemContent.replace(/^[✅❌⚠️🔧📝💡🎯📊⭐]+[\s]*/, '');
+        return `<div class="flex items-start gap-2 my-2"><span class="text-gray-400 dark:text-gray-600 mt-0.5">•</span><span>${cleanContent}</span></div>`;
     });
 
-    // 7. 有序列表 1. item
-    const orderedListPattern = /(^|\n)\d+\. (.+)(\n(?!\d+\.)|\n*$)/g;
-    safeText = safeText.replace(orderedListPattern, (match, prefix, itemContent, end) => {
-        return `<ol class="list-decimal list-inside my-1 space-y-0.5"><li>${itemContent}</li></ol>${end}`;
+    // ✅ 优化5：改进有序列表处理 - 每个列表项单独成行
+    const orderedListPattern = /(^|\n)(\d+)\. (.+?)(?=\n\d+\. |\n\n|\n- |\n*$)/g;
+    safeText = safeText.replace(orderedListPattern, (match, prefix, num, itemContent) => {
+        const cleanContent = itemContent.replace(/^[✅❌⚠️🔧📝💡🎯📊⭐]+[\s]*/, '');
+        return `<div class="flex items-start gap-2 my-2"><span class="text-gray-400 dark:text-gray-600 mt-0.5 font-semibold">${num}.</span><span>${cleanContent}</span></div>`;
     });
 
-    // 8. 标题 # Heading
-    // ✅ v=38.4.11.1 修复：统一间距为 my-1，与列表保持一致
-    safeText = safeText.replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold my-1">$1</h3>');
-    safeText = safeText.replace(/^## (.+)$/gm, '<h2 class="text-base font-bold my-1">$1</h2>');
-    safeText = safeText.replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold my-1">$1</h1>');
+    // 6. 标题 # Heading
+    safeText = safeText.replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold my-2">$1</h3>');
+    safeText = safeText.replace(/^## (.+)$/gm, '<h2 class="text-base font-bold my-2">$1</h2>');
+    safeText = safeText.replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold my-2">$1</h1>');
 
-    // 9. 换行（不在列表中的换行）
-    // ✅ v=38.4.11 修复：减少段落间距
-    // 修复问题：原 /\n\n/g 无法匹配 \n\n\n 等多个换行符的情况
-    // 改进：使用 /\n{2,}/g 匹配2个或更多连续换行符
-    safeText = safeText.replace(/\n{2,}/g, '<br class="mb-2">');
+    // 7. 换行（不在列表中的换行）
+    // 使用 /\n{2,}/g 匹配2个或更多连续换行符
+    safeText = safeText.replace(/\n{2,}/g, '<br class="mb-3">');
+
+    // 8. 单个换行转换为<br>
+    safeText = safeText.replace(/\n/g, '<br>');
 
     return safeText;
 }
@@ -730,12 +748,12 @@ function createDeliverableCard(session) {
                 </div>
             ` : '<p class="text-slate-600 dark:text-slate-400">任务正在执行中...</p>'}
         </div>
-        
+
         <div class="space-y-4">
             <h2 class="text-xl font-semibold text-slate-900 dark:text-white">
-                下一步交付
+                交付文件
             </h2>
-            
+
             ${hasWebFiles ? `
                 <div class="space-y-3">
                     <div class="grid grid-cols-1 gap-3" id="web-file-cards-${session.id}">
