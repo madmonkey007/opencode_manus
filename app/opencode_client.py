@@ -397,6 +397,12 @@ class OpenCodeClient:
                         event, session_id, message_id
                     ):
                         yield e
+                elif event_type == "reasoning" or event_type == "thinking":
+                    logger.info(f"[_process_line] Handling {event_type} event")
+                    async for e in self._handle_thought_event(
+                        event, session_id, message_id
+                    ):
+                        yield e
 
                 elif event_type == "step_start" or event_type == "step-start":
                     logger.info(f"[_process_line] Handling step_start event")
