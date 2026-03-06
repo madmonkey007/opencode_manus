@@ -9,12 +9,15 @@
 
     const ENABLE_NEW_API = true;
 
-    // ✅ 调试配置（独立定义，避免跨文件引用错误）
-    const DEBUG_CONFIG = {
+    // ✅ 调试配置（暴露到全局，便于调试和跨文件访问）
+    window.DEBUG_CONFIG = {
         ENABLE_THOUGHT_DIAGNOSTIC: false,
         ENABLE_DELIVERABLE_DIAGNOSTIC: false,
         ENABLE_MARKDOWN_DIAGNOSTIC: false
     };
+
+    // ✅ 保留局部引用，兼容现有代码
+    const DEBUG_CONFIG = window.DEBUG_CONFIG;
 
     // 🔍 Thought 事件追踪开关（在浏览器控制台设置：window._DEBUG_THOUGHT_EVENTS = true）
     window._DEBUG_THOUGHT_EVENTS = false;
