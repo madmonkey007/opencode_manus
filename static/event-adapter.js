@@ -228,13 +228,23 @@ class EventAdapter {
 
             // THOUGHT 类型
             if (toolType === 'thought') {
-                return {
+                const thoughtEvent = {
                     id: newEvent.id || EventAdapter.generateEventId('thought'),
                     type: 'thought',
                     content: data.content || '',
                     timestamp: newEvent.timestamp || Date.now(),
                     message_id: newEvent.message_id  // ✅ 添加缺失字段
                 };
+                
+                // 🔍 调试日志：追踪 thought 事件转换
+                if (window._DEBUG_THOUGHT_EVENTS) {
+                    console.log('🔍 [EVENT_ADAPTER] Thought event created:', {
+                        input: { toolType, data, originalEvent: newEvent },
+                        output: thoughtEvent
+                    });
+                }
+                
+                return thoughtEvent;
             }
 
             console.warn('[EventAdapter] Unknown tool_event type:', {

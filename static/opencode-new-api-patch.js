@@ -1857,6 +1857,16 @@
 
                     // 判断事件类型并显示
                     if (adapted.type === 'thought') {
+                        // 🔍 调试日志：追踪 thought 事件接收
+                        if (window._DEBUG_THOUGHT_EVENTS) {
+                            console.log('🔍 [SSE_HANDLER] Thought event received:', {
+                                adapted: adapted,
+                                session: s.id,
+                                hasResponse: !!s.response,
+                                responseLength: s.response?.length || 0
+                            });
+                        }
+                        
                         // ✅ v=35: 思考内容立即显示在主聊天区域（XSS安全）
                         const content = adapted.content || adapted.data?.text || '';
 
