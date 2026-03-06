@@ -117,7 +117,6 @@ window.Logger = {
     const PREVIEW_DEBOUNCE_MS = 2000; // 2秒内不重复预览同一文件
     const MAX_PREVIEW_CACHE_SIZE = 100; // 最多缓存100个文件路径
 
-    // ✅ P0-1 & P0-4: 打字机效果管理器（防止UI抖动 + 并发保护 + 超时恢复）
     const TypingEffectManager = (function () {
         let count = 0; // 并发计数器（支持多文件同时写入）
         let timeout = null; // 超时定时器
@@ -151,7 +150,6 @@ window.Logger = {
                 count = Math.max(0, count - 1);
                 console.log(`[TypingEffectManager] End (count: ${count}, reason: ${reason})`);
 
-                // ✅ P0-4: 当所有打字机效果都结束时，清除超时定时器
                 if (count === 0 && timeout) {
                     clearTimeout(timeout);
                     timeout = null;
@@ -898,11 +896,9 @@ window.Logger = {
      * 防止每次事件都触发完整的DOM重渲染，提升性能
      */
     const throttledRenderResults = throttle(() => {
-        // ✅ Round 4: 移除 TypingEffectManager.isActive() 检查
         // 允许在打字机效果（如右侧写代码）期间，左侧任务面板也能实时更新进度
         // 这解决了用户看到的“右侧写完很久左侧才出事件”的延迟感
 
-        // ✅ P0-3: 添加错误处理，防止renderResults异常导致事件流中断
         try {
             if (typeof window.renderResults === 'function') {
                 window.renderResults();
@@ -1494,13 +1490,11 @@ window.Logger = {
             if (adapted.type === 'file_preview_start') {
                 console.log('[NewAPI] File preview start:', adapted.file_path);
 
-                // ✅ P0-1 & P0-4: 添加文件路径验证
                 if (!adapted.file_path) {
                     console.error('[NewAPI] preview_start missing file_path:', adapted);
                     return;
                 }
 
-                // ✅ P0-1 & P0-4: 使用TypingEffectManager开始打字机效果，暂停renderResults
                 TypingEffectManager.start(`file_preview_start: ${adapted.file_path}`);
 
                 // 显示文件编辑器
@@ -1536,7 +1530,6 @@ window.Logger = {
             if (adapted.type === 'file_preview_end') {
                 console.log('[NewAPI] File preview end:', adapted.file_path);
 
-                // ✅ P0-1 & P0-4: 使用TypingEffectManager结束打字机效果，恢复renderResults
                 TypingEffectManager.end(`file_preview_end: ${adapted.file_path}`);
 
                 // 更新状态为完成
@@ -1544,7 +1537,6 @@ window.Logger = {
                     window.rightPanelManager.setFileStatus('完成');
                 }
 
-                // ✅ P0-3: 触发一次UI更新以显示最终状态（带错误处理）
                 try {
                     if (typeof window.renderResults === 'function') {
                         window.renderResults();
@@ -1645,7 +1637,6 @@ window.Logger = {
                         window.addSystemMessage(`[Timeline] ${title}`, 'info');
                     }
 
-                    // ✅ v=38.4.12: 关联 timeline_event 到 phase.events
                     // 这样增强任务面板也能显示 timeline 事件
                     if (s.currentPhase && s.phases) {
                         const currentPhase = s.phases.find(p => p.id === s.currentPhase);
@@ -1851,7 +1842,6 @@ window.Logger = {
                     return;
                 }
 
-                // ✅ Round 4: 改进完成逻辑 - 确保所有阶段和状态都正确更新
                 const isError = adapted.value === 'error' || adapted.status === 'error';
                 const isDone = adapted.value === 'done' || adapted.value === 'completed' || (adapted.type === 'message_updated' && adapted.time?.completed);
 
@@ -1998,7 +1988,6 @@ window.Logger = {
                     s.actions.push(actionEvent);
                     s.orphanEvents.push(actionEvent);
 
-                    // ✅ v=38.4.12: 删除重复关联 - 统一使用第1929行的通用处理器
                     // 避免同一个事件被添加两次到 phase.events
                     // 通用处理器已经有完整的去重和更新逻辑（第1942-1961行）
 
@@ -2234,30 +2223,7 @@ window.Logger = {
 
                         // 文件收集：如果是write/edit/file_editor工具，将文件添加到deliverables
                         if (adapted.type === 'action' && adapted.data) {
-                            const toolName = adapted.data.tool_name || adapted.data.tool || '';
-                            const toolLower = toolName.toLowerCase();
-
-                            // 判断是否为文件写入类工具
-                            if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
-                                const input = adapted.data.input || {};
-                                const filePath = input.path || input.file_path || input.file;
-
-                                if (filePath) {
-                                    // 初始化deliverables数组
-                                    if (!s.deliverables) s.deliverables = [];
-
-                                    // 检查文件是否已存在（避免重复）
-                                    const exists = s.deliverables.some(d => {
-                                        const dPath = typeof d === 'string' ? d : (d.name || d.path);
-                                        return dPath === filePath;
-                                    });
-
-                                    if (!exists) {
-                                        s.deliverables.push(filePath);
-                                        console.log('[NewAPI] 文件已添加到deliverables:', filePath);
-                                    }
-                                }
-                            }
+                            collectFileToDeliverables(s, adapted.data);
                         }
                     }
                 }
@@ -2288,6 +2254,39 @@ window.Logger = {
 
             // 显示用户警告
             console.warn('[processEvent] Some data may be inconsistent for session:', s.id);
+        }
+    }
+
+    // === P1修复3：通用文件收集函数（支持多种事件格式） ===
+    function addFileToDeliverables(session, filePath, source = 'unknown') {
+        if (!filePath) {
+            return;
+        }
+
+        if (!session.deliverables) session.deliverables = [];
+
+        const exists = session.deliverables.some(d => {
+            const dPath = typeof d === 'string' ? d : (d.name || d.path);
+            return dPath === filePath;
+        });
+
+        if (!exists) {
+            session.deliverables.push(filePath);
+        }
+    }
+
+    // === P0-2修复：文件收集辅助函数（消除重复代码） ===
+    function collectFileToDeliverables(session, actionData) {
+        const toolName = actionData.tool_name || actionData.tool || '';
+        const toolLower = toolName.toLowerCase();
+
+        if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
+            const input = actionData.input || {};
+            const filePath = input.path || input.file_path || input.file;
+
+            if (filePath) {
+                addFileToDeliverables(session, filePath, 'action');
+            }
         }
     }
 
