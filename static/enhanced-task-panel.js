@@ -853,9 +853,9 @@ function createDeliverableCard(session) {
             if (previewBtn) {
                 previewBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    console.log('[Deliverable] Preview web file:', previewUrl);
+                    console.log('[Deliverable] Preview web file:', fileName);
                     if (window.rightPanelManager && typeof window.rightPanelManager.showWebPreview === 'function') {
-                        window.rightPanelManager.showWebPreview(previewUrl);
+                        window.rightPanelManager.showWebPreview(session.id, fileName);
                     }
                 });
             }
@@ -865,7 +865,7 @@ function createDeliverableCard(session) {
                 if (e.target.closest('.preview-btn')) return;
                 console.log('[Deliverable] Click web file card:', fileName);
                 if (window.rightPanelManager && typeof window.rightPanelManager.showWebPreview === 'function') {
-                    window.rightPanelManager.showWebPreview(previewUrl);
+                    window.rightPanelManager.showWebPreview(session.id, fileName);
                 }
             });
         });
@@ -887,11 +887,10 @@ function createDeliverableCard(session) {
 
                 // HTML文件默认预览网页
                 if (fileExt === 'html') {
-                    const previewUrl = `/opencode/preview_file?session_id=${session.id}&file_path=${encodeURIComponent(fileName)}`;
-                    console.log('[FileCard] Loading HTML preview:', previewUrl);
+                    console.log('[FileCard] Loading HTML preview:', fileName);
 
                     if (window.rightPanelManager && typeof window.rightPanelManager.showWebPreview === 'function') {
-                        window.rightPanelManager.showWebPreview(previewUrl);
+                        window.rightPanelManager.showWebPreview(session.id, fileName);
                     }
                 } else {
                     // 其他文件显示源码
