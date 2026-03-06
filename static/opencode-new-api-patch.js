@@ -1831,12 +1831,23 @@
                     console.log('[NewAPI] Added action to session:', actionEvent.data.tool_name, 'total actions:', s.actions.length);
                 }
 
-                // 实时显示到右侧面板
-                if (window.rightPanelManager) {
-                    const data = adapted.data || {};
-                    const toolName = data.tool_name || adapted.tool || '';
+                        // 实时显示到右侧面板
+                        if (window.rightPanelManager) {
+                            const data = adapted.data || {};
+                            const toolName = data.tool_name || adapted.tool || '';
 
-                    // 确保右侧面板展开并切换到预览标签页
+                            // ✅ 诊断：追踪思考内容是否误入回复
+                            if (adapted.type === 'thought') {
+                                console.group('🔍 [THOUGHT DIAGNOSTIC]');
+                                console.log('Thought type:', adapted.type);
+                                console.log('Thought content:', adapted.content || adapted.message);
+                                console.log('Current response length:', s.response?.length || 0);
+                                console.log('Response preview:', s.response?.substring(-100));
+                                console.log('Will be added to response?', !!(s.response && (s.response.includes(adapted.content) || s.response.includes(adapted.message))));
+                                console.groupEnd();
+                            }
+
+                            // 确保右侧面板展开并切换到预览标签页
                     if (typeof window.rightPanelManager.show === 'function') {
                         window.rightPanelManager.show();
                     }
