@@ -1563,6 +1563,13 @@ window.Logger = {
                     // 否则不强制显示，避免打扰用户
                     console.log('[NewAPI] File info:', fileInfo);
                 }
+
+                // ✅ 修复：收集文件到deliverables
+                if (adapted.file && adapted.file.path) {
+                    addFileToDeliverables(s, adapted.file.path, 'file_generated');
+                    console.log('[Deliverables] Added file from file_generated event:', adapted.file.path);
+                }
+
                 return;
             }
 
@@ -1575,6 +1582,12 @@ window.Logger = {
                     const step = adapted.step;
                     const action = step.action || step.action_type || 'unknown';
                     const path = step.path || step.file_path || '';
+
+                    // ✅ 修复：收集文件到deliverables（在防抖检查之前）
+                    if (path) {
+                        addFileToDeliverables(s, path, 'timeline');
+                        console.log('[Deliverables] Added file from timeline event:', path);
+                    }
 
                     // ✅ v=29: 防止重复预览同一文件（2秒内只预览一次）
                     // ✅ v=30: 修复内存泄漏 - 添加LRU清理机制
@@ -2210,8 +2223,16 @@ window.Logger = {
                         const existing = targetPhase.events[existingEventIndex];
                         if (adapted.type === 'action' && existing.type === 'action') {
                             existing.data = { ...existing.data, ...adapted.data };
+
+                            // ✅ 修复：更新action事件时也收集文件
+                            collectFileToDeliverables(s, adapted.data);
                         } else {
                             targetPhase.events[existingEventIndex] = adapted;
+
+                            // ✅ 修复：更新其他类型事件时也尝试收集文件
+                            if (adapted.type === 'action' && adapted.data) {
+                                collectFileToDeliverables(s, adapted.data);
+                            }
                         }
                     } else {
                         // 只有在新事件时才追加
