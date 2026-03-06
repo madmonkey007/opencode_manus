@@ -4,6 +4,32 @@
  * 完整功能修复：找回丢失的 executeSubmission, prepareSession 等核心函数
  */
 
+// ✅ 全局DEBUG常量 - 从window.DEBUG_MODE读取
+const DEBUG = window.DEBUG_MODE || false;
+
+// ✅ 统一日志管理器 - 提供更精细的控制
+window.Logger = {
+    // 记录日志（受DEBUG开关控制）
+    log: function(category, ...args) {
+        // error和warn始终记录，其他受DEBUG控制
+        if (DEBUG || category === 'error' || category === 'warn') {
+            console.log(`[${category}]`, ...args);
+        }
+    },
+    
+    // 快捷方法
+    info: function(...args) { this.log('INFO', ...args); },
+    warn: function(...args) { this.log('WARN', ...args); },
+    error: function(...args) { this.log('ERROR', ...args); },
+    debug: function(...args) { if (DEBUG) this.log('DEBUG', ...args); }
+};
+
+// 📝 使用说明：
+// 1. window.DEBUG_MODE = false  → 只记录ERROR和WARN（生产环境）
+// 2. window.DEBUG_MODE = true   → 记录所有日志（开发环境）
+// 3. console.error 始终会显示
+// 4. 使用示例：Logger.info('[NewAPI]', 'Processing...');
+
 (function () {
     'use strict';
 
@@ -687,20 +713,25 @@
      * 安全特性：
      * - 使用textContent而不是innerHTML插入用户内容
      * - 防止XSS攻击
+     *
+     * @param {string} content - 消息内容
+     * @param {string} type - 消息类型 (thought|success|error|info)
+     * @param {string|null} messageId - 消息ID（用于后续移除，P0修复）
+     * @returns {HTMLElement|null} 返回消息卡片元素引用，失败时返回null
      */
-    function addSystemMessage(content, type = 'info') {
+    function addSystemMessage(content, type = 'info', messageId = null) {
         try {
             const s = state.sessions.find(x => x.id === state.activeId);
             if (!s) {
                 console.warn('[addSystemMessage] No active session found');
-                return;
+                return null;
             }
 
             // 找到聊天消息容器
             const chatMessages = document.querySelector('#chat-messages');
             if (!chatMessages) {
                 console.warn('[addSystemMessage] Chat messages container not found');
-                return;
+                return null;
             }
 
             // ✅ v=35: 消息配置对象 - 消除重复，易于扩展
@@ -745,6 +776,12 @@
             const messageCard = document.createElement('div');
             messageCard.className = `system-message message-bubble mb-3 p-3 rounded-lg text-sm animate-fade-in ${config.bgClass} border ${config.borderClass} ${config.textClass}`;
 
+            // ✅ P0修复：添加data属性用于后续移除
+            if (messageId) {
+                messageCard.setAttribute('data-message-id', messageId);
+                messageCard.setAttribute('data-message-type', type);
+            }
+
             // ✅ v=35: 安全地创建DOM结构（使用createElement而不是innerHTML）
             const container = document.createElement('div');
             container.className = 'flex items-start gap-2';
@@ -779,13 +816,72 @@
                 ? content.substring(0, 50) + `... (${content.length} chars)`
                 : content;
             console.log(`[addSystemMessage] Displayed ${type} message:`, preview);
+
+            // ✅ P0修复：返回消息卡片元素引用
+            return messageCard;
         } catch (error) {
             console.error('[addSystemMessage] Failed to display message:', error);
+            return null;
+        }
+    }
+
+    /**
+     * ✅ P1修复：清理thinking消息的辅助函数
+     *
+     * 功能：
+     * - 清除超时定时器
+     * - 移除DOM元素（优先使用缓存的引用）
+     * - 清理所有状态标志
+     *
+     * @param {Object} s - Session对象
+     */
+    function cleanupThinkingMessage(s) {
+        if (!s) return;
+
+        try {
+            // 清除超时定时器
+            if (s._thinkingTimeout) {
+                clearTimeout(s._thinkingTimeout);
+                s._thinkingTimeout = null;
+                console.log('[Status] Cleared thinking timeout timer');
+            }
+
+            // 移除DOM元素（优先使用缓存的引用）
+            if (s._thinkingMessageElement) {
+                s._thinkingMessageElement.remove();
+                s._thinkingMessageElement = null;
+                console.log('[Status] Removed thinking message via cached element reference');
+            } else if (s._thinkingMessageId) {
+                // 如果缓存引用失效，通过ID查找并移除
+                const chatMessages = document.querySelector('#chat-messages');
+                if (chatMessages) {
+                    const oldMessage = chatMessages.querySelector(`[data-message-id="${s._thinkingMessageId}"]`);
+                    if (oldMessage) {
+                        oldMessage.remove();
+                        console.log('[Status] Removed thinking message via data attribute selector');
+                    }
+                }
+            }
+
+            // 清理所有状态标志
+            s._isLoadingThinking = false;
+            s._thinkingMessageId = null;
+            s._thinkingMessageElement = null;
+
+            console.log('[Status] All thinking state cleared');
+        } catch (error) {
+            console.error('[Status] Error cleaning up thinking message:', error);
+            // 确保状态标志被清理，即使移除失败
+            s._isLoadingThinking = false;
+            s._thinkingMessageId = null;
+            s._thinkingMessageElement = null;
+            s._thinkingTimeout = null;
         }
     }
 
     // 暴露到全局作用域，供事件处理函数调用
     window.addSystemMessage = addSystemMessage;
+    window.cleanupThinkingMessage = cleanupThinkingMessage;
 
     /**
      * ✅ 修复3：节流版本的状态更新函数 - 限制DOM更新频率（每500ms最多更新一次）
@@ -1010,6 +1106,13 @@
         if (window.state.activeSSE) {
             console.log('[NewAPI] Closing existing SSE');
             window.state.activeSSE.close();
+        }
+
+        // ✅ P1修复：网络重连时清理thinking消息
+        // 防止旧的thinking消息残留
+        if (s._isLoadingThinking) {
+            console.log('[Status] Network reconnection, cleaning up thinking message');
+            cleanupThinkingMessage(s);
         }
 
         // 显示停止按钮，隐藏发送按钮
@@ -1654,6 +1757,13 @@
 
                 s.phases = Array.from(phaseMap.values()).sort((a, b) => (a.number || 0) - (b.number || 0));
 
+                // ✅ P1修复：phases_init时清理thinking消息
+                // 当真正的phase开始时，临时thinking消息应该被移除
+                if (s._isLoadingThinking) {
+                    console.log('[Status] phases_init received, cleaning up thinking message');
+                    cleanupThinkingMessage(s);
+                }
+
                 // 自动清理临时的 Planning Phase
                 const hasDynamicPhases = s.phases.some(p => p.id?.startsWith('phase_') && p.id !== 'phase_planning');
                 if (hasDynamicPhases) {
@@ -1696,6 +1806,51 @@
             } else if (adapted.type === 'deliverables') {
                 s.deliverables = adapted.items || [];
             } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
+                // ✅ P0修复：处理status thinking事件（显示开场白/思考中消息）
+                const isThinking = adapted.status === 'thinking' || adapted.value === 'thinking';
+
+                if (isThinking) {
+                    console.log('[Status] Received thinking event for session:', s.id);
+
+                    // ✅ P1修复：检测并忽略重复的thinking事件
+                    if (s._isLoadingThinking) {
+                        console.log('[Status] Duplicate thinking event detected, skipping display');
+                        return;
+                    }
+
+                    // ✅ P1修复：清理旧的thinking消息（如果存在）
+                    if (s._thinkingMessageId) {
+                        cleanupThinkingMessage(s);
+                    }
+
+                    // ✅ P0修复：显示thinking消息（开场白/思考中）
+                    // 使用后端传入的message，或使用默认值作为fallback
+                    const thinkingContent = adapted.message || '正在分析任务并制定计划...';
+                    const messageId = `thinking_${Date.now()}`;
+
+                    const messageElement = window.addSystemMessage(thinkingContent, 'info', messageId);
+
+                    // ✅ P1修复：设置状态标志和缓存引用
+                    if (messageElement) {
+                        s._isLoadingThinking = true;
+                        s._thinkingMessageId = messageId;
+                        s._thinkingMessageElement = messageElement;
+                        s._thinkingTimeout = null;
+
+                        // ✅ P1修复：15秒超时自动移除
+                        s._thinkingTimeout = setTimeout(() => {
+                            console.log('[Status] Thinking message timeout (15s), auto-removing');
+                            cleanupThinkingMessage(s);
+                        }, 15000);
+                    } else {
+                        console.error('[Status] Failed to create thinking message element');
+                    }
+
+                    // ✅ P1修复：不调用throttledRenderResults，避免触发节流
+                    // thinking消息已经通过addSystemMessage显示，无需额外渲染
+                    return;
+                }
+
                 // ✅ Round 4: 改进完成逻辑 - 确保所有阶段和状态都正确更新
                 const isError = adapted.value === 'error' || adapted.status === 'error';
                 const isDone = adapted.value === 'done' || adapted.value === 'completed' || (adapted.type === 'message_updated' && adapted.time?.completed);
@@ -2071,6 +2226,10 @@
                         }
                     } else {
                         // 只有在新事件时才追加
+                        // ✅ 方案A修复：添加timestamp确保排序正确
+                        if (!adapted.timestamp) {
+                            adapted.timestamp = adapted.time || Date.now();
+                        }
                         targetPhase.events.push(adapted);
 
                         // 文件收集：如果是write/edit/file_editor工具，将文件添加到deliverables
