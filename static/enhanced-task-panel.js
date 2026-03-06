@@ -102,10 +102,16 @@ function renderSimpleMarkdown(text) {
     let safeText = escapeHtml(text);
 
     // ✅ 优化1：移除统计信息行（完成阶段、工具调用等）
-    safeText = safeText.replace(/^[\s]*(完成阶段|阶段).*[:].*$/gm, '');
-    safeText = safeText.replace(/^[\s]*工具调用.*[:].*$/gm, '');
+    // 匹配各种格式的统计信息行
+    safeText = safeText.replace(/^[\s]*(完成阶段|阶段|阶段完成|完成).*[:：].*$/gm, '');
+    safeText = safeText.replace(/^[\s]*工具调用.*[:：].*$/gm, '');
     safeText = safeText.replace(/^[\s]*\*.*完成阶段.*$/gm, '');
     safeText = safeText.replace(/^[\s]*\*.*工具调用.*$/gm, '');
+    // ✅ 移除列表项格式的统计信息
+    safeText = safeText.replace(/^[\s]*-\s*(完成阶段|阶段).*[:：].*$/gm, '');
+    safeText = safeText.replace(/^[\s]*-\s*工具调用.*[:：].*$/gm, '');
+    safeText = safeText.replace(/^[\s]*•\s*(完成阶段|阶段).*[:：].*$/gm, '');
+    safeText = safeText.replace(/^[\s]*•\s*工具调用.*[:：].*$/gm, '');
 
     // ✅ 优化2：移除emoji（包括带 ✅ 等标记的行）
     // 移除行首的emoji和标记（如 ✅、❌、⚠️ 等）
@@ -130,7 +136,7 @@ function renderSimpleMarkdown(text) {
     safeText = safeText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-500 underline" target="_blank" rel="noopener">$1</a>');
 
     // ✅ 优化3：处理分隔符 --- 作为段落分隔（换行显示）
-    safeText = safeText.replace(/^---+$/gm, '<hr class="my-4 border-gray-300 dark:border-zinc-700">');
+    safeText = safeText.replace(/^---+$/gm, '<hr class="my-2 border-gray-300 dark:border-zinc-700">');
 
     // ✅ 优化4：改进无序列表处理 - 每个列表项单独成行
     // 匹配连续的列表项，并为每个创建独立的段落
@@ -564,8 +570,8 @@ function createEventItem(event, index) {
                 <div class="flex items-center gap-2 mb-1">
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200">${title}</span>
                 </div>
-                <div class="event-content text-xs text-gray-500 dark:text-gray-400 ${isExpandable ? 'line-clamp-2' : ''}">${isThought ? safeRenderMarkdown(content || '') : escapeHtml(content || '')}</div>
-                <div class="event-details hidden">${detailsHtml || (isThought ? safeRenderMarkdown(content || '') : escapeHtml(content || ''))}</div>
+                <div class="event-content text-xs text-gray-500 dark:text-gray-400 ${isExpandable ? 'line-clamp-1' : ''}">${isThought ? safeRenderMarkdown(content || '') : escapeHtml(content || '')}</div>
+                <div class="event-details text-xs text-gray-500 dark:text-gray-400 hidden">${detailsHtml || (isThought ? safeRenderMarkdown(content || '') : escapeHtml(content || ''))}</div>
             </div>
             ${isExpandable ? `
                 <div class="flex-shrink-0 expand-icon-wrapper cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
