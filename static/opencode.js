@@ -1330,61 +1330,38 @@ function renderResults() {
         window.rightPanelManager.clearPreview && window.rightPanelManager.clearPreview();
     }
 
+    // ✅ 诊断配置（默认关闭）
+    const DEBUG_CONFIG = {
+        ENABLE_DELIVERABLE_DIAGNOSTIC: false,
+        ENABLE_MARKDOWN_DIAGNOSTIC: false
+    };
+
     if (!s) { return; }
 
-    // ✅ 诊断：追踪交付面板渲染
-    console.group('🔍 [DELIVERABLE PANEL DIAGNOSTIC]');
-    console.log('Session ID:', s.id);
-    console.log('Has deliverables:', !!(s.deliverables && s.deliverables.length > 0));
-    console.log('Deliverables count:', s.deliverables?.length || 0);
-    console.log('renderEnhancedTaskPanel exists:', typeof renderEnhancedTaskPanel === 'function');
-    console.log('window.renderEnhancedTaskPanel exists:', typeof window.renderEnhancedTaskPanel === 'function');
-    
-    if (typeof renderEnhancedTaskPanel === 'function') {
-        console.log('Calling renderEnhancedTaskPanel...');
-        const enhancedPanel = renderEnhancedTaskPanel(s);
-        console.log('Panel return type:', typeof enhancedPanel);
-        console.log('Panel return value:', enhancedPanel);
-        console.log('Is DOM node?: enhancedPanel?.nodeType ===', enhancedPanel?.nodeType);
+    // ✅ 诊断：追踪交付面板渲染（只记录日志，不修改 DOM）
+    if (DEBUG_CONFIG.ENABLE_DELIVERABLE_DIAGNOSTIC) {
+        console.group('🔍 [DELIVERABLE PANEL DIAGNOSTIC]');
+        console.log('Session ID:', s.id);
+        console.log('Has deliverables:', !!(s.deliverables && s.deliverables.length > 0));
+        console.log('Deliverables count:', s.deliverables?.length || 0);
+        console.log('renderEnhancedTaskPanel exists:', typeof renderEnhancedTaskPanel === 'function');
+        console.log('window.renderEnhancedTaskPanel exists:', typeof window.renderEnhancedTaskPanel === 'function');
         
-        if (enhancedPanel) {
-            // 检查是否已存在，避免重复插入
-            const existingPanel = document.getElementById('enhanced-task-panel-diagnostic');
-            if (existingPanel) {
-                console.log('⚠️ Removing existing panel');
-                existingPanel.remove();
-            }
+        if (typeof renderEnhancedTaskPanel === 'function') {
+            console.log('Calling renderEnhancedTaskPanel...');
+            const startTime = performance.now();
+            const enhancedPanel = renderEnhancedTaskPanel(s);
+            const endTime = performance.now();
             
-            // 设置唯一ID便于调试
-            if (enhancedPanel.nodeType === Node.ELEMENT_NODE) {
-                enhancedPanel.id = 'enhanced-task-panel-diagnostic';
-                console.log('✅ Panel is DOM node, ID set');
-            } else {
-                console.log('⚠️ Panel is not DOM node, wrapping...');
-                const wrapper = document.createElement('div');
-                wrapper.id = 'enhanced-task-panel-diagnostic';
-                if (typeof enhancedPanel === 'string') {
-                    wrapper.innerHTML = enhancedPanel;
-                } else {
-                    wrapper.textContent = String(enhancedPanel);
-                }
-            }
-            
-            // 尝试插入到 DOM
-            const conversation = document.querySelector('.conversation');
-            if (conversation) {
-                conversation.appendChild(enhancedPanel);
-                console.log('✅ Panel inserted into conversation');
-            } else {
-                console.error('❌ Cannot find .conversation element');
-            }
+            console.log('Panel return type:', typeof enhancedPanel);
+            console.log('Panel nodeType:', enhancedPanel?.nodeType);
+            console.log('Panel tagName:', enhancedPanel?.tagName);
+            console.log('⏱️ Render time:', (endTime - startTime).toFixed(2), 'ms');
         } else {
-            console.warn('⚠️ renderEnhancedTaskPanel returned null/undefined');
+            console.log('❌ renderEnhancedTaskPanel not available');
         }
-    } else {
-        console.log('❌ renderEnhancedTaskPanel not available');
+        console.groupEnd();
     }
-    console.groupEnd();
 
     // Use enhanced task panel if available
     if (typeof renderEnhancedTaskPanel === 'function') {
@@ -1496,24 +1473,32 @@ function renderResults() {
             const r = document.createElement('div');
             r.className = 'message-bubble assistant-bubble animate-fade-in max-w-[90%] text-sm leading-relaxed mt-6 prose dark:prose-invert';
             
-            // ✅ 诊断：追踪 Markdown 解析和换行问题
-            console.group(`🔍 [MARKDOWN DIAGNOSTIC] Response ${index + 1}/${responses.length}`);
-            console.log('Raw response length:', resp.length);
-            console.log('Raw response preview:', resp.substring(0, 200));
-            console.log('Has newlines:', resp.includes('\n'));
-            console.log('Has markdown lists:', resp.match(/^\s*-\s+/m) ? 'Yes' : 'No');
-            console.log('marked version:', typeof marked !== 'undefined' ? marked.version : 'N/A');
-            
-            try {
-                const parsedHTML = marked.parse(resp);
-                console.log('Parsed HTML length:', parsedHTML.length);
-                console.log('Parsed HTML preview:', parsedHTML.substring(0, 200));
-                r.innerHTML = parsedHTML;
-            } catch (e) {
-                console.error('❌ Marked parse error:', e);
-                r.textContent = resp;
+            // ✅ 诊断：追踪 Markdown 解析和换行问题（只记录日志，不修改 DOM）
+            if (DEBUG_CONFIG.ENABLE_MARKDOWN_DIAGNOSTIC) {
+                console.group(`🔍 [MARKDOWN DIAGNOSTIC] Response ${index + 1}/${responses.length}`);
+                console.log('Raw response length:', resp.length);
+                console.log('Raw response preview:', resp.substring(0, 50) + '...');
+                console.log('Has newlines:', resp.includes('\n'));
+                console.log('Has markdown lists:', resp.match(/^\s*-\s+/m) ? 'Yes' : 'No');
+                console.log('Word count:', resp.split(/\s+/).length);
+                
+                try {
+                    const parseStartTime = performance.now();
+                    const parsedHTML = marked.parse(resp);
+                    const parseEndTime = performance.now();
+                    
+                    console.log('⏱️ Parse time:', (parseEndTime - parseStartTime).toFixed(2), 'ms');
+                    console.log('Parsed HTML length:', parsedHTML.length);
+                    r.innerHTML = parsedHTML;
+                } catch (e) {
+                    console.error('❌ Marked parse error:', e);
+                    r.textContent = resp;
+                }
+                console.groupEnd();
+            } else {
+                // 正常渲染（不记录日志）
+                r.innerHTML = marked.parse(resp);
             }
-            console.groupEnd();
             
             convo.appendChild(r);
         });

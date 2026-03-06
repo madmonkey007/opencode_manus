@@ -1837,12 +1837,12 @@
                             const toolName = data.tool_name || adapted.tool || '';
 
                             // ✅ 诊断：追踪思考内容是否误入回复
-                            if (adapted.type === 'thought') {
+                            if (DEBUG_CONFIG.ENABLE_THOUGHT_DIAGNOSTIC && adapted.type === 'thought') {
                                 console.group('🔍 [THOUGHT DIAGNOSTIC]');
                                 console.log('Thought type:', adapted.type);
                                 console.log('Thought content:', adapted.content || adapted.message);
                                 console.log('Current response length:', s.response?.length || 0);
-                                console.log('Response preview:', s.response?.substring(-100));
+                                console.log('Response preview:', s.response?.slice(-100));  // ✅ 修复：使用 slice
                                 console.log('Will be added to response?', !!(s.response && (s.response.includes(adapted.content) || s.response.includes(adapted.message))));
                                 console.groupEnd();
                             }
