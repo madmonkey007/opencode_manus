@@ -1886,12 +1886,30 @@
                             console.log('[NewAPI] 显示read文件内容:', filePath);
                             window.rightPanelManager.showFileEditor(filePath, output);
                         } else if (toolLower === 'bash' || toolLower === 'grep') {
-                            // bash/grep - 显示命令输出
+                            // bash/grep - 显示命令输出并保存到 deliverables
                             const input = data.input || {};
                             const command = input.command || input.pattern || '';
                             const title = command ? `${toolName}: ${command}` : `${toolName} 输出`;
                             console.log('[NewAPI] 显示终端输出:', title);
                             window.rightPanelManager.showFileEditor(title, output);
+
+                            // ✅ 将命令输出保存到 deliverables，刷新后可查看
+                            if (!s.deliverables) s.deliverables = [];
+                            
+                            // 检查是否已存在（避免重复保存）
+                            const exists = s.deliverables.some(d => {
+                                if (typeof d === 'string') return d === title;
+                                return d.name === title || d.path === title;
+                            });
+
+                            if (!exists) {
+                                s.deliverables.push({
+                                    name: title,
+                                    content: output,
+                                    type: 'command'
+                                });
+                                console.log('[NewAPI] 命令输出已保存到 deliverables:', title);
+                            }
                         } else if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
                             // write/edit - 显示正在写入
                             const input = data.input || {};

@@ -1232,21 +1232,47 @@ async function renderFiles() {
         if (files.length > 0) {
             fileList.innerHTML = '';
             files.forEach(f => {
-                const ext = f.name.split('.').pop().toLowerCase();
-                const cat = getFileTypeCategory(ext);
+                // ✅ 兼容三种格式：字符串路径、文件对象、命令对象
+                let filePath, fileName, fileType, fileContent;
+                
+                if (typeof f === 'string') {
+                    // 旧格式：字符串路径
+                    filePath = f;
+                    fileName = f.split('/').pop();
+                    fileType = fileName.split('.').pop();
+                    fileContent = null;
+                } else {
+                    // 新格式：对象
+                    if (f.type === 'command') {
+                        // 命令对象：{name, content, type}
+                        filePath = null;
+                        fileName = f.name;
+                        fileType = 'command';
+                        fileContent = f.content;
+                    } else {
+                        // 文件对象：{name, path, type}
+                        filePath = f.path || f.file_path;
+                        fileName = f.name || (filePath && filePath.split('/').pop());
+                        fileType = f.type || (fileName && fileName.split('.').pop());
+                        fileContent = f.content || null;
+                    }
+                }
+                
+                const ext = fileType === 'command' ? 'COMMAND' : (fileType || 'unknown');
+                const cat = getFileTypeCategory(fileType === 'command' ? 'txt' : ext);
                 const config = FILE_TYPE_CONFIG[cat] || FILE_TYPE_CONFIG['default'];
 
                 const item = document.createElement('div');
                 item.className = 'file-item group cursor-pointer';
                 item.innerHTML = `
                     <div class="${config.bg} p-2 rounded-lg ${config.color}">
-                        <span class="material-symbols-outlined text-[20px]">${config.icon}</span>
+                        <span class="material-symbols-outlined text-[20px]">${fileType === 'command' ? 'terminal' : config.icon}</span>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">${f.name}</div>
+                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">${fileName}</div>
                         <div class="flex items-center gap-2 mt-0.5">
                             <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-700 text-gray-500 uppercase tracking-tight">${ext.toUpperCase()}</span>
-                            <span class="text-[10px] text-gray-400">Mock Date</span>
+                            <span class="text-[10px] text-gray-400">${fileType === 'command' ? '命令输出' : 'Mock Date'}</span>
                         </div>
                     </div>
                     <button class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 p-1 transition-opacity">
@@ -1255,7 +1281,17 @@ async function renderFiles() {
                 `;
                 item.onclick = (e) => {
                     if (e.target.closest('button')) return;
-                    openFile(f.path);
+                    
+                    // ✅ 根据类型处理点击事件
+                    if (fileType === 'command') {
+                        // 命令输出：显示在右侧面板
+                        if (window.rightPanelManager && window.rightPanelManager.showFileEditor) {
+                            window.rightPanelManager.showFileEditor(fileName, fileContent);
+                        }
+                    } else if (filePath) {
+                        // 文件：打开预览
+                        openFile(filePath);
+                    }
                 };
                 fileList.appendChild(item);
             });

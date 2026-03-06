@@ -357,7 +357,7 @@ class RightPanelManager {
 
         if (lineCountEl) lineCountEl.textContent = `${lineCount} 行`;
         if (charCountEl) charCountEl.textContent = `${charCount} 字符`;
-
+ 
         // ✅ v=33: 修复自动滚动 - 使用双重RAF + setTimeout降级确保内容完全渲染
         // 问题：单个RAF可能在DOM完全更新前执行，导致scrollHeight计算不准确
         if (!this._scrollRAFPending) {
@@ -369,7 +369,10 @@ class RightPanelManager {
                 requestAnimationFrame(() => {
                     try {
                         this._performScroll();
-                        console.log('[RightPanel] Auto-scrolled to bottom (double RAF)');
+                        this._scrollLogCounter++;
+                        if (this._scrollLogCounter % this._scrollLogInterval === 0) {
+                            console.log('[RightPanel] Auto-scrolled to bottom (count:', this._scrollLogCounter + ')');
+                        }
                     } catch (error) {
                         console.error('[RightPanel] Failed to auto-scroll:', error);
                     } finally {
@@ -380,10 +383,12 @@ class RightPanelManager {
                 // ✅ v=33: 添加setTimeout降级方案，确保双重RAF失败时仍能滚动
                 setTimeout(() => {
                     if (this._scrollRAFPending) {
-                        console.warn('[RightPanel] ⚠️ Double RAF timeout, using setTimeout fallback');
+                        this._scrollLogCounter++;
+                        if (this._scrollLogCounter % this._scrollLogInterval === 0) {
+                            console.warn('[RightPanel] ⚠️ Double RAF timeout, using setTimeout fallback');
+                        }
                         try {
                             this._performScroll();
-                            console.log('[RightPanel] Auto-scrolled to bottom (setTimeout fallback)');
                         } catch (error) {
                             console.error('[RightPanel] Failed to auto-scroll with setTimeout:', error);
                         } finally {
