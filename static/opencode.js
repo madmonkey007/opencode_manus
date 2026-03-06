@@ -1123,38 +1123,54 @@ function renderSidebar() {
     }
 }
 
-function deleteSession(sessionId) {
+async function deleteSession(sessionId) {
     if (!confirm('确定要删除这条任务记录吗？')) return;
 
-    const index = state.sessions.findIndex(s => s.id === sessionId);
-    if (index !== -1) {
-        state.sessions.splice(index, 1);
-
-        // 如果删除的是当前活动会话
-        if (state.activeId === sessionId) {
-            if (state.sessions.length > 0) {
-                // 切换到相邻的一个
-                const nextIndex = Math.min(index, state.sessions.length - 1);
-                state.activeId = state.sessions[nextIndex].id;
-            } else {
-                // 没有会话了，显示欢迎界面
-                state.activeId = null;
-                const welcome = el('#welcome-interface');
-                const scrollArea = el('#chat-scroll-area');
-                if (welcome && scrollArea) {
-                    welcome.classList.remove('hidden');
-                    // 清空显示区域
-                    const container = scrollArea.querySelector('.max-w-4xl');
-                    if (container) {
-                        // 移除除 welcome 之外的所有内容（如果有的话）
-                    }
-                }
+    try {
+        // ✅ 1. 先删除后端数据库记录
+        if (typeof apiClient !== 'undefined') {
+            const success = await apiClient.deleteSession(sessionId);
+            if (!success) {
+                console.warn('[deleteSession] Session not found in backend:', sessionId);
+                // 即使后端没找到，也继续删除本地记录
             }
         }
 
-        renderSidebar();
-        renderAll();
-        saveState();
+        // ✅ 2. 再删除本地状态
+        const index = state.sessions.findIndex(s => s.id === sessionId);
+        if (index !== -1) {
+            state.sessions.splice(index, 1);
+
+            // 如果删除的是当前活动会话
+            if (state.activeId === sessionId) {
+                if (state.sessions.length > 0) {
+                    // 切换到相邻的一个
+                    const nextIndex = Math.min(index, state.sessions.length - 1);
+                    state.activeId = state.sessions[nextIndex].id;
+                } else {
+                    // 没有会话了，显示欢迎界面
+                    state.activeId = null;
+                    const welcome = el('#welcome-interface');
+                    const scrollArea = el('#chat-scroll-area');
+                    if (welcome && scrollArea) {
+                        welcome.classList.remove('hidden');
+                        // 清空显示区域
+                        const container = scrollArea.querySelector('.max-w-4xl');
+                        if (container) {
+                            // 移除除 welcome 之外的所有内容（如果有的话）
+                        }
+                    }
+                }
+            }
+
+            renderSidebar();
+            renderAll();
+            saveState();
+            console.log('[deleteSession] Session deleted successfully:', sessionId);
+        }
+    } catch (e) {
+        console.error('[deleteSession] Delete failed:', e);
+        alert('删除失败: ' + e.message);
     }
 }
 
