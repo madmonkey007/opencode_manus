@@ -9,6 +9,22 @@
 
     const ENABLE_NEW_API = true;
 
+    // ✅ 调试配置（独立定义，避免跨文件引用错误）
+    const DEBUG_CONFIG = {
+        ENABLE_THOUGHT_DIAGNOSTIC: false,
+        ENABLE_DELIVERABLE_DIAGNOSTIC: false,
+        ENABLE_MARKDOWN_DIAGNOSTIC: false
+    };
+
+    // 🔍 Thought 事件追踪开关（在浏览器控制台设置：window._DEBUG_THOUGHT_EVENTS = true）
+    window._DEBUG_THOUGHT_EVENTS = false;
+
+    // 显示当前调试状态
+    if (window._DEBUG_THOUGHT_EVENTS) {
+        console.log('🔍 [DEBUG] Thought event tracking ENABLED');
+        console.log('🔍 [DEBUG] To disable: window._DEBUG_THOUGHT_EVENTS = false');
+    }
+
     // ✅ 修复1：提取重复的icons和labels定义为常量，消除重复代码
     const MODE_CONFIG = {
         plan: {
