@@ -2488,6 +2488,20 @@ function bindUI() {
                     const activePhase = s.phases.find(p => p.status === 'active');
                     if (activePhase) activePhase.status = 'done';
                 }
+
+                // ✅ P1修复：用户取消任务时清理thinking消息
+                if (s._isLoadingThinking) {
+                    console.log('[Status] User cancelled task, cleaning up thinking message');
+                    // 复用全局cleanupThinkingMessage函数
+                    if (window.cleanupThinkingMessage) {
+                        window.cleanupThinkingMessage(s);
+                    } else {
+                        // 降级：如果全局函数不可用，手动清理
+                        console.warn('[Status] Global cleanupThinkingMessage not available, manual cleanup');
+                        s._isLoadingThinking = false;
+                        s._thinkingMessageId = null;
+                    }
+                }
             }
             renderAll();
             saveState();

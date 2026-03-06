@@ -446,15 +446,9 @@ async def run_agent(prompt: str, sid: str, mode: str = "auto"):
 
         yield format_sse(
             {
-                "type": "phases_init",
-                "phases": [
-                    {
-                        "id": "phase_planning",
-                        "number": 0,
-                        "title": "📋 正在制定执行计划...",
-                        "status": "active",
-                    }
-                ],
+                "type": "status",
+                "value": "thinking",
+                "message": "正在分析任务并制定计划..."
             }
         )
 
