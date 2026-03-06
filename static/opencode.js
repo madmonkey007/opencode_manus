@@ -1483,6 +1483,35 @@ function renderResults() {
         const rSep = '\n\n---\n\n**新的回答：**\n\n';
         const responses = s.response.split(rSep);
         responses.forEach((resp, index) => {
+            let filteredResp = resp;
+            
+            // ✅ 过滤开场白模式（改进版）
+            // 只过滤response开头的开场白，避免误判中间的正常文本
+            const openingPatterns = [
+                /^(我来创建|I'll create|Let me create|I will create)[^.!?。！？]*(?:[.!?。！？]|\n|$)/i,
+                /^(让我来|我来帮你|I'll help you|Let me help)[^.!?。！？]*(?:[.!?。！？]|\n|$)/i,
+                /^(我来帮你创建|I'll create for you)[^.!?。！？]*(?:[.!?。！？]|\n|$)/i
+            ];
+            
+            // 检查是否是response的开头（前50个字符）
+            const respStart = resp.trim().substring(0, 50);
+            
+            for (const pattern of openingPatterns) {
+                // 只在response开头匹配时才过滤
+                if (pattern.test(respStart)) {
+                    filteredResp = resp.replace(pattern, '').trim();
+                    if (filteredResp !== resp) {
+                        console.log('[renderResults] ✅ Filtered opening statement from response', index + 1);
+                        // 如果过滤后为空，跳过这个response
+                        if (!filteredResp) {
+                            console.log('[renderResults] ⚠️ Skipping empty response after filtering');
+                            return;
+                        }
+                        break;
+                    }
+                }
+            }
+            
             const r = document.createElement('div');
             r.className = 'message-bubble assistant-bubble animate-fade-in max-w-[90%] text-sm leading-relaxed mt-6 prose dark:prose-invert';
             
