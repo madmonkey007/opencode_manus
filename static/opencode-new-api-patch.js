@@ -1761,7 +1761,36 @@ window.Logger = {
             } else if (adapted.type === 'phases_init') {
                 // 处理阶段初始化
                 const currentTurnIndex = window._turnIndex || 0;
+
+                // ✅ P0修复：追问时强制创建新phase对象，不复用旧phase
+                // 判断是否是新对话轮次（通过比较prompt数量和现有phases的最大turn_index）
+                const pSep = '\n\n---\n\n';
+                const promptCount = (s.prompt || '').split(pSep).length;
+                const maxExistingTurnIndex = s.phases && s.phases.length > 0
+                    ? Math.max(...s.phases.map(p => parseInt(p.turn_index, 10) || 0))
+                    : 0;
+
+                const isNewTurn = promptCount > maxExistingTurnIndex;
+
+                console.log('[phases_init] Debug:', {
+                    promptCount,
+                    maxExistingTurnIndex,
+                    currentTurnIndex,
+                    isNewTurn,
+                    phasesCount: adapted.phases?.length
+                });
+
                 const newPhases = (adapted.phases || []).map(p => {
+                    // ✅ 如果是新对话轮次，强制创建新phase对象
+                    if (isNewTurn) {
+                        return {
+                            ...p,
+                            events: [],  // ✅ 新轮次使用空events数组
+                            turn_index: currentTurnIndex  // ✅ 使用当前turn_index
+                        };
+                    }
+
+                    // 否则，复用旧phase（保持兼容性）
                     const existingPhase = s.phases?.find(sp => sp.id === p.id);
                     return {
                         ...p,
