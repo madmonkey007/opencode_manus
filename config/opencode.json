@@ -759,6 +759,18 @@
       "url": "https://mcp.grep.app",
       "enabled": false,
       "timeout": 60000
+    },
+    "tavily": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "tavily-mcp@latest"
+      ],
+      "enabled": true,
+      "environment": {
+        "TAVILY_API_KEY": "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"
+      }
     }
   }
 }
