@@ -102,15 +102,18 @@ function renderSimpleMarkdown(text) {
     let safeText = escapeHtml(text);
 
     // ✅ 优化1：移除统计信息行（完成阶段、工具调用、任务完成等）
-    // 匹配各种格式的统计信息行
+    // 匹配各种格式的统计信息行（包括带emoji的）
+    safeText = safeText.replace(/^[\s]*[✅❌⚠️🔧📝💡🎯📊⭐]*[\s]*任务完成.*$/gm, '');
     safeText = safeText.replace(/^[\s]*任务完成.*$/gm, '');
     safeText = safeText.replace(/^[\s]*(完成阶段|阶段|阶段完成|完成).*[:：].*$/gm, '');
     safeText = safeText.replace(/^[\s]*工具调用.*[:：].*$/gm, '');
     safeText = safeText.replace(/^[\s]*\*.*完成阶段.*$/gm, '');
     safeText = safeText.replace(/^[\s]*\*.*工具调用.*$/gm, '');
     // ✅ 移除列表项格式的统计信息
+    safeText = safeText.replace(/^[\s]*-\s*[✅❌⚠️🔧📝💡🎯📊⭐]*[\s]*(完成阶段|阶段|任务完成).*[:：]?.*$/gm, '');
     safeText = safeText.replace(/^[\s]*-\s*(完成阶段|阶段).*[:：].*$/gm, '');
     safeText = safeText.replace(/^[\s]*-\s*工具调用.*[:：].*$/gm, '');
+    safeText = safeText.replace(/^[\s]*•\s*[✅❌⚠️🔧📝💡🎯📊⭐]*[\s]*(完成阶段|阶段|任务完成).*[:：]?.*$/gm, '');
     safeText = safeText.replace(/^[\s]*•\s*(完成阶段|阶段).*[:：].*$/gm, '');
     safeText = safeText.replace(/^[\s]*•\s*工具调用.*[:：].*$/gm, '');
 
