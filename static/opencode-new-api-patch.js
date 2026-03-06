@@ -768,9 +768,6 @@
             // 添加到聊天区域（append到最后）
             chatMessages.appendChild(messageCard);
 
-            // ✅ 添加标记，防止被renderResults删除
-            messageCard.dataset.thoughtMessage = 'true';
-
             // 滚动到底部
             const scrollArea = document.querySelector('#chat-scroll-area');
             if (scrollArea) {
@@ -1897,14 +1894,6 @@
                             ? content.substring(0, 100) + `... (${content.length} chars)`
                             : content;
                         console.log('[NewAPI] Thought event received:', preview);
-
-                        // ✅ v=35: 立即显示，不受打字机效果限制
-                        if (typeof window.addSystemMessage === 'function') {
-                            window.addSystemMessage(`💭 ${content}`, 'thought');
-                            console.log('[NewAPI] ✅ Thought displayed immediately');
-                        } else {
-                            console.error('[NewAPI] ❌ addSystemMessage not available!');
-                        }
 
                         // ✅ Option C: 判断当前是否有active phase
                         if (s.currentPhase && s.phases) {

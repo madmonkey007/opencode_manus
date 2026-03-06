@@ -1328,11 +1328,7 @@ async function renderFiles() {
 function renderResults() {
     const convo = el('#chat-messages'); if (!convo) return;
     const s = state.sessions.find(x => x.id === state.activeId);
-
-    // ✅ 保护临时thought消息不被删除
-    const thoughtMessages = convo.querySelectorAll('[data-thought-message="true"]');
     convo.innerHTML = '';
-    thoughtMessages.forEach(msg => convo.appendChild(msg));
 
     // 欢迎页面时清空右侧预览面板，避免显示旧会话的内容
     if (!s && window.rightPanelManager) {
