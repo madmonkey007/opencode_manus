@@ -68,11 +68,11 @@ class EnhancedCodePreviewOverlay {
         return new Promise((resolve) => {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
-            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+            link.href = 'https://cdn.baomitu.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
             document.head.appendChild(link);
 
             const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';
+            script.src = 'https://cdn.baomitu.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';
             script.onload = () => {
                 this.highlightjs = window.hljs;
                 resolve();
