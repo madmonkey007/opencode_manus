@@ -768,6 +768,9 @@
             // 添加到聊天区域（append到最后）
             chatMessages.appendChild(messageCard);
 
+            // ✅ 添加标记，防止被renderResults删除
+            messageCard.dataset.thoughtMessage = 'true';
+
             // 滚动到底部
             const scrollArea = document.querySelector('#chat-scroll-area');
             if (scrollArea) {
@@ -1903,14 +1906,38 @@
                             console.error('[NewAPI] ❌ addSystemMessage not available!');
                         }
 
-                        // ✅ v=35: 同时添加到orphanEvents，确保在历史记录中可见
-                        if (!s.orphanEvents) s.orphanEvents = [];
-                        s.orphanEvents.push({
-                            type: 'thought',
-                            content: content,
-                            timestamp: Date.now()
-                        });
-                        console.log('[NewAPI] Thought added to orphanEvents, total:', s.orphanEvents.length);
+                        // ✅ Option C: 判断当前是否有active phase
+                        if (s.currentPhase && s.phases) {
+                            const currentPhase = s.phases.find(p => p.id === s.currentPhase);
+                            if (currentPhase) {
+                                // 添加到当前phase的events
+                                if (!currentPhase.events) currentPhase.events = [];
+                                currentPhase.events.push({
+                                    type: 'thought',
+                                    content: content,
+                                    timestamp: Date.now()
+                                });
+                                console.log('[NewAPI] Thought added to phase.events, phase:', currentPhase.id);
+                            } else {
+                                // phase未找到，添加到orphanEvents（兜底）
+                                if (!s.orphanEvents) s.orphanEvents = [];
+                                s.orphanEvents.push({
+                                    type: 'thought',
+                                    content: content,
+                                    timestamp: Date.now()
+                                });
+                                console.log('[NewAPI] Thought added to orphanEvents (phase not found)');
+                            }
+                        } else {
+                            // 没有active phase，添加到thoughtEvents
+                            if (!s.thoughtEvents) s.thoughtEvents = [];
+                            s.thoughtEvents.push({
+                                type: 'thought',
+                                content: content,
+                                timestamp: Date.now()
+                            });
+                            console.log('[NewAPI] Thought added to thoughtEvents (no active phase), total:', s.thoughtEvents.length);
+                        }
 
                         // 不在右侧面板显示，避免覆盖文件预览
                         return;

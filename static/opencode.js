@@ -197,6 +197,7 @@ function _executeSave(retryCount = 0) {
                 deliverables: s.deliverables || [],
                 actions: s.actions || [],
                 orphanEvents: s.orphanEvents || [],
+                thoughtEvents: s.thoughtEvents || [],
                 mode: s.mode || null,
                 _version: s._version || 1,
                 _createdTime: s._createdTime || Date.now(),  // ✅ 修复I1: 添加创建时间，用于宽限期判断
@@ -390,6 +391,10 @@ async function loadState() {
                     }
                     if (!s.orphanEvents) {
                         s.orphanEvents = [];
+                        repairedCount++;
+                    }
+                    if (!s.thoughtEvents) {
+                        s.thoughtEvents = [];
                         repairedCount++;
                     }
                     if (!s.mode) {
@@ -1323,7 +1328,11 @@ async function renderFiles() {
 function renderResults() {
     const convo = el('#chat-messages'); if (!convo) return;
     const s = state.sessions.find(x => x.id === state.activeId);
+
+    // ✅ 保护临时thought消息不被删除
+    const thoughtMessages = convo.querySelectorAll('[data-thought-message="true"]');
     convo.innerHTML = '';
+    thoughtMessages.forEach(msg => convo.appendChild(msg));
 
     // 欢迎页面时清空右侧预览面板，避免显示旧会话的内容
     if (!s && window.rightPanelManager) {
@@ -1422,6 +1431,14 @@ function renderResults() {
 
     const timelineContainer = document.createElement('div');
     timelineContainer.className = 'flex flex-col space-y-0';
+
+    // ✅ Option C: 优先渲染独立thought事件（在orphanEvents之前）
+    if (s.thoughtEvents && s.thoughtEvents.length > 0) {
+        s.thoughtEvents.forEach(ev => {
+            timelineContainer.appendChild(renderEvent(ev));
+        });
+        console.log('[renderResults] Rendered', s.thoughtEvents.length, 'thought events');
+    }
 
     // Render orphan events first
     if (s.orphanEvents && s.orphanEvents.length > 0) {

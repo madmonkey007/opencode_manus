@@ -7794,3 +7794,29 @@ INFO:     172.18.0.1:60372 - "POST /opencode/session HTTP/1.1" 200 OK
 INFO:     172.18.0.1:60372 - "POST /opencode/session/ses_13c46bc7/message HTTP/1.1" 200 OK
 INFO:     172.18.0.1:60372 - "GET /opencode/list_session_files?sid=ses_13c46bc7 HTTP/1.1" 200 OK
 INFO:     172.18.0.1:60386 - "GET /opencode/events?session_id=ses_13c46bc7 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:46148 - "GET /opencode/events?session_id=ses_13c46bc7 HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:45182 - "GET / HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45182 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:45196 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45182 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45200 - "GET /static/enhanced-task-panel.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45210 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45212 - "GET /static/code-preview-enhanced.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45222 - "GET /static/right-panel-manager.js?v=14 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45200 - "GET /static/api-client.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45210 - "GET /static/opencode.js?v=38.4.2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45196 - "GET /static/event-adapter.js?v=38.4.2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45182 - "GET /static/opencode-new-api-patch.js?v=38.4.18 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45212 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45182 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45182 - "GET /opencode/list_session_files?sid=ses_13c46bc7 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45182 - "GET /opencode/projects HTTP/1.1" 200 OK
+INFO:     172.18.0.1:45182 - "GET /opencode/list_session_files?sid=ses_13c46bc7 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:42968 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.18.0.1:42968 - "POST /opencode/session/ses_8050eb3a/message HTTP/1.1" 200 OK
+INFO:     172.18.0.1:42968 - "GET /opencode/list_session_files?sid=ses_8050eb3a HTTP/1.1" 200 OK
+INFO:     172.18.0.1:42972 - "GET /opencode/events?session_id=ses_8050eb3a HTTP/1.1" 200 OK
+INFO:     172.18.0.1:37408 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.18.0.1:37408 - "POST /opencode/session/ses_255cfeac/message HTTP/1.1" 200 OK
+INFO:     172.18.0.1:37408 - "GET /opencode/list_session_files?sid=ses_255cfeac HTTP/1.1" 200 OK
+INFO:     172.18.0.1:37414 - "GET /opencode/events?session_id=ses_255cfeac HTTP/1.1" 200 OK
