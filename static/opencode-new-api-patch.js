@@ -1928,6 +1928,9 @@
                             console.log('[NewAPI] Thought added to thoughtEvents (no active phase), total:', s.thoughtEvents.length);
                         }
 
+                        // ✅ 触发渲染，确保thought实时显示
+                        throttledRenderResults();
+
                         // 不在右侧面板显示，避免覆盖文件预览
                         return;
                     } else if (adapted.type === 'action') {
