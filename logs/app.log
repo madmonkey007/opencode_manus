@@ -7844,3 +7844,23 @@ INFO:     172.18.0.1:54364 - "POST /opencode/session HTTP/1.1" 200 OK
 INFO:     172.18.0.1:54364 - "POST /opencode/session/ses_24deb72b/message HTTP/1.1" 200 OK
 INFO:     172.18.0.1:54364 - "GET /opencode/events?session_id=ses_24deb72b HTTP/1.1" 200 OK
 INFO:     172.18.0.1:54376 - "GET /opencode/list_session_files?sid=ses_24deb72b HTTP/1.1" 200 OK
+INFO:     172.18.0.1:58416 - "GET /opencode/events?session_id=ses_24deb72b HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:55330 - "GET / HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55330 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:55330 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55346 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55358 - "GET /static/code-preview-enhanced.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55366 - "GET /static/right-panel-manager.js?v=14 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55372 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55382 - "GET /static/enhanced-task-panel.js?v=26 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55346 - "GET /static/api-client.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55330 - "GET /static/event-adapter.js?v=38.4.2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55358 - "GET /static/opencode-new-api-patch.js?v=38.4.18 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55366 - "GET /static/opencode.js?v=38.4.2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:55372 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59930 - "GET /opencode/session/ses_8050eb3a/messages HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:59934 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59934 - "GET /opencode/list_session_files?sid=ses_24deb72b HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59934 - "GET /opencode/session/ses_8050eb3a/timeline HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59934 - "GET /opencode/projects HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59934 - "GET /opencode/list_session_files?sid=ses_24deb72b HTTP/1.1" 200 OK
