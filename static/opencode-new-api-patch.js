@@ -1890,6 +1890,15 @@
                             const input = data.input || {};
                             const command = input.command || input.pattern || '';
                             const title = command ? `${toolName}: ${command}` : `${toolName} 输出`;
+                            const output = adapted.content || adapted.output || '';
+
+                            // ✅ 验证输出内容，避免保存空命令
+                            if (!output || output.trim() === '') {
+                                console.log('[NewAPI] 命令输出为空，跳过保存:', title);
+                                window.rightPanelManager.showFileEditor(title, output || '(无输出)');
+                                return;
+                            }
+
                             console.log('[NewAPI] 显示终端输出:', title);
                             window.rightPanelManager.showFileEditor(title, output);
 
@@ -1909,6 +1918,7 @@
                                     type: 'command'
                                 });
                                 console.log('[NewAPI] 命令输出已保存到 deliverables:', title);
+                                saveState();
                             }
                         } else if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
                             // write/edit - 显示正在写入

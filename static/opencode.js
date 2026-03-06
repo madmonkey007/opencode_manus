@@ -1272,7 +1272,7 @@ async function renderFiles() {
                         <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">${fileName}</div>
                         <div class="flex items-center gap-2 mt-0.5">
                             <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-700 text-gray-500 uppercase tracking-tight">${ext.toUpperCase()}</span>
-                            <span class="text-[10px] text-gray-400">${fileType === 'command' ? '命令输出' : 'Mock Date'}</span>
+                            <span class="text-[10px] text-gray-400">${fileType === 'command' ? '命令输出' : '文件预览'}</span>
                         </div>
                     </div>
                     <button class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 p-1 transition-opacity">
