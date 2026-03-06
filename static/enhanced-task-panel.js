@@ -101,8 +101,9 @@ function renderSimpleMarkdown(text) {
     // 安全处理：先转义HTML特殊字符
     let safeText = escapeHtml(text);
 
-    // ✅ 优化1：移除统计信息行（完成阶段、工具调用等）
+    // ✅ 优化1：移除统计信息行（完成阶段、工具调用、任务完成等）
     // 匹配各种格式的统计信息行
+    safeText = safeText.replace(/^[\s]*任务完成.*$/gm, '');
     safeText = safeText.replace(/^[\s]*(完成阶段|阶段|阶段完成|完成).*[:：].*$/gm, '');
     safeText = safeText.replace(/^[\s]*工具调用.*[:：].*$/gm, '');
     safeText = safeText.replace(/^[\s]*\*.*完成阶段.*$/gm, '');
