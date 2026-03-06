@@ -30,14 +30,33 @@ function extractFileInfo(file) {
  * 修复问题：Important #1 - 缺少文件路径验证
  */
 function isValidFilePath(filePath) {
-    // 阻止路径遍历攻击
-    if (filePath.includes('..') || filePath.startsWith('/') || filePath.startsWith('\\')) {
-        console.warn('[Security] Invalid file path detected:', filePath);
+    // ✅ 方案1修复：允许Linux/Mac绝对路径（后端标准路径格式）
+    // 例如：/app/opencode/workspace/ses_xxx/file.html
+
+    // 阻止路径遍历攻击（关键安全验证）
+    if (filePath.includes('..')) {
+        console.warn('[Security] Path traversal attack detected:', filePath);
         return false;
     }
-    // 只允许文件名字符（字母、数字、下划线、点、短横线、斜杠）
-    const validPattern = /^[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+$/;
-    return validPattern.test(filePath);
+
+    // 阻止Windows绝对路径（\\开头）
+    if (filePath.startsWith('\\\\')) {
+        console.warn('[Security] Windows absolute path not allowed:', filePath);
+        return false;
+    }
+
+    // ✅ 允许Linux/Mac绝对路径（/开头）- 后端标准路径格式
+
+    // 验证路径格式（允许绝对路径和相对路径）
+    // 规则：字母、数字、下划线、点、短横线、斜杠
+    const validPattern = /^[a-zA-Z0-9_\-.\/]+\.[a-zA-Z0-9]+$/;
+    const isValid = validPattern.test(filePath);
+
+    if (!isValid) {
+        console.warn('[Security] Invalid file path format:', filePath);
+    }
+
+    return isValid;
 }
 
 /**
