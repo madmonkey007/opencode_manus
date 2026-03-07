@@ -1781,20 +1781,17 @@ window.Logger = {
                 });
 
                 const newPhases = (adapted.phases || []).map(p => {
-                    // ✅ P0修复v2：新轮次时设置正确的turn_index，不复用旧phase
+                    // ✅ P0修复v3：新轮次时创建独立的phase对象，不复用旧phase
                     if (isNewTurn) {
-                        // 检查是否已有相同ID和turn_index的phase
-                        const hasSameTurnPhase = s.phases?.find(sp =>
-                            sp.id === p.id && parseInt(sp.turn_index, 10) === currentTurnIndex
-                        );
-
-                        if (!hasSameTurnPhase) {
-                            // 没有相同ID和turn_index的phase，创建新phase
-                            return {
-                                ...p,
-                                turn_index: currentTurnIndex
-                            };
-                        }
+                        // ✅ 新轮次：创建完全独立的phase对象
+                        // 使用后端返回的数据，但确保是新的对象引用
+                        return {
+                            ...p,
+                            events: [],
+                            turn_index: currentTurnIndex,
+                            // ✅ 添加唯一标识符，确保不同轮次的phase不会互相覆盖
+                            _uniqueId: `${p.id}_turn${currentTurnIndex}`
+                        };
                     }
 
                     // 复用旧phase（保持兼容性）
@@ -1807,11 +1804,23 @@ window.Logger = {
                 });
 
 
+                // ✅ P0修复v3：使用复合键（id + turn_index）来区分不同轮次的phase
+                // 防止相同ID的phase在不同轮次互相覆盖
                 const phaseMap = new Map();
-                s.phases?.forEach(p => phaseMap.set(p.id, p));
 
+                // 先将现有phases放入Map，使用复合键
+                s.phases?.forEach(p => {
+                    const phaseTurn = parseInt(p.turn_index, 10);
+                    const key = p._uniqueId || `${p.id}_turn${phaseTurn}`;
+                    phaseMap.set(key, p);
+                });
+
+                // 将新phases放入Map
                 newPhases.forEach(p => {
-                    const existing = phaseMap.get(p.id);
+                    const phaseTurn = parseInt(p.turn_index, 10);
+                    const key = p._uniqueId || `${p.id}_turn${phaseTurn}`;
+                    const existing = phaseMap.get(key);
+
                     if (existing) {
                         // 只有在现有状态是 pending 或者新状态不是 pending 时才更新状态
                         if (p.status !== 'pending' || existing.status === 'pending') {
@@ -1819,12 +1828,19 @@ window.Logger = {
                         }
                         if (p.title) existing.title = p.title;
                         if (p.number !== undefined) existing.number = p.number;
+                        if (p._uniqueId) existing._uniqueId = p._uniqueId;
                     } else {
-                        phaseMap.set(p.id, p);
+                        phaseMap.set(key, p);
                     }
                 });
 
-                s.phases = Array.from(phaseMap.values()).sort((a, b) => (a.number || 0) - (b.number || 0));
+                s.phases = Array.from(phaseMap.values()).sort((a, b) => {
+                    // 先按turn_index排序，再按number排序
+                    const turnA = parseInt(a.turn_index, 10) || 0;
+                    const turnB = parseInt(b.turn_index, 10) || 0;
+                    if (turnA !== turnB) return turnA - turnB;
+                    return (a.number || 0) - (b.number || 0);
+                });
 
                 // ✅ P1修复：phases_init时清理thinking消息
                 // 当真正的phase开始时，临时thinking消息应该被移除

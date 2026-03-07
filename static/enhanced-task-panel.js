@@ -200,23 +200,23 @@ function renderEnhancedTaskPanel(session) {
         // 2. 任务阶段卡片 - 仅显示属于该对话轮次 (turn_index === i + 1) 的 phases
         // 注意：turnIndex 是从 1 开始计数的（在 patch.js 中初始化为 1）
         // ✅ 修复：使用 parseInt 确保类型一致，避免字符串与数字比较失败
+        // ✅ v=31: 精确匹配当前轮次，不使用容错逻辑，避免显示其他轮次的phases
         const turnPhases = session.phases ? session.phases.filter(p => {
             const phaseTurn = parseInt(p.turn_index, 10);
-            // ✅ v=38.4.12.2: 容错 - 允许上下 1 层的偏移，确保在轮次索引不完全对齐时也能显示内容
-            return phaseTurn === i + 1 ||
-                (i === 0 && phaseTurn === 2) || // 第一轮显示索引为 2 的内容
-                (i === turnsCount - 1 && phaseTurn === i); // 最后一轮补偿
+            // ✅ 精确匹配：只显示当前轮次的phases
+            return phaseTurn === i + 1;
         }) : [];
 
         // 兜底：如果是最后一轮且没找到匹配的 turn_index，显示所有未关联的 phases
         // ✅ 修复：使用 parseInt 确保类型一致
+        // ✅ v=31: 只在真正没有匹配时才使用兜底逻辑
         if (i === turnsCount - 1 && turnPhases.length === 0 && session.phases && session.phases.length > 0) {
-            // ✅ P1修复v2：显示当前轮次及之后的phases（phaseTurn >= i+1），避免显示旧轮次
+            // ✅ P1修复v3：只显示完全没有turn_index的phases
+            // 由于新修复已经确保所有phases都有正确的turn_index，这个兜底应该很少触发
             const unassociatedPhases = session.phases.filter(p => {
                 const phaseTurn = parseInt(p.turn_index, 10);
-                // ✅ 显示：没有turn_index的phases 或 当前轮次及之后的phases（phaseTurn >= i+1）
-                // 防止追问时复制上一轮的旧phases到新一轮
-                return !p.turn_index || isNaN(phaseTurn) || phaseTurn >= i + 1;
+                // ✅ 只显示完全没有turn_index的phases
+                return !p.turn_index || isNaN(phaseTurn);
             });
             if (unassociatedPhases.length > 0) {
                 const phasesCard = createPhasesCard(unassociatedPhases, session.currentPhase);
