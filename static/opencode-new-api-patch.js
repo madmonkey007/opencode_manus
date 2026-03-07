@@ -2372,33 +2372,21 @@ window.Logger = {
 
         if (!session.deliverables) session.deliverables = [];
 
+        // ✅ v=38.4.22优化：检查文件是否已存在（兼容新旧格式）
         const exists = session.deliverables.some(d => {
             const dPath = typeof d === 'string' ? d : (d.name || d.path);
             return dPath === filePath;
         });
 
         if (!exists) {
-            // ✅ v=36修复：存储turn_index信息，支持按轮次显示交付物
-            // 新格式：{ path: filePath, turn_index: currentTurn, timestamp: Date.now() }
-            // 旧格式：filePath (字符串)
-            const currentTurn = window._turnIndex || 1;
-
-            // 检查是否已经是对象格式（避免重复包装）
-            const isObjectFormat = typeof filePath === 'object' && filePath.path;
-
-            if (isObjectFormat) {
-                // 已经是对象格式，直接添加
-                session.deliverables.push(filePath);
-            } else {
-                // 字符串格式，转换为对象格式
-                session.deliverables.push({
-                    path: typeof filePath === 'string' ? filePath : (filePath.name || filePath.path || filePath),
-                    turn_index: currentTurn,
-                    timestamp: Date.now()
-                });
-            }
-
-            console.log('[Deliverables] Added file:', filePath, 'turn:', currentTurn);
+            // ✅ v=38.4.22优化：存储为对象格式，包含turn_index信息
+            // 这样可以按轮次过滤交付物，解决追问时交付物位置混乱的问题
+            session.deliverables.push({
+                path: filePath,
+                turn_index: window._turnIndex || 1,
+                timestamp: Date.now()
+            });
+            console.log('[Deliverables] Added file:', filePath, 'turn:', window._turnIndex || 1);
         }
     }
 
