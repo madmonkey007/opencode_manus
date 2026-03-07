@@ -235,8 +235,9 @@ function renderEnhancedTaskPanel(session) {
                 const summaryCard = createDeliverableCard({
                     ...session,
                     response: responses[i],
-                    // 交付物通常也只关联到最后一轮执行
-                    deliverables: (i === turnsCount - 1) ? session.deliverables : null
+                    // ✅ v=34修复：只在最后一轮显示交付物，避免重复显示
+                    // session.deliverables是整个任务的交付物，只在最后一轮显示即可
+                    deliverables: (i === turnsCount - 1) ? session.deliverables : []
                 });
                 turnContainer.appendChild(summaryCard);
             }
