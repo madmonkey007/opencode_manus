@@ -1220,17 +1220,24 @@ window.Logger = {
             }
         );
 
+        // ✅ v=38.4.21修复：追问时也要发送消息到后端，否则AI会丢失上下文
+        // 问题描述：追问时AI说"根据上下文不知道要修改什么文件"
+        // 根本原因：只有isNewSubmission时才发送消息，追问时不会发送
+        // 解决方案：总是发送消息到后端，但只在isNewSubmission时增加turnIndex
+
         if (isNewSubmission) {
-            // ✅ 每一轮新对话增加索引，并持久化到 session
+            // 每一轮新对话增加索引，并持久化到 session
             window._turnIndex = (window._turnIndex || 0) + 1;
-            // ✅ 将 turnIndex 同步到 session 对象，确保刷新后能恢复
+            // 将 turnIndex 同步到 session 对象，确保刷新后能恢复
             if (s) {
                 s.turnIndex = window._turnIndex;
             }
-            const currentPrompt = s.prompt.split('\n\n---\n\n').pop();
-            console.log('[NewAPI] Sending user message to backend (Mode:', window._currentMode, ', Turn:', window._turnIndex, ')');
-            await window.apiClient.sendTextMessage(s.id, currentPrompt, { mode: window._currentMode });
         }
+
+        // ✅ 总是发送消息到后端（无论是新任务还是追问）
+        const currentPrompt = s.prompt.split('\n\n---\n\n').pop();
+        console.log('[NewAPI] Sending user message to backend (Mode:', window._currentMode, ', Turn:', window._turnIndex, ', isNewSubmission:', isNewSubmission, ')');
+        await window.apiClient.sendTextMessage(s.id, currentPrompt, { mode: window._currentMode });
 
 
         // 重新同步 UI 状态
