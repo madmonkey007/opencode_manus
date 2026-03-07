@@ -211,12 +211,12 @@ function renderEnhancedTaskPanel(session) {
         // 兜底：如果是最后一轮且没找到匹配的 turn_index，显示所有未关联的 phases
         // ✅ 修复：使用 parseInt 确保类型一致
         if (i === turnsCount - 1 && turnPhases.length === 0 && session.phases && session.phases.length > 0) {
-            // ✅ P1修复：只显示完全没有turn_index的phases，避免显示旧轮次
+            // ✅ P1修复v2：显示当前轮次及之后的phases（phaseTurn >= i+1），避免显示旧轮次
             const unassociatedPhases = session.phases.filter(p => {
                 const phaseTurn = parseInt(p.turn_index, 10);
-                // ✅ 只显示完全没有turn_index的phases，不显示phaseTurn <= i+1的phases
+                // ✅ 显示：没有turn_index的phases 或 当前轮次及之后的phases（phaseTurn >= i+1）
                 // 防止追问时复制上一轮的旧phases到新一轮
-                return !p.turn_index || isNaN(phaseTurn);
+                return !p.turn_index || isNaN(phaseTurn) || phaseTurn >= i + 1;
             });
             if (unassociatedPhases.length > 0) {
                 const phasesCard = createPhasesCard(unassociatedPhases, session.currentPhase);

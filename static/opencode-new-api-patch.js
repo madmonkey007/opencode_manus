@@ -1781,16 +1781,23 @@ window.Logger = {
                 });
 
                 const newPhases = (adapted.phases || []).map(p => {
-                    // ✅ 如果是新对话轮次，强制创建新phase对象
+                    // ✅ P0修复v2：新轮次时设置正确的turn_index，不复用旧phase
                     if (isNewTurn) {
-                        return {
-                            ...p,
-                            events: [],  // ✅ 新轮次使用空events数组
-                            turn_index: currentTurnIndex  // ✅ 使用当前turn_index
-                        };
+                        // 检查是否已有相同ID和turn_index的phase
+                        const hasSameTurnPhase = s.phases?.find(sp =>
+                            sp.id === p.id && parseInt(sp.turn_index, 10) === currentTurnIndex
+                        );
+
+                        if (!hasSameTurnPhase) {
+                            // 没有相同ID和turn_index的phase，创建新phase
+                            return {
+                                ...p,
+                                turn_index: currentTurnIndex
+                            };
+                        }
                     }
 
-                    // 否则，复用旧phase（保持兼容性）
+                    // 复用旧phase（保持兼容性）
                     const existingPhase = s.phases?.find(sp => sp.id === p.id);
                     return {
                         ...p,
