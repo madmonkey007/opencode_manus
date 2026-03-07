@@ -1566,13 +1566,11 @@ window.Logger = {
                     window.rightPanelManager.setFileStatus('完成');
                 }
 
-                try {
-                    if (typeof window.renderResults === 'function') {
-                        window.renderResults();
-                    }
-                } catch (error) {
-                    console.error('[NewAPI] Failed to render results after preview end:', error);
-                }
+                // ✅ v=35修复：移除renderResults()调用，避免无限循环
+                // 问题：file_preview_end → renderResults() → 重新渲染面板 → 触发预览 → file_preview_end → 循环
+                // 解决：文件预览结束不需要重新渲染整个面板，右侧面板已独立更新
+                console.log('[NewAPI] File preview end - skipping renderResults to prevent infinite loop');
+
                 return;
             }
 
