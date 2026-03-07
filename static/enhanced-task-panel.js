@@ -232,12 +232,22 @@ function renderEnhancedTaskPanel(session) {
         if (responses[i] !== undefined && responses[i] !== null) {
             // 只有当有内容或者是最后一轮时才渲染回答卡片
             if (responses[i].trim() || i === turnsCount - 1) {
+                // ✅ v=36修复：按turn_index过滤交付物，每轮只显示该轮生成的文件
+                const turnDeliverables = session.deliverables ? session.deliverables.filter(d => {
+                    // 兼容旧格式（字符串）和新格式（对象）
+                    if (typeof d === 'string' || typeof d === 'object') {
+                        const dPath = typeof d === 'string' ? d : (d.path || d.name || d);
+                        const dTurn = typeof d === 'object' && d.turn_index ? parseInt(d.turn_index, 10) : 1;
+                        // 只显示当前轮次的文件（turn_index === i + 1）
+                        return dTurn === i + 1;
+                    }
+                    return false;
+                }) : [];
+
                 const summaryCard = createDeliverableCard({
                     ...session,
                     response: responses[i],
-                    // ✅ v=34修复：只在最后一轮显示交付物，避免重复显示
-                    // session.deliverables是整个任务的交付物，只在最后一轮显示即可
-                    deliverables: (i === turnsCount - 1) ? session.deliverables : []
+                    deliverables: turnDeliverables
                 });
                 turnContainer.appendChild(summaryCard);
             }
@@ -716,8 +726,15 @@ function createDeliverableCard(session) {
     const card = document.createElement('div');
     card.className = 'space-y-6';
 
+    // ✅ v=36修复：规范化deliverables为字符串数组（兼容新旧格式）
+    // 新格式：{ path: '/app/file.html', turn_index: 1, timestamp: ... }
+    // 旧格式：'/app/file.html' (字符串)
+    const normalizedDeliverables = (session.deliverables || []).map(d => {
+        return typeof d === 'string' ? d : (d.path || d.name || d);
+    }).filter(d => d);  // 过滤掉空值
+
     // 早出口：如果没有交付物，只显示响应内容
-    const hasDeliverables = session.deliverables && session.deliverables.length > 0;
+    const hasDeliverables = normalizedDeliverables && normalizedDeliverables.length > 0;
     if (!hasDeliverables) {
         // ✅ 代码审查修复 #1: 使用safeRenderMarkdown防止XSS，而不是marked.parse
         card.innerHTML = `
@@ -735,7 +752,7 @@ function createDeliverableCard(session) {
     // ✅ 代码审查修复 #2: 使用辅助函数消除重复代码
     // 分类文件：网页文件 vs 非网页文件
     const webExtensions = ['html', 'htm'];
-    const allFiles = session.deliverables;
+    const allFiles = normalizedDeliverables;  // ✅ 使用规范化后的数组
 
     const webFiles = allFiles.filter(f => {
         const { ext } = extractFileInfo(f);

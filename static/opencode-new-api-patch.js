@@ -2378,7 +2378,27 @@ window.Logger = {
         });
 
         if (!exists) {
-            session.deliverables.push(filePath);
+            // ✅ v=36修复：存储turn_index信息，支持按轮次显示交付物
+            // 新格式：{ path: filePath, turn_index: currentTurn, timestamp: Date.now() }
+            // 旧格式：filePath (字符串)
+            const currentTurn = window._turnIndex || 1;
+
+            // 检查是否已经是对象格式（避免重复包装）
+            const isObjectFormat = typeof filePath === 'object' && filePath.path;
+
+            if (isObjectFormat) {
+                // 已经是对象格式，直接添加
+                session.deliverables.push(filePath);
+            } else {
+                // 字符串格式，转换为对象格式
+                session.deliverables.push({
+                    path: typeof filePath === 'string' ? filePath : (filePath.name || filePath.path || filePath),
+                    turn_index: currentTurn,
+                    timestamp: Date.now()
+                });
+            }
+
+            console.log('[Deliverables] Added file:', filePath, 'turn:', currentTurn);
         }
     }
 
