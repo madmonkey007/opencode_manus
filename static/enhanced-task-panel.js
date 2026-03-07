@@ -233,15 +233,22 @@ function renderEnhancedTaskPanel(session) {
             // 只有当有内容或者是最后一轮时才渲染回答卡片
             if (responses[i].trim() || i === turnsCount - 1) {
                 // ✅ v=36修复：按turn_index过滤交付物，每轮只显示该轮生成的文件
+                // 检查是否是旧任务（所有文件都是字符串格式，没有turn_index）
+                const hasNewFormatFiles = session.deliverables && session.deliverables.some(d => {
+                    return typeof d === 'object' && d.turn_index !== undefined;
+                });
+
                 const turnDeliverables = session.deliverables ? session.deliverables.filter(d => {
-                    // 兼容旧格式（字符串）和新格式（对象）
-                    if (typeof d === 'string' || typeof d === 'object') {
-                        const dPath = typeof d === 'string' ? d : (d.path || d.name || d);
-                        const dTurn = typeof d === 'object' && d.turn_index ? parseInt(d.turn_index, 10) : 1;
-                        // 只显示当前轮次的文件（turn_index === i + 1）
-                        return dTurn === i + 1;
+                    // 新任务：按turn_index过滤
+                    if (hasNewFormatFiles) {
+                        if (typeof d === 'object' && d.path && d.turn_index !== undefined) {
+                            const dTurn = parseInt(d.turn_index, 10);
+                            return dTurn === i + 1;
+                        }
+                        return false;  // 忽略旧格式文件
                     }
-                    return false;
+                    // 旧任务：显示所有文件（保持旧行为）
+                    return true;
                 }) : [];
 
                 const summaryCard = createDeliverableCard({
