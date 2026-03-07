@@ -232,23 +232,33 @@ function renderEnhancedTaskPanel(session) {
         if (responses[i] !== undefined && responses[i] !== null) {
             // 只有当有内容或者是最后一轮时才渲染回答卡片
             if (responses[i].trim() || i === turnsCount - 1) {
-                // ✅ v=36修复：按turn_index过滤交付物，每轮只显示该轮生成的文件
-                // 检查是否是旧任务（所有文件都是字符串格式，没有turn_index）
+                // ✅ v=37修复：按turn_index过滤交付物，每轮只显示该轮生成的文件
+                // ✅ v=37改进：检测是否是新任务（有turn_index信息），区分新旧任务的显示逻辑
+
+                // 检查是否有新格式文件（对象格式，包含turn_index）
                 const hasNewFormatFiles = session.deliverables && session.deliverables.some(d => {
-                    return typeof d === 'object' && d.turn_index !== undefined;
+                    return d && typeof d === 'object' && d.turn_index !== undefined;
                 });
 
                 const turnDeliverables = session.deliverables ? session.deliverables.filter(d => {
-                    // 新任务：按turn_index过滤
-                    if (hasNewFormatFiles) {
-                        if (typeof d === 'object' && d.path && d.turn_index !== undefined) {
-                            const dTurn = parseInt(d.turn_index, 10);
+                    // 防御性检查：过滤掉null、undefined
+                    if (!d) return false;
+
+                    // 兼容字符串和对象格式
+                    if (typeof d === 'string' || typeof d === 'object') {
+                        const dPath = typeof d === 'string' ? d : (d.path || d.name || d);
+
+                        if (hasNewFormatFiles) {
+                            // 新任务：按turn_index严格过滤
+                            const dTurn = typeof d === 'object' && d.turn_index ? parseInt(d.turn_index, 10) : 1;
                             return dTurn === i + 1;
+                        } else {
+                            // 旧任务：显示所有文件（保持旧行为）
+                            // 因为旧任务的deliverables没有turn_index信息，无法区分轮次
+                            return true;
                         }
-                        return false;  // 忽略旧格式文件
                     }
-                    // 旧任务：显示所有文件（保持旧行为）
-                    return true;
+                    return false;
                 }) : [];
 
                 const summaryCard = createDeliverableCard({
