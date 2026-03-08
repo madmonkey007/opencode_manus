@@ -1220,23 +1220,46 @@ window.Logger = {
             }
         );
 
-        // ✅ v=38.4.21修复：追问时也要发送消息到后端，否则AI会丢失上下文
-        // 问题描述：追问时AI说"根据上下文不知道要修改什么文件"
-        // 根本原因：只有isNewSubmission时才发送消息，追问时不会发送
-        // 解决方案：总是发送消息到后端，但只在isNewSubmission时增加turnIndex
+        // ✅ v=38.4.23修复：正确处理多轮对话的turnIndex递增
+        // 问题描述：追问时turnIndex不递增，导致所有文件的turn_index都是1
+        // 根本原因：isNewSubmission只表示"是否新任务"，不表示"是否新轮次"
+        // 解决方案：使用prompt数量检测新轮次，不依赖isNewSubmission
 
-        if (isNewSubmission) {
-            // 每一轮新对话增加索引，并持久化到 session
+        const pSep = '\n\n---\n\n';
+        const promptCount = (s.prompt || '').split(pSep).length;
+
+        // ✅ 从session恢复turnIndex（处理页面刷新场景）
+        if (s && s.turnIndex && (!window._turnIndex || window._turnIndex < s.turnIndex)) {
+            window._turnIndex = s.turnIndex;
+            console.log('[NewAPI] Restored turnIndex from session:', window._turnIndex);
+        }
+
+        // 初始化计数器（持久化到session）
+        s._lastPromptCount = s._lastPromptCount || 0;
+
+        // ✅ 检测新轮次：prompt数量增加
+        if (promptCount > s._lastPromptCount) {
             window._turnIndex = (window._turnIndex || 0) + 1;
-            // 将 turnIndex 同步到 session 对象，确保刷新后能恢复
-            if (s) {
-                s.turnIndex = window._turnIndex;
-            }
+            s.turnIndex = window._turnIndex;
+            s._lastPromptCount = promptCount;
+
+            console.log('[NewAPI] 🔄 New turn detected:', {
+                turnIndex: window._turnIndex,
+                promptCount: promptCount,
+                lastPromptCount: s._lastPromptCount - 1,
+                isNewSubmission: isNewSubmission
+            });
+        } else {
+            console.log('[NewAPI] 📝 Existing turn:', {
+                turnIndex: window._turnIndex,
+                promptCount: promptCount,
+                isNewSubmission: isNewSubmission
+            });
         }
 
         // ✅ 总是发送消息到后端（无论是新任务还是追问）
-        const currentPrompt = s.prompt.split('\n\n---\n\n').pop();
-        console.log('[NewAPI] Sending user message to backend (Mode:', window._currentMode, ', Turn:', window._turnIndex, ', isNewSubmission:', isNewSubmission, ')');
+        const currentPrompt = s.prompt.split(pSep).pop();
+        console.log('[NewAPI] 📤 Sending message (Mode:', window._currentMode, ', Turn:', window._turnIndex, ', Prompt length:', currentPrompt.length, ')');
         await window.apiClient.sendTextMessage(s.id, currentPrompt, { mode: window._currentMode });
 
 

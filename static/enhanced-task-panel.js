@@ -246,18 +246,36 @@ function renderEnhancedTaskPanel(session) {
             turnContainer.appendChild(phasesCard);
         }
 
-        // 3. 该轮的回答
+        // 3. 该轮的回答和交付物
+
+        // ✅ v=37优化：从预计算的Map中获取当前轮次的deliverables（O(1)）
+        const turnDeliverables = deliverablesByTurn[i + 1] || [];
+
+        // ✅ v=37修复：更健壮的渲染条件
+        // 问题：追问时response可能为空，导致交付面板不显示
+        // 解决：满足以下任一条件就渲染：
+        //   1. 有response内容，或
+        //   2. 是最后一轮，或
+        //   3. 有该轮的deliverables（即使response为空）
+        const hasResponse = responses[i] && responses[i].trim();
+        const isLastTurn = i === turnsCount - 1;
+        const hasDeliverables = turnDeliverables && turnDeliverables.length > 0;
+
+        // 调试日志
+        console.log('[Render] Turn', i + 1, 'conditions:', {
+            hasResponse,
+            isLastTurn,
+            hasDeliverables,
+            deliverablesCount: turnDeliverables.length,
+            willRender: hasResponse || isLastTurn || hasDeliverables
+        });
 
         if (responses[i] !== undefined && responses[i] !== null) {
-            // 只有当有内容或者是最后一轮时才渲染回答卡片
-            if (responses[i].trim() || i === turnsCount - 1) {
-                // ✅ v=36优化：从预计算的Map中获取当前轮次的deliverables（O(1)）
-                const turnDeliverables = deliverablesByTurn[i + 1] || [];
-
+            if (hasResponse || isLastTurn || hasDeliverables) {
                 const summaryCard = createDeliverableCard({
                     ...session,
-                    response: responses[i],
-                    // ✅ v=36修复：每轮只显示该轮生成的交付物，不显示其他轮的
+                    response: responses[i] || '',  // ✅ 确保response不为undefined
+                    // ✅ v=37修复：每轮只显示该轮生成的交付物，不显示其他轮的
                     // 使用预计算Map，性能优化：O(1)查询 vs O(n) filter
                     deliverables: turnDeliverables
                 });
