@@ -11,6 +11,20 @@ import re
 import logging
 import subprocess
 import shlex
+import sys
+
+# Fix Windows encoding issue
+if sys.platform == "win32":
+    import locale
+    try:
+        # Try to set UTF-8 encoding
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        if hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except:
+        # Fallback for older Python versions
+        pass
 
 # Configure logging FIRST before using logger
 logging.basicConfig(

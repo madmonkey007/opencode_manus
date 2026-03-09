@@ -201,7 +201,11 @@ function _executeSave(retryCount = 0) {
                 mode: s.mode || null,
                 _version: s._version || 1,
                 _createdTime: s._createdTime || Date.now(),  // ✅ 修复I1: 添加创建时间，用于宽限期判断
-                _hasCompletionSummary: s._hasCompletionSummary || false  // ✅ v=32: 持久化任务总结标志位
+                _hasCompletionSummary: s._hasCompletionSummary || false,  // ✅ v=32: 持久化任务总结标志位
+                
+                // ✅ P0修复：持久化turnIndex状态，解决第二轮交付面板丢失问题
+                turnIndex: s.turnIndex || 0,
+                _lastPromptCount: s._lastPromptCount || 0
             };
         });
 
@@ -410,6 +414,17 @@ async function loadState() {
                         s._hasCompletionSummary = !!(s.response && s.response.includes('**✅ 任务完成**'));
                         repairedCount++;
                     }
+                    
+                    // ✅ P0修复：确保turnIndex状态正确初始化
+                    if (typeof s.turnIndex !== 'number') {
+                        s.turnIndex = 0;
+                        repairedCount++;
+                    }
+                    if (typeof s._lastPromptCount !== 'number') {
+                        s._lastPromptCount = 0;
+                        repairedCount++;
+                    }
+                    
                     s._version = 1;
                 }
 

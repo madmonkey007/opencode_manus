@@ -1211,6 +1211,18 @@ window.Logger = {
                             console.log(`[ChildSession] ✅ Cleanup complete for: ${childSessionId}`);
                         }, CHILD_SESSION_CLEANUP_DELAY_MS);
                     }
+                    
+                    // ✅ P0修复：在任务完成时同步turnIndex状态到session对象
+                    // 这确保了window._turnIndex的值被正确保存到session中
+                    // 然后通过saveState()持久化到localStorage
+                    if (s && window._turnIndex) {
+                        s.turnIndex = window._turnIndex;
+                        s._lastPromptCount = s._lastPromptCount || 0;
+                        console.log('[NewAPI] 💾 Saving turnIndex state on completion:', {
+                            turnIndex: s.turnIndex,
+                            _lastPromptCount: s._lastPromptCount
+                        });
+                    }
                 }
             },
             (err) => {
