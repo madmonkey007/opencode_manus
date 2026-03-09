@@ -447,3 +447,24 @@ class OpenCodeServerManager:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """异步上下文管理器出口，确保资源清理"""
         await self.stop()
+
+
+def main():
+    """主入口点：启动持久化的opencode服务器"""
+    import uvicorn
+    import asyncio
+    
+    print("Starting OpenCode Server Manager...")
+    
+    # 直接启动uvicorn服务器（无需懒加载，因为Docker会持续运行）
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        log_level="info",
+        access_log=False
+    )
+
+
+if __name__ == "__main__":
+    main()
