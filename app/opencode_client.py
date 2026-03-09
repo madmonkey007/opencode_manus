@@ -1390,6 +1390,7 @@ async def execute_opencode_message_with_manager(
         workspace_base: 工作区基础路径
         mode: 运行模式
     """
+    # ✅ 延迟导入，避免循环导入问题
     from app.main import get_opencode_server_manager
     import logging
     import json
@@ -1409,17 +1410,28 @@ async def execute_opencode_message_with_manager(
         # manager.execute返回AsyncGenerator[str, None]，每个元素是SSE事件
         async for response_chunk in manager.execute(session_id, user_prompt, mode):
             # 解析SSE事件（格式：data: {...}）
-            if response_chunk.strip().startswith("data: "):
+            line = response_chunk.strip()
+            
+            # 跳过空行和注释
+            if not line or line.startswith(':'):
+                continue
+            
+            # 处理data行
+            if line.startswith('data: '):
+                data_content = line[6:]  # 去掉 "data: " 前缀
+                
+                # 检查是否是结束标记
+                if data_content == '[DONE]':
+                    break
+                
+                # 解析JSON
                 try:
-                    # 提取JSON部分
-                    json_str = response_chunk.strip()[6:]  # 去掉 "data: " 前缀
-                    event = json.loads(json_str)
-                    
+                    event = json.loads(data_content)
                     # 广播事件到前端
                     await client._broadcast_event(session_id, event)
                     
                 except json.JSONDecodeError as e:
-                    logger.warning(f"[Perf] Failed to parse SSE event: {e}")
+                    logger.warning(f"[Perf] Failed to parse SSE data: {e}")
                 except Exception as e:
                     logger.error(f"[Perf] Error broadcasting event: {e}")
             
