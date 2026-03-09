@@ -56,12 +56,22 @@ except ImportError as e:
 
 app = FastAPI()
 
+# CORS配置：从环境变量读取允许的来源
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8999").split(",")
+cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin"
+    ],
 )
 
 # 导入提示词增强模块
