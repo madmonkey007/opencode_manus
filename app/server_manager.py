@@ -450,20 +450,37 @@ class OpenCodeServerManager:
 
 
 def main():
-    """主入口点：启动持久化的opencode服务器"""
+    """主入口点：使用app.main的懒加载机制"""
     import uvicorn
-    import asyncio
     
-    print("Starting OpenCode Server Manager...")
-    
-    # 直接启动uvicorn服务器（无需懒加载，因为Docker会持续运行）
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        log_level="info",
-        access_log=False
-    )
+    # 导入app.main模块（包含懒加载的OpenCodeServerManager）
+    try:
+        from app import main as app_main
+        logger.info("Using app.main with lazy loading OpenCodeServerManager")
+        
+        # 使用app.main的FastAPI app
+        # 这个app内部已经实现了OpenCodeServerManager的懒加载
+        uvicorn.run(
+            app_main.app,  # 使用app.main中定义的FastAPI应用
+            host="0.0.0.0",
+            port=8000,
+            log_level="info",
+            access_log=False
+        )
+        
+    except ImportError as e:
+        logger.error(f"Failed to import app.main: {e}")
+        logger.info("Falling back to direct uvicorn startup")
+        
+        # 如果app.main导入失败，使用直接启动（原始方式）
+        import uvicorn as uv
+        uv.run(
+            "app.main:app",
+            host="0.0.0.0",
+            port=8000,
+            log_level="info",
+            access_log=False
+        )
 
 
 if __name__ == "__main__":
