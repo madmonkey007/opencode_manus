@@ -13,6 +13,9 @@ import subprocess
 import shlex
 import sys
 
+# Import from managers module to avoid circular imports
+from app.managers import get_opencode_server_manager
+
 # Fix Windows encoding issue
 if sys.platform == "win32":
     import locale
@@ -82,30 +85,6 @@ from .prompt_enhancer import enhance_prompt
 from .server_manager import OpenCodeServerManager
 
 # 懒加载：只在首次使用时才创建实例
-_opencode_server_manager: Optional[OpenCodeServerManager] = None
-_manager_lock = asyncio.Lock()
-
-async def get_opencode_server_manager() -> OpenCodeServerManager:
-    """
-    懒加载 OpenCodeServerManager
-
-    使用 Lock 确保线程安全，避免竞态条件
-    """
-    global _opencode_server_manager
-
-    if _opencode_server_manager is None:
-        async with _manager_lock:
-            if _opencode_server_manager is None:
-                try:
-                    logger.info("Initializing OpenCodeServerManager (lazy load)...")
-                    _opencode_server_manager = OpenCodeServerManager()
-                    logger.info("OpenCodeServerManager initialized successfully")
-                except Exception as e:
-                    logger.error(f"Failed to initialize OpenCodeServerManager: {e}", exc_info=True)
-                    raise RuntimeError("Failed to initialize OpenCode server manager") from e
-
-    return _opencode_server_manager
-
 # Workspace setup
 WORKSPACE_BASE = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../workspace")
