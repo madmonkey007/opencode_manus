@@ -1368,6 +1368,70 @@ async def execute_opencode_message(
     await client.execute_message(session_id, message_id, user_prompt, mode=mode)
 
 
+async def execute_opencode_message_with_manager(
+    session_id: str,
+    message_id: str,
+    user_prompt: str,
+    workspace_base: str,
+    mode: str = "auto",
+):
+    """
+    使用全局OpenCodeServerManager执行OpenCode消息（性能优化版本）
+    
+    优势：
+    - 复用全局opencode serve进程（首次15秒，后续2秒）
+    - 避免每个任务都启动新进程
+    - 适用于多任务场景
+    
+    Args:
+        session_id: 会话ID
+        message_id: 消息ID
+        user_prompt: 用户提示词
+        workspace_base: 工作区基础路径
+        mode: 运行模式
+    """
+    from app.main import get_opencode_server_manager
+    import logging
+    import json
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # 获取全局OpenCodeServerManager实例（懒加载）
+        manager = await get_opencode_server_manager()
+        
+        logger.info(f"[Perf] Using global OpenCodeServerManager for session {session_id}")
+        
+        # 创建client实例用于广播事件
+        client = OpenCodeClient(workspace_base)
+        
+        # 使用manager的execute方法（会复用已启动的opencode serve）
+        # manager.execute返回AsyncGenerator[str, None]，每个元素是SSE事件
+        async for response_chunk in manager.execute(session_id, user_prompt, mode):
+            # 解析SSE事件（格式：data: {...}）
+            if response_chunk.strip().startswith("data: "):
+                try:
+                    # 提取JSON部分
+                    json_str = response_chunk.strip()[6:]  # 去掉 "data: " 前缀
+                    event = json.loads(json_str)
+                    
+                    # 广播事件到前端
+                    await client._broadcast_event(session_id, event)
+                    
+                except json.JSONDecodeError as e:
+                    logger.warning(f"[Perf] Failed to parse SSE event: {e}")
+                except Exception as e:
+                    logger.error(f"[Perf] Error broadcasting event: {e}")
+            
+        logger.info(f"[Perf] Completed message execution for session {session_id}")
+        
+    except Exception as e:
+        logger.error(f"[Perf] Error in execute_opencode_message_with_manager: {e}", exc_info=True)
+        # 降级到原始方式
+        logger.warning(f"[Perf] Falling back to original execute_opencode_message")
+        await execute_opencode_message(session_id, message_id, user_prompt, workspace_base, mode)
+
+
 # ====================================================================
 # 工具类型映射（兼容前端）
 # ====================================================================

@@ -628,8 +628,9 @@ async def send_message(
         # 3. 发送消息更新事件（通过 SSE 广播）
         await broadcast_message_update(session_id, assistant_message)
 
-        # 4. 后台执行 OpenCode CLI 任务
-        from .opencode_client import execute_opencode_message
+        # 4. 后台执行 OpenCode CLI 任务 - 使用全局OpenCodeServerManager实现性能优化
+        from app.main import get_opencode_server_manager
+        from .opencode_client import execute_opencode_message_with_manager
 
         workspace_base = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "../workspace")
@@ -661,8 +662,9 @@ async def send_message(
 
         logger.info(f"Sending message to {session_id} in mode: {run_mode}")
 
+        # ✅ 性能优化：使用全局OpenCodeServerManager而不是每次启动新进程
         background_tasks.add_task(
-            execute_opencode_message,
+            execute_opencode_message_with_manager,
             session_id,
             assistant_message_id,
             enhanced_user_text,
