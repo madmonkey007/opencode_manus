@@ -13,7 +13,9 @@ import subprocess
 import logging
 import httpx
 import os
-from typing import Optional, Dict, Any
+import uuid
+import json
+from typing import Optional, Dict, Any, List
 
 logger = logging.getLogger("opencode")
 
@@ -32,6 +34,16 @@ class OpenCodeServerManager:
         model: str = "new-api/glm-4.7",
         workspace: str = "/app/opencode/workspace",
     ):
+        # 参数验证
+        if not (1 <= port <= 65535):
+            raise ValueError(f"Port must be between 1 and 65535, got {port}")
+
+        if not host:
+            raise ValueError("Host cannot be empty")
+
+        if not model:
+            raise ValueError("Model cannot be empty")
+
         self.host = host
         self.port = port
         self.model = model
@@ -42,7 +54,7 @@ class OpenCodeServerManager:
         self.is_running = False
         self.startup_lock = asyncio.Lock()
 
-    async def start(self) -> bool:
+    async def start(self, max_retries: int = 3) -> bool:
         """
         启动 opencode serve 服务器（懒加载）
 
@@ -54,9 +66,22 @@ class OpenCodeServerManager:
                 logger.info(f"OpenCode server already running at {self.base_url}")
                 return True
 
-            # 尝试启动服务器
+            # 尝试启动服务器（带重试机制）
             logger.info(f"Starting OpenCode server at {self.base_url}...")
-            return await self._start_server()
+
+            for attempt in range(max_retries):
+                if attempt > 0:
+                    logger.info(f"Retry {attempt + 1}/{max_retries} starting server...")
+                    await asyncio.sleep(2 ** attempt)  # 指数退避
+
+                if await self._start_server():
+                    # ✅ 在锁内设置状态，避免竞态条件
+                    self.is_running = True
+                    logger.info(f"✅ OpenCode server started successfully at {self.base_url}")
+                    return True
+
+            logger.error(f"Failed to start server after {max_retries} attempts")
+            return False
 
     async def _start_server(self) -> bool:
         """启动 opencode serve 进程"""
@@ -111,8 +136,20 @@ class OpenCodeServerManager:
             self._stop_process()
             return False
 
+        except FileNotFoundError as e:
+            logger.error(f"opencode executable not found: {e}")
+            return False
+        except PermissionError as e:
+            logger.error(f"Permission denied: {e}")
+            return False
+        except OSError as e:
+            if "Address already in use" in str(e) or "port" in str(e).lower():
+                logger.error(f"Port {self.port} is already in use or unavailable")
+            else:
+                logger.error(f"OS error starting server: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to start OpenCode server: {e}")
+            logger.error(f"Unexpected error starting server: {e}", exc_info=True)
             return False
 
     async def _check_health(self) -> bool:
@@ -121,19 +158,37 @@ class OpenCodeServerManager:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(f"{self.base_url}/opencode/health")
                 return response.status_code == 200
-        except Exception:
+        except httpx.ConnectTimeout:
+            logger.debug(f"Health check timeout")
+            return False
+        except httpx.ConnectError as e:
+            logger.debug(f"Health check connection error: {e}")
+            return False
+        except Exception as e:
+            logger.debug(f"Health check failed: {e}")
             return False
 
     def _stop_process(self):
         """停止服务器进程"""
-        if self.process:
+        if not self.process:
+            return
+
+        try:
+            # 1. 先尝试优雅终止
+            self.process.terminate()
             try:
-                self.process.terminate()
                 self.process.wait(timeout=5)
-            except Exception as e:
-                logger.error(f"Error stopping process: {e}")
-            finally:
-                self.process = None
+                logger.info(f"Process terminated gracefully")
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Process did not terminate gracefully, forcing kill")
+                # 2. 强制终止（kill() 后备方案）
+                self.process.kill()
+                self.process.wait(timeout=3)
+                logger.info(f"Process killed forcefully")
+        except Exception as e:
+            logger.error(f"Error stopping process: {e}")
+        finally:
+            self.process = None
 
     async def execute(self, session_id: str, prompt: str, mode: str = "auto") -> str:
         """

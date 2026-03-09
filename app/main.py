@@ -72,9 +72,13 @@ async def get_opencode_server_manager() -> OpenCodeServerManager:
     if _opencode_server_manager is None:
         async with _manager_lock:
             if _opencode_server_manager is None:
-                logger.info("Initializing OpenCodeServerManager (lazy load)...")
-                _opencode_server_manager = OpenCodeServerManager()
-                logger.info("OpenCodeServerManager initialized successfully")
+                try:
+                    logger.info("Initializing OpenCodeServerManager (lazy load)...")
+                    _opencode_server_manager = OpenCodeServerManager()
+                    logger.info("OpenCodeServerManager initialized successfully")
+                except Exception as e:
+                    logger.error(f"Failed to initialize OpenCodeServerManager: {e}", exc_info=True)
+                    raise RuntimeError("Failed to initialize OpenCode server manager") from e
 
     return _opencode_server_manager
 
