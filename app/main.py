@@ -53,6 +53,31 @@ app.add_middleware(
 # 导入提示词增强模块
 from .prompt_enhancer import enhance_prompt
 
+# 导入 OpenCode 服务器管理器（懒加载）
+# 不在模块导入时初始化，避免阻塞主线程
+from .server_manager import OpenCodeServerManager
+
+# 懒加载：只在首次使用时才创建实例
+_opencode_server_manager: Optional[OpenCodeServerManager] = None
+_manager_lock = asyncio.Lock()
+
+async def get_opencode_server_manager() -> OpenCodeServerManager:
+    """
+    懒加载 OpenCodeServerManager
+
+    使用 Lock 确保线程安全，避免竞态条件
+    """
+    global _opencode_server_manager
+
+    if _opencode_server_manager is None:
+        async with _manager_lock:
+            if _opencode_server_manager is None:
+                logger.info("Initializing OpenCodeServerManager (lazy load)...")
+                _opencode_server_manager = OpenCodeServerManager()
+                logger.info("OpenCodeServerManager initialized successfully")
+
+    return _opencode_server_manager
+
 # Workspace setup
 WORKSPACE_BASE = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../workspace")
@@ -322,67 +347,32 @@ class SessionManager:
             logger.info(f"Enhancing prompt with mode: {mode}")
             enhanced_prompt = enhance_prompt(prompt, mode)
 
-            # Build command
-            cmd = [
-                "opencode",
-                "run",
-                "--model",
-                "new-api/glm-4.7",
-                "--format",
-                "json",
-            ]
-            
-            if mode in ["plan", "build"]:
-                cmd.extend(["--agent", mode])
-            
-            cmd.append(enhanced_prompt)
+            # ✅ 新方案：使用 OpenCodeServerManager 的 HTTP API（懒加载）
+            logger.info(f"Using OpenCodeServerManager (lazy load) for session {sid}")
 
-            env = {**os.environ}
-            path_env = "/root/.bun/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
-            env["PATH"] = path_env
-            env["FORCE_COLOR"] = "1"
+            # 获取管理器实例（首次请求时才会启动服务器）
+            manager = await get_opencode_server_manager()
 
-            # Use config_host directly as it's verified to work
-            patched_config = "/app/opencode/config_host/opencode.json"
-            # For local development, use relative path if Docker path doesn't exist
-            if not os.path.exists(patched_config):
-                patched_config = "config_host/opencode.json"
-
-            if os.path.exists(patched_config):
-                # Use absolute path for reliability
-                patched_config = os.path.abspath(patched_config)
-                env["OPENCODE_CONFIG_FILE"] = patched_config
-                logger.info(f"Using config: {patched_config}")
-            else:
-                logger.warning(f"Config file not found: {patched_config}")
-
-            logger.info(f"Starting process for {sid} with command: {cmd}")
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                cwd=session_dir,
-                env=env,
-            )
-
+            # 更新会话状态
             if sid in self.sessions:
-                self.sessions[sid]["process"] = process
                 self.sessions[sid]["status"] = "running"
 
-            if process.stdout:
-                async for line in process.stdout:
-                    decoded = line.decode(errors="ignore").strip()
-                    if decoded:
-                        # Write to file
-                        with open(log_file, "a", encoding="utf-8") as f:
-                            f.write(decoded + "\n")
+            # 发送 HTTP 请求执行任务
+            logger.info(f"Executing task via HTTP API: {mode}")
+            result = await manager.execute(
+                session_id=sid,
+                prompt=enhanced_prompt,
+                mode=mode
+            )
 
-                        # Broadcast to queues
-                        if sid in self.sessions:
-                            for q in self.sessions[sid]["queues"]:
-                                await q.put(decoded)
+            # 写入结果到日志
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(result + "\n")
 
-            await process.wait()
+            # 广播结果到队列（保持与原代码一致的接口）
+            if sid in self.sessions:
+                for q in self.sessions[sid]["queues"]:
+                    await q.put(result)
 
             with open(status_file, "w", encoding="utf-8") as f:
                 f.write("completed")
