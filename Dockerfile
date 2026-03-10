@@ -49,6 +49,10 @@ ENV SCREEN_WIDTH=1280
 ENV SCREEN_HEIGHT=720
 ENV OPENCODE_CONFIG_DIR=/app/opencode/config_host
 
+# Security fixes for CORS and encoding
+ENV CORS_ORIGINS=http://localhost:3000,http://localhost:8089
+ENV PYTHONIOENCODING=utf-8
+
 # 暴露端口：8000 (UI), 6080 (UVN)
 EXPOSE 8000 6080
 

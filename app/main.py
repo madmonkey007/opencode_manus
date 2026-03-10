@@ -13,8 +13,8 @@ import subprocess
 import shlex
 import sys
 
-# Import from managers module to avoid circular imports
-from app.managers import get_opencode_server_manager
+# Import from managers_internal module to avoid circular imports
+from app.managers_internal import get_opencode_server_manager
 
 # Fix Windows encoding issue
 if sys.platform == "win32":

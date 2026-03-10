@@ -1391,8 +1391,8 @@ async def execute_opencode_message_with_manager(
         mode: 运行模式
     """
     # ✅ 延迟导入，避免循环导入问题
-    # Import from managers module to avoid circular imports
-    from app.managers import get_opencode_server_manager
+    # Import from managers_internal module to avoid circular imports
+    from app.managers_internal import get_opencode_server_manager
     import logging
     import json
     

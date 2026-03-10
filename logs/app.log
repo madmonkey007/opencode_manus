@@ -7924,3 +7924,56 @@ INFO:     172.18.0.1:59752 - "GET /opencode/events?session_id=ses_d8c44c97 HTTP/
 INFO:     172.18.0.1:59758 - "POST /opencode/session/ses_129324d0/message HTTP/1.1" 200 OK
 INFO:     172.18.0.1:59738 - "GET /opencode/events?session_id=ses_129324d0 HTTP/1.1" 200 OK
 INFO:     172.18.0.1:59758 - "GET /opencode/list_session_files?sid=ses_129324d0 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:38400 - "GET /health HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:38400 - "OPTIONS /health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56444 - "GET /health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60808 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42540 - "OPTIONS / HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:46500 - "OPTIONS / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46512 - "GET /files?path=../../../etc/passwd HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:36004 - "GET / HTTP/1.1" 200 OK
+INFO:     172.18.0.1:36012 - "OPTIONS / HTTP/1.1" 400 Bad Request
+INFO:     172.18.0.1:46708 - "OPTIONS / HTTP/1.1" 200 OK
+INFO:     172.18.0.1:46722 - "GET /health HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:59522 - "GET / HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59534 - "OPTIONS / HTTP/1.1" 405 Method Not Allowed
+INFO:     172.18.0.1:59548 - "GET / HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59552 - "GET /static/opencode-new-api-patch.js?v=38.4.23 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59548 - "GET /static/enhanced-task-panel.js?v=37 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59562 - "GET /static/opencode.js?v=38.4.2 HTTP/1.1" 304 Not Modified
+INFO:     172.18.0.1:59552 - "GET /opencode/session/ses_a2da3dcb/messages HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:59548 - "GET /opencode/session/ses_umcmy88/messages HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:59562 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59562 - "GET /opencode/list_session_files?sid=ses_83a7eeab HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59562 - "GET /opencode/session/ses_a2da3dcb/timeline HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59548 - "GET /opencode/session/ses_umcmy88/timeline HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59548 - "GET /opencode/projects HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59548 - "GET /opencode/list_session_files?sid=ses_83a7eeab HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59548 - "GET /opencode/run_sse?prompt=%E7%94%A8Python%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E8%AE%A1%E7%AE%97%E5%99%A8%E8%84%9A%E6%9C%AC%EF%BC%8C%E6%94%AF%E6%8C%81%E5%8A%A0%E5%87%8F%E4%B9%98%E9%99%A4%E8%BF%90%E7%AE%97&sid=ses_83a7eeab HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59548 - "GET /opencode/session/ses_f58e7036/messages HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:59548 - "GET /opencode/list_session_files?sid=ses_f58e7036 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:50224 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56628 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56634 - "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:50224 - "POST /opencode/session/ses_eabf40b4/message HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56634 - "POST /opencode/session/ses_1381ab07/message HTTP/1.1" 200 OK
+INFO:     172.18.0.1:50224 - "GET /opencode/list_session_files?sid=ses_eabf40b4 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56628 - "GET /opencode/events?session_id=ses_1381ab07 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56650 - "GET /opencode/events?session_id=ses_eabf40b4 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56634 - "GET /opencode/list_session_files?sid=ses_1381ab07 HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56634 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56634 - "POST /opencode/session/ses_cbab0cbb/message HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56634 - "GET /opencode/list_session_files?sid=ses_cbab0cbb HTTP/1.1" 200 OK
+INFO:     172.18.0.1:50224 - "GET /opencode/events?session_id=ses_cbab0cbb HTTP/1.1" 200 OK
+INFO:     172.18.0.1:39012 - "GET /opencode/list_session_files?sid=ses_cbab0cbb HTTP/1.1" 200 OK
+INFO:     172.18.0.1:40726 - "POST /opencode/session HTTP/1.1" 200 OK
+INFO:     172.18.0.1:40726 - "POST /opencode/session/ses_765c1b0d/message HTTP/1.1" 200 OK
+INFO:     172.18.0.1:40726 - "GET /opencode/list_session_files?sid=ses_765c1b0d HTTP/1.1" 200 OK
+INFO:     172.18.0.1:40732 - "GET /opencode/events?session_id=ses_765c1b0d HTTP/1.1" 200 OK
+INFO:     172.18.0.1:43204 - "GET /opencode/read_file?session_id=ses_765c1b0d&file_path=%2Fapp%2Fopencode%2Fworkspace%2Fses_765c1b0d%2Ftest.html HTTP/1.1" 200 OK
+INFO:     172.18.0.1:43204 - "GET /opencode/read_file?session_id=ses_765c1b0d&file_path=%2Fapp%2Fopencode%2Fworkspace%2Fses_765c1b0d%2Ftest.html HTTP/1.1" 200 OK
+INFO:     172.18.0.1:47964 - "GET /opencode/events?session_id=ses_765c1b0d HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:57606 - "POST /opencode/session/ses_765c1b0d/message HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:57610 - "GET /opencode/events?session_id=ses_765c1b0d HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:57610 - "POST /opencode/session/ses_765c1b0d/message HTTP/1.1" 404 Not Found
+INFO:     172.18.0.1:57610 - "GET /opencode/events?session_id=ses_765c1b0d HTTP/1.1" 404 Not Found

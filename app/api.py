@@ -629,8 +629,8 @@ async def send_message(
         await broadcast_message_update(session_id, assistant_message)
 
         # 4. 后台执行 OpenCode CLI 任务 - 使用全局OpenCodeServerManager实现性能优化
-        # Import from managers module to avoid circular imports
-        from app.managers import get_opencode_server_manager
+        # Import from managers_internal module to avoid circular imports
+        from app.managers_internal import get_opencode_server_manager
         from .opencode_client import execute_opencode_message_with_manager
 
         workspace_base = os.path.abspath(
