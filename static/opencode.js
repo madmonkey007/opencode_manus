@@ -549,6 +549,16 @@ async function loadState() {
                                 }).catch(async (err) => {
                                     console.warn('[loadState] Deep load failed for', s.id, ':', err);
 
+                                    // If backend session is missing, stop retrying to avoid console spam
+                                    const isNotFound = (err && (err.status === 404 || (err.message && err.message.includes('404'))));
+                                    if (isNotFound) {
+                                        console.warn('[loadState] Session not found on backend, skipping deep load:', s.id);
+                                        s._missingRemote = true;
+                                        s._deepLoaded = true;
+                                        saveState();
+                                        return;
+                                    }
+
                                     // ✅ v=38.1修复：降级尝试timeline API（从steps表获取工具调用）
                                     if (typeof apiClient !== 'undefined' && apiClient.getTimeline) {
                                         try {

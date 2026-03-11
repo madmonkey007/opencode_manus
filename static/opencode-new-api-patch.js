@@ -823,6 +823,148 @@ window.Logger = {
         }
     }
 
+    // === Question Modal (blocking) ===
+    const questionQueue = [];
+    let activeQuestion = null;
+    let questionModal = null;
+
+    function setInputBlocked(blocked) {
+        const runBtn = document.getElementById('runStream');
+        const runBtnWelcome = document.getElementById('runStream-welcome');
+        const prompt = document.getElementById('prompt');
+        const promptWelcome = document.getElementById('prompt-welcome');
+        const promptBottom = document.getElementById('prompt-bottom');
+        const inputs = [prompt, promptWelcome, promptBottom];
+
+        if (runBtn) runBtn.disabled = blocked;
+        if (runBtnWelcome) runBtnWelcome.disabled = blocked;
+        inputs.forEach((el) => {
+            if (!el) return;
+            el.disabled = blocked;
+            if (blocked) {
+                el.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                el.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+    }
+
+    function normalizeQuestionPayload(data = {}) {
+        const input = data.input || {};
+        const question = data.question || input.question || input.prompt || data.title || '请回答以下问题';
+        const rawChoices = data.choices || input.choices || input.options || [];
+        const choices = Array.isArray(rawChoices)
+            ? rawChoices.map((c) => {
+                if (typeof c === 'string') return { label: c, value: c };
+                return { label: c.label || c.text || String(c.value || c.id || ''), value: c.value || c.id || c.label || c.text || '' };
+            }).filter(c => c.value !== '')
+            : [];
+        return { question, choices };
+    }
+
+    function enqueueQuestion(session, data) {
+        const payload = normalizeQuestionPayload(data);
+        questionQueue.push({ session, payload });
+        if (!activeQuestion) {
+            // Avoid UI re-render race; render in next tick
+            setTimeout(showNextQuestion, 0);
+        }
+    }
+
+    function showNextQuestion() {
+        if (activeQuestion || questionQueue.length === 0) return;
+        activeQuestion = questionQueue.shift();
+        renderQuestionModal(activeQuestion.session, activeQuestion.payload);
+    }
+
+    function closeQuestionModal() {
+        if (questionModal && questionModal.parentNode) {
+            questionModal.parentNode.removeChild(questionModal);
+        }
+        questionModal = null;
+        activeQuestion = null;
+        setInputBlocked(false);
+        showNextQuestion();
+    }
+
+    async function submitQuestionAnswer(sessionId, answer) {
+        if (!answer || !answer.trim()) return;
+        setInputBlocked(true);
+        try {
+            await window.apiClient.sendTextMessage(sessionId, answer.trim(), {
+                mode: window._currentMode || 'build'
+            });
+            closeQuestionModal();
+        } catch (err) {
+            console.error('[QuestionModal] Failed to send answer:', err);
+            alert('发送回答失败，请重试');
+            setInputBlocked(false);
+        }
+    }
+
+    function renderQuestionModal(session, payload) {
+        const { question, choices } = payload;
+        setInputBlocked(true);
+
+        questionModal = document.createElement('div');
+        // Use inline styles for critical layering/positioning to avoid missing Tailwind classes
+        questionModal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center p-4';
+        questionModal.style.position = 'fixed';
+        questionModal.style.top = '0';
+        questionModal.style.right = '0';
+        questionModal.style.bottom = '0';
+        questionModal.style.left = '0';
+        questionModal.style.zIndex = '9999';
+
+        const card = document.createElement('div');
+        card.className = 'bg-white dark:bg-zinc-900 rounded-lg w-full max-w-xl p-5 shadow-lg border border-gray-200 dark:border-gray-700';
+
+        const title = document.createElement('div');
+        title.className = 'text-base font-semibold text-gray-900 dark:text-gray-100 mb-2';
+        title.textContent = '需要你的选择';
+
+        const questionText = document.createElement('div');
+        questionText.className = 'text-sm text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap';
+        questionText.textContent = question;
+
+        const choicesContainer = document.createElement('div');
+        choicesContainer.className = 'flex flex-col gap-2 mb-4';
+
+        const input = document.createElement('textarea');
+        input.className = 'w-full min-h-[90px] p-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-zinc-800 text-sm text-gray-900 dark:text-gray-100';
+        input.placeholder = '请在此输入你的回答';
+
+        if (choices.length > 0) {
+            choices.forEach((c) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full text-left px-3 py-2 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-zinc-800 text-sm text-gray-800 dark:text-gray-200';
+                btn.textContent = c.label || c.value;
+                btn.onclick = () => {
+                    input.value = c.value || c.label || '';
+                };
+                choicesContainer.appendChild(btn);
+            });
+        } else {
+            const hint = document.createElement('div');
+            hint.className = 'text-xs text-gray-500 dark:text-gray-400';
+            hint.textContent = '未提供选项，请直接输入回答。';
+            choicesContainer.appendChild(hint);
+        }
+
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'w-full mt-2 px-4 py-2 rounded bg-black text-white dark:bg-white dark:text-black text-sm';
+        submitBtn.textContent = '提交回答';
+        submitBtn.onclick = () => submitQuestionAnswer(session.id, input.value);
+
+        card.appendChild(title);
+        card.appendChild(questionText);
+        card.appendChild(choicesContainer);
+        card.appendChild(input);
+        card.appendChild(submitBtn);
+        questionModal.appendChild(card);
+        document.body.appendChild(questionModal);
+    }
+
     /**
      * ✅ P1修复：清理thinking消息的辅助函数
      *
@@ -880,6 +1022,67 @@ window.Logger = {
     // 暴露到全局作用域，供事件处理函数调用
     window.addSystemMessage = addSystemMessage;
     window.cleanupThinkingMessage = cleanupThinkingMessage;
+
+    /**
+     * Append answer chunk text to session response with timeline filtering.
+     * Returns true if appended.
+     */
+    function appendAnswerChunk(s, text) {
+        if (!s || typeof text !== 'string' || text.length === 0) return false;
+
+        // ✅ v=33: 精确过滤timeline事件 - 避免误报AI的正常回复
+        // 问题：后端可能错误地把timeline信息包装成answer_chunk
+        const TIMELINE_PATTERNS = [
+            // 模式1: 完整的timeline事件格式
+            /^\s*Step ID:\s*[a-f0-9\-]+.*Action:\s*\w+.*$/mi,
+            // 模式2: Timeline event开头
+            /^\s*Timeline event:\s*\w+.*$/mi,
+            // 模式3: 多个timeline字段组合（至少2个）
+            /(?:Step ID:|Action:|tool_input:|file_path:|step_id:).*(?:Step ID:|Action:|tool_input:|file_path:)/mis
+        ];
+
+        // ✅ 重要：如果文本在markdown代码块中，不应该被过滤
+        // AI的正常代码会包含"write"、"read"等，但会在```中
+        const isInCodeBlock = /```\s*(?:javascript|python|json|bash|shell)?[\s\S]*?```/.test(text) ||
+            text.trim().startsWith('```') ||
+            text.includes('```代码');
+
+        let isTimelineEvent = false;
+        if (!isInCodeBlock && text.length > 0) {
+            // 只有不在代码块中，才检查是否是timeline事件
+            isTimelineEvent = TIMELINE_PATTERNS.some(pattern => pattern.test(text));
+        }
+
+        if (isTimelineEvent) {
+            // ✅ 保存完整内容到debug变量，便于调试
+            if (!window._debugFilteredTimeline) {
+                window._debugFilteredTimeline = [];
+            }
+            window._debugFilteredTimeline.push({
+                timestamp: Date.now(),
+                content: text,
+                preview: text.substring(0, 200)
+            });
+
+            console.warn('[NewAPI] ⚠️ Filtered structured timeline event from answer_chunk');
+            console.log('[NewAPI] Debug: Filtered content preview:', text.substring(0, 150));
+            console.log('[NewAPI] Debug: Total filtered events:', window._debugFilteredTimeline.length);
+
+            // 不添加到response中，跳过这段文本
+            return false;
+        }
+
+        // 支持多轮对话分隔符
+        const pSep = '\n\n---\n\n';
+        const rSep = '\n\n---\n\n**新的回答：**\n\n';
+        const pCount = (s.prompt || '').split(pSep).length - 1;
+        const rCount = (s.response || '').split(rSep).length - 1;
+        if (pCount > rCount) {
+            s.response += rSep;
+        }
+        s.response += text;
+        return true;
+    }
 
     /**
      * ✅ 修复3：节流版本的状态更新函数 - 限制DOM更新频率（每500ms最多更新一次）
@@ -1740,64 +1943,12 @@ window.Logger = {
             }
 
             if (adapted.type === 'answer_chunk') {
-                // ✅ v=33: 精确过滤timeline事件 - 避免误报AI的正常回复
-                // 问题：后端可能错误地把timeline信息包装成answer_chunk
                 const text = adapted.text || '';
-
-                // ✅ 改进：使用结构化模式匹配，而不是简单的关键词搜索
-                // Timeline事件通常有以下特征：
-                // 1. 以"Step ID:"或"Timeline event:"开头
-                // 2. 包含结构化的字段（Action:, tool_input:, file_path:等）
-                // 3. 通常不在markdown代码块中（AI的正常代码会在```中）
-                const TIMELINE_PATTERNS = [
-                    // 模式1: 完整的timeline事件格式
-                    /^\s*Step ID:\s*[a-f0-9\-]+.*Action:\s*\w+.*$/mi,
-                    // 模式2: Timeline event开头
-                    /^\s*Timeline event:\s*\w+.*$/mi,
-                    // 模式3: 多个timeline字段组合（至少2个）
-                    /(?:Step ID:|Action:|tool_input:|file_path:|step_id:).*(?:Step ID:|Action:|tool_input:|file_path:)/mis
-                ];
-
-                // ✅ 重要：如果文本在markdown代码块中，不应该被过滤
-                // AI的正常代码会包含"write"、"read"等，但会在```中
-                const isInCodeBlock = /```\s*(?:javascript|python|json|bash|shell)?[\s\S]*?```/.test(text) ||
-                    text.trim().startsWith('```') ||
-                    text.includes('```代码');
-
-                let isTimelineEvent = false;
-                if (!isInCodeBlock && text.length > 0) {
-                    // 只有不在代码块中，才检查是否是timeline事件
-                    isTimelineEvent = TIMELINE_PATTERNS.some(pattern => pattern.test(text));
+                const appended = appendAnswerChunk(s, text);
+                if (appended) {
+                    s._hasAnswerChunk = true;
+                    s._usingThoughtAsAnswer = false;
                 }
-
-                if (isTimelineEvent) {
-                    // ✅ 保存完整内容到debug变量，便于调试
-                    if (!window._debugFilteredTimeline) {
-                        window._debugFilteredTimeline = [];
-                    }
-                    window._debugFilteredTimeline.push({
-                        timestamp: Date.now(),
-                        content: text,
-                        preview: text.substring(0, 200)
-                    });
-
-                    console.warn('[NewAPI] ⚠️ Filtered structured timeline event from answer_chunk');
-                    console.log('[NewAPI] Debug: Filtered content preview:', text.substring(0, 150));
-                    console.log('[NewAPI] Debug: Total filtered events:', window._debugFilteredTimeline.length);
-
-                    // 不添加到response中，跳过这段文本
-                    return;
-                }
-
-                // 支持多轮对话分隔符
-                const pSep = '\n\n---\n\n';
-                const rSep = '\n\n---\n\n**新的回答：**\n\n';
-                const pCount = (s.prompt || '').split(pSep).length - 1;
-                const rCount = (s.response || '').split(rSep).length - 1;
-                if (pCount > rCount) {
-                    s.response += rSep;
-                }
-                s.response += text;
             } else if (adapted.type === 'phases_init') {
                 // 处理阶段初始化
                 const currentTurnIndex = window._turnIndex || 0;
@@ -2023,6 +2174,14 @@ window.Logger = {
                             window.addSystemMessage(`✅ 任务完成 - 完成${completedPhases}个阶段，执行${totalActions}次工具调用`, 'success');
                         }
 
+                        // Fallback: only if no answer chunks, use last thought at completion
+                        if (!s._hasAnswerChunk && s._lastThoughtContent) {
+                            console.warn('[NewAPI] Fallback: using last thought as answer on completion');
+                            if (appendAnswerChunk(s, s._lastThoughtContent)) {
+                                s._hasAnswerChunk = true;
+                            }
+                        }
+
                         // ✅ v=33: 强制刷新UI，绕过节流确保总结立即显示
                         try {
                             // 检查是否有原始的renderResults（非节流版本）
@@ -2206,6 +2365,11 @@ window.Logger = {
                             console.log('[NewAPI] Thought added to thoughtEvents (no active phase), total:', s.thoughtEvents.length);
                         }
 
+                        // Store last thought for fallback use only if final answer is missing
+                        if (content) {
+                            s._lastThoughtContent = content;
+                        }
+
                         // ✅ 触发渲染，确保thought实时显示
                         throttledRenderResults();
 
@@ -2215,6 +2379,16 @@ window.Logger = {
                         // 显示工具操作
                         const output = data.output || '';
                         const toolLower = toolName.toLowerCase();
+
+                        if (toolLower === 'question') {
+                            try {
+                                enqueueQuestion(s, adapted.data || data);
+                                console.log('[NewAPI] Queued question tool for session:', s.id);
+                            } catch (err) {
+                                console.error('[NewAPI] Failed to enqueue question:', err);
+                            }
+                            return;
+                        }
 
                         if (toolLower === 'read') {
                             // read 工具 - 显示文件内容

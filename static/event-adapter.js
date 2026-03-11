@@ -7,6 +7,21 @@
 
 class EventAdapter {
     /**
+     * Best-effort extract text from a part payload.
+     * Different backends may use different shapes.
+     */
+    static extractText(part) {
+        if (!part) return '';
+        const content = part.content;
+        if (typeof content === 'string') return content;
+
+        const text = content?.text ?? content?.content ?? content?.value;
+        if (typeof text === 'string') return text;
+
+        if (typeof part.text === 'string') return part.text;
+        return '';
+    }
+    /**
      * 将新 API 事件转换为前端格式
      * @param {Object} newEvent - 新 API 事件
      * @param {Object} session - 当前会话对象
@@ -306,7 +321,7 @@ class EventAdapter {
         if (partType === 'text') {
             return {
                 type: 'answer_chunk',
-                text: part.content?.text || '',
+                text: this.extractText(part),
                 message_id: part.message_id
             };
         }
@@ -327,6 +342,7 @@ class EventAdapter {
             const toolName = content.tool || 'unknown';
             const state = content.state || {};
             const status = state.status || 'running';
+            const callId = content.call_id || part.call_id || part.callID || part.id;
 
             // 跳过 todowrite 工具（前端已处理）
             if (toolName === 'todowrite') {
@@ -341,10 +357,10 @@ class EventAdapter {
             const title = metadata.title || (isThought ? 'Thinking' : `Using ${toolName}`);
 
             const adaptedEvent = {
-                id: part.id,
+                id: callId || part.id,
                 type: 'action',  // ✅ 修复：统一使用 'action' 类型，确保被 session.actions 捕获
                 data: {
-                    id: part.id,
+                    id: callId || part.id,
                     tool: toolType,
                     tool_name: toolName,
                     title: title,
