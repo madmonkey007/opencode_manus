@@ -13,6 +13,8 @@ import os
 import re
 import platform
 import sys
+import time
+import httpx
 from typing import AsyncGenerator, Dict, Any, Optional, List
 from datetime import datetime
 
@@ -42,6 +44,9 @@ except ImportError:
 
 logger = logging.getLogger("opencode.client")
 
+# Server API session reuse: map app session_id -> server session_id
+_SERVER_SESSION_ID_MAP: Dict[str, str] = {}
+
 # ✅ 修复可维护性：提取CLI事件相关的常量（避免魔法字符串）
 CLI_EVENT_TYPE_TOOL_USE = 'tool_use'
 CLI_EVENT_TYPE_TOOL_RESULT = 'tool_result'
@@ -54,7 +59,7 @@ PART_TYPE_THOUGHT = 'thought'
 # ✅ 已知工具白名单（用于安全验证）
 KNOWN_TOOLS = [
     'read', 'write', 'edit', 'bash', 'grep', 'task', 'todowrite',
-    'search', 'browse', 'run_server', 'file_editor'
+    'search', 'browse', 'run_server', 'file_editor', 'common_search__search'
 ]
 
 # ✅ JSON大小限制（防止DoS）
@@ -87,6 +92,8 @@ class OpenCodeClient:
         """
         self.workspace_base = workspace_base
         os.makedirs(workspace_base, exist_ok=True)
+        # Default to the local opencode serve HTTP endpoint.
+        self.server_api_base_url = os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
 
         # 尝试初始化 history_service
         try:
@@ -95,6 +102,185 @@ class OpenCodeClient:
         except Exception as e:
             logger.warning(f"Failed to initialize history service: {e}")
             self.history_service = None
+        # Sessions that already emitted tool-based previews via global SSE
+        self._skip_preview_sessions = set()
+
+    def _extract_session_id_from_payload(self, payload: Dict[str, Any]) -> Optional[str]:
+        props = payload.get("properties") or {}
+        if isinstance(props, dict) and props.get("sessionID"):
+            return props.get("sessionID")
+        info = props.get("info") or {}
+        if isinstance(info, dict) and info.get("sessionID"):
+            return info.get("sessionID")
+        part = props.get("part") or {}
+        if isinstance(part, dict) and part.get("sessionID"):
+            return part.get("sessionID")
+        if payload.get("type", "").startswith("question") and props.get("sessionID"):
+            return props.get("sessionID")
+        return None
+
+    def _normalize_server_event(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if not payload or "type" not in payload:
+            return None
+
+        etype = payload.get("type")
+        props = payload.get("properties") or {}
+
+        if etype == "question.asked":
+            try:
+                questions = props.get("questions") or []
+                if questions:
+                    q = questions[0] or {}
+                    tool_meta = props.get("tool") or {}
+                    input_data = {
+                        "question": q.get("question") or q.get("header") or "请回答以下问题",
+                        "choices": [
+                            {"label": opt.get("label"), "value": opt.get("label")}
+                            for opt in (q.get("options") or [])
+                            if opt.get("label")
+                        ],
+                    }
+                    part = {
+                        "id": props.get("id") or generate_part_id("tool_question"),
+                        "session_id": props.get("sessionID"),
+                        "message_id": tool_meta.get("messageID"),
+                        "type": "tool",
+                        "content": {
+                            "tool": "question",
+                            "call_id": tool_meta.get("callID") or props.get("id"),
+                            "state": {"status": "completed", "input": input_data},
+                            "text": "",
+                        },
+                        "metadata": {
+                            "title": "Question",
+                            "input": input_data,
+                            "status": "completed",
+                        },
+                        "time": {"start": int(datetime.now().timestamp())},
+                    }
+                    return {
+                        "type": "message.part.updated",
+                        "properties": {"part": part},
+                    }
+            except Exception:
+                return None
+            return None
+
+        if etype == "todo.updated":
+            todos = props.get("todos") or []
+            part = {
+                "id": generate_part_id("tool_todowrite"),
+                "session_id": props.get("sessionID"),
+                "message_id": None,
+                "type": "tool",
+                "content": {
+                    "tool": "todowrite",
+                    "call_id": generate_part_id("call_todowrite"),
+                    "state": {"status": "completed", "input": {"todos": todos}},
+                    "text": "",
+                },
+                "metadata": {
+                    "title": "Todo",
+                    "input": {"todos": todos},
+                    "status": "completed",
+                },
+                "time": {"start": int(datetime.now().timestamp())},
+            }
+            return {"type": "message.part.updated", "properties": {"part": part}}
+
+        if etype == "message.part.updated":
+            part = props.get("part") or {}
+            if not isinstance(part, dict):
+                return payload
+
+            part_type = part.get("type")
+            if part_type == "reasoning":
+                part["type"] = "thought"
+                if "content" not in part:
+                    part["content"] = {"text": part.get("text", "")}
+            if part_type == "text" and "content" not in part:
+                part["content"] = {"text": part.get("text", "")}
+            if part_type == "tool":
+                state = part.get("state") or {}
+                tool_name = part.get("tool") or "unknown"
+                call_id = part.get("callID") or part.get("callId") or part.get("id")
+                content = {
+                    "tool": tool_name,
+                    "call_id": call_id,
+                    "state": state,
+                    "text": state.get("output", ""),
+                }
+                metadata = part.get("metadata") or {}
+                if "input" not in metadata:
+                    metadata["input"] = state.get("input", {})
+                if "status" not in metadata:
+                    metadata["status"] = state.get("status")
+                part["content"] = content
+                part["metadata"] = metadata
+            payload["properties"]["part"] = part
+            return payload
+
+        return payload
+
+    async def _bridge_global_events(
+        self,
+        base_url: str,
+        request_params: Dict[str, Any],
+        server_session_id: str,
+        session_id: str,
+        assistant_message_id: str,
+        stop_event: asyncio.Event,
+        state: Dict[str, Any],
+    ) -> None:
+        url = f"{base_url}/global/event"
+        try:
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream("GET", url, params=request_params) as resp:
+                    resp.raise_for_status()
+                    data_buf: List[str] = []
+                    async for line in resp.aiter_lines():
+                        if stop_event.is_set():
+                            break
+                        if not line:
+                            if not data_buf:
+                                continue
+                            data_str = "\n".join(data_buf).strip()
+                            data_buf = []
+                            if not data_str or data_str == "[DONE]":
+                                continue
+                            try:
+                                event = json.loads(data_str)
+                            except Exception:
+                                continue
+                            payload = event.get("payload") or event
+                            sid = self._extract_session_id_from_payload(payload)
+                            if sid != server_session_id:
+                                continue
+                            normalized = self._normalize_server_event(payload)
+                            if normalized:
+                                # Track tool events to avoid duplicate previews later
+                                try:
+                                    if normalized.get("type") == "message.part.updated":
+                                        part = (normalized.get("properties") or {}).get("part") or {}
+                                        if part.get("type") == "tool":
+                                            state["saw_tool"] = True
+                                except Exception:
+                                    pass
+                                await self._broadcast_event(session_id, normalized)
+                                state["events"] += 1
+                                if normalized.get("type") == "message.updated":
+                                    info = (normalized.get("properties") or {}).get("info") or {}
+                                    if info.get("id") == assistant_message_id and info.get("time", {}).get("completed"):
+                                        stop_event.set()
+                                        break
+                            continue
+                        if line.startswith(":"):
+                            continue
+                        if line.startswith("data:"):
+                            data_buf.append(line[5:].lstrip())
+        except Exception as e:
+            logger.warning(f"[SERVER_API] Global event stream failed: {e}")
+            state["failed"] = True
 
     async def execute_message(
         self,
@@ -172,6 +358,41 @@ class OpenCodeClient:
                 },
             )
 
+            # Prefer Server API execution path, fallback to CLI if it fails.
+            server_api_ok = await self._execute_via_server_api(
+                session_id=session_id,
+                assistant_message_id=assistant_message_id,
+                user_prompt=user_prompt,
+                mode=mode,
+                model_id=model_id,
+            )
+            if server_api_ok:
+                await self._scan_and_preview_new_files(
+                    session_id, assistant_message_id, session_dir, initial_files
+                )
+                with open(status_file, "w", encoding="utf-8") as f:
+                    f.write("completed")
+
+                await self._broadcast_event(
+                    session_id,
+                    {
+                        "type": "message.updated",
+                        "properties": {
+                            "info": {
+                                "id": assistant_message_id,
+                                "time": {
+                                    "created": int(datetime.now().timestamp()),
+                                    "completed": int(datetime.now().timestamp()),
+                                },
+                            }
+                        },
+                    },
+                )
+                logger.info(
+                    f"Message {assistant_message_id} completed via server API"
+                )
+                return
+
             # 环境和路径检测
             is_windows = platform.system() == "Windows"
 
@@ -205,49 +426,66 @@ class OpenCodeClient:
             # 构建命令行
             safe_prompt = shlex.quote(user_prompt)
             agent_flag = f" --agent {mode}" if mode in ["plan", "build"] else ""
-
-            # ✅ v=38.4.4修复：不传递session参数给CLI
-            # 原因：CLI查询session表，Python写入sessions表（表名不同，schema不兼容）
-            # 让CLI创建自己的session，避免"Session not found"错误
-            # 注意：Python和CLI将使用不同的session ID，这是正常的
-            session_flag = ""
-
-            # ✅ 修复：正确拼接命令参数
-            # safe_prompt 已经被 shlex.quote() 处理，包含引号，需要放在最后
-            inner_cmd = f"opencode run --model {model_id} --format json --thinking{agent_flag}{session_flag} {safe_prompt}"
+            
+            # ✅ Phase 1 修复：使用--attach参数附加到运行中的opencode serve服务器
+            # 强制使用127.0.0.1避免localhost解析问题
+            # 
+            # ⚠️ 已修复：通过分离stderr/stdout和容错解析，现在可以获取完整输出
+            attach_flag = " --attach http://127.0.0.1:4096"  # ✅ 重新启用--attach
+            
+            # 传递session参数以保持会话连贯性
+            session_flag = f" --session {session_id}"
+            
+            # 设置session标题
+            title_flag = f" --title {shlex.quote(user_prompt[:50])}"
+            
+            # ✅ Phase 1 修复：正确拼接命令参数
+            inner_cmd = f"opencode run --model {model_id} --format json --thinking{agent_flag}{attach_flag}{session_flag}{title_flag} {safe_prompt}"
 
             # 添加调试日志
-            logger.info(f"CLI command - Mode: '{mode}', Python Session: '{session_id}', Agent flag: '{agent_flag}', Full cmd: {inner_cmd[:200]}...")
+            logger.info(f"CLI command - Mode: '{mode}', Python Session: '{session_id}', Agent flag: '{agent_flag}', Attach: '{attach_flag}', Full cmd: {inner_cmd[:200]}...")
 
-            if is_windows:
-                # Windows 不需要 script 命令且路径不同
-                cmd = ["cmd", "/c", inner_cmd]
-            else:
-                # Linux/Docker 使用 script 伪终端
-                cmd = ["script", "-q", "-c", inner_cmd, "/dev/null"]
 
-            logger.info(
-                f"Starting CLI process (Platform: {platform.system()}): {inner_cmd[:100]}..."
+            # ✅ Phase 1 修复：使用list参数构建命令，避免shell解析问题
+            # 构建命令参数
+            cmd = [
+                "opencode", "run",
+                "--attach", "http://127.0.0.1:4096",  # 核心：复用Server
+                "--model", model_id,
+                "--format", "json",
+                "--thinking",
+                "--agent", mode,
+                "--session", session_id,
+                "--title", user_prompt[:50],
+                user_prompt
+            ]
+            
+            logger.info(f"[CLI Command] {' '.join(cmd)}")
+
+            # ✅ Phase 1 修复：分离stderr和stdout，避免JSON流被污染
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,  # ✅ 分离stderr
+                cwd=session_dir,
+                env=env,
             )
+            logger.info(f"[CLI Process] Started with PID: {process.pid}")
 
-            # 启动进程
-            try:
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                    cwd=session_dir,
-                    env=env,
-                )
-            except FileNotFoundError as fnf:
-                logger.error(f"Failed to start process: Command not found ({cmd[0]})")
-                raise RuntimeError(f"CLI tool not found: {cmd[0]}")
-            except Exception as pe:
-                logger.error(f"Failed to start subprocess: {pe}")
-                raise
+            # ✅ Phase 1 新增：异步读取stderr日志，不干扰主流程
+            async def log_stderr():
+                async for err_line in process.stderr:
+                    err_text = err_line.decode('utf-8', errors='ignore').strip()
+                    if err_text:
+                        logger.warning(f"[CLI stderr] {err_text}")
+            
+            asyncio.create_task(log_stderr())
+
 
             # 解析输出并生成事件
             line_count = 0
+            event_count = 0
+            
             # 使用本地会话上下文追踪当前活跃步骤，确保 ID 一致性
             # 并根据模式动态设置默认标题
             default_title = (
@@ -261,32 +499,83 @@ class OpenCodeClient:
                 "mode": mode,
             }
 
+            # ✅ Phase 5 修复：增加超时时间到120秒（opencode serve启动需要51秒）
+            READ_TIMEOUT = 120.0
+            last_output_time = time.time()
+
             if process.stdout is not None:
                 logger.info(
-                    f"Starting to read stdout for message {assistant_message_id}"
+                    f"[CLI Stream] Starting to read stdout for message {assistant_message_id}..."
                 )
-                async for line in process.stdout:
-                    line_text = line.decode(errors="ignore").strip()
-                    if not line_text:
-                        continue
+                
+                try:
+                    while True:
+                        # ✅ Phase 1 新增：使用wait_for实现超时检测
+                        line = await asyncio.wait_for(
+                            process.stdout.readline(),
+                            timeout=READ_TIMEOUT
+                        )
+                        
+                        # 更新最后输出时间
+                        last_output_time = time.time()
+                        
+                        if not line:  # EOF (进程结束)
+                            break
+                        
+                        line_text = line.decode(errors="ignore").strip()
+                        if not line_text:
+                            continue
 
-                    line_count += 1
-                    logger.info(f"Processing line {line_count}: {line_text[:100]}")
+                        line_count += 1
+                        logger.info(f"Processing line {line_count}: {line_text[:100]}")
 
-                    # 写入日志文件
-                    with open(log_file, "a", encoding="utf-8") as f:
-                        f.write(line_text + "\n")
+                        # 写入日志文件
+                        with open(log_file, "a", encoding="utf-8") as f:
+                            f.write(line_text + "\n")
 
-                    # 解析并生成事件
-                    try:
-                        async for event in self._process_line(
-                            line_text, session_id, assistant_message_id, session_context
-                        ):
-                            logger.info(f"Yielded event type: {event.get('type')}")
-                            await self._broadcast_event(session_id, event)
+                        # ✅ Phase 1 新增：容错JSON解析
+                        # 跳过警告和错误行（不以{开头）
+                        if line_text.startswith('!') or line_text.startswith('[WARN') or line_text.startswith('[ERROR') or not line_text.startswith('{'):
+                            logger.info(f"[CLI Non-JSON Output] {line_text[:100]}")
+                            continue
+                        
+                        # 解析并生成事件
+                        try:
+                            async for event in self._process_line(
+                                line_text, session_id, assistant_message_id, session_context
+                            ):
+                                event_type = event.get('type', 'unknown')
+                                logger.info(f"[Yielded event type: {event_type}] to session {session_id}")
+                                await self._broadcast_event(session_id, event)
+                                event_count += 1
 
-                    except Exception as e:
-                        logger.error(f"Error processing line {line_count}: {e}")
+                        except Exception as e:
+                            logger.error(f"Error processing line {line_count}: {e}")
+                
+                except asyncio.TimeoutError:
+                    logger.error(f"[CLI Timeout] No output for {READ_TIMEOUT}s. Terminating PID {process.pid}.")
+                    
+                    # ✅ Phase 4 修复：强制击杀，避免僵尸进程阻塞
+                    if process is not None:
+                        try:
+                            logger.warning(f"[CLI Timeout] Force killing PID {process.pid}...")
+                            process.kill()  # 直接kill，不用terminate
+                            await asyncio.sleep(1)  # 等待进程退出
+                            
+                            # 检查进程是否已退出
+                            if process.returncode is None:
+                                logger.error(f"[CLI Timeout] Process {process.pid} still alive after kill, waiting...")
+                                await asyncio.sleep(2)
+                                if process.returncode is None:
+                                    logger.error(f"[CLI Timeout] Process {process.pid} FAILED to terminate, may be zombie")
+                            else:
+                                logger.info(f"[CLI Timeout] Process {process.pid} terminated successfully (code={process.returncode})")
+                        except ProcessLookupError:
+                            logger.info(f"[CLI Timeout] Process {process.pid} already terminated")
+                        except Exception as cleanup_error:
+                            logger.error(f"[CLI Timeout] Error during cleanup: {cleanup_error}")
+                except Exception as e:
+                    logger.error(f"[CLI Unexpected Error] {e}", exc_info=True)
 
             # 等待进程结束
             return_code = await process.wait()
@@ -518,7 +807,7 @@ class OpenCodeClient:
                             # ✅ 修复正确性：验证工具名称
                             if tool_name == 'unknown':
                                 logger.warning(f"[_process_line] Missing tool name in part: {part.get('tool')}")
-                            elif tool_name not in KNOWN_TOOLS:
+                            elif tool_name not in KNOWN_TOOLS and not tool_name.startswith('common_search__'):
                                 logger.info(f"[_process_line] Unknown tool: {tool_name}")
                             
                             # ✅ 修复正确性：正确处理timestamp（避免0被替换）
@@ -714,7 +1003,8 @@ class OpenCodeClient:
             logger.warning(f"[_handle_tool_use_event] Missing 'state' in part for tool={tool_name}. Keys: {part.keys()}")
 
         status = state.get("status")
-        input_data = part.get("input", {})
+        # Prefer explicit part.input, fallback to state.input for server API parts
+        input_data = part.get("input") or state.get("input") or {}
         output = state.get("output", "")
 
         # 调试：打印完整的 part 结构
@@ -1146,6 +1436,36 @@ class OpenCodeClient:
             },
         }
 
+    async def _handle_tool_result_event(
+        self, event: Dict[str, Any], session_id: str, message_id: str
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """处理 tool_result 事件"""
+        part = event.get("part", {})
+        tool_name = part.get("tool", "tool")
+        state = part.get("state", {})
+        input_data = state.get("input", {}) or {}
+        output_data = state.get("output", "") or ""
+
+        yield {
+            "type": "message.part.updated",
+            "properties": {
+                "part": {
+                    "id": generate_part_id("tool"),
+                    "session_id": session_id,
+                    "message_id": message_id,
+                    "type": "tool",
+                    "tool": tool_name,
+                    "state": {
+                        "status": "completed",
+                        "input": input_data,
+                        "output": output_data,
+                    },
+                    "content": {"text": str(output_data)},
+                    "time": {"start": int(datetime.now().timestamp())},
+                }
+            },
+        }
+
     async def _handle_step_finish_event(
         self,
         event: Dict[str, Any],
@@ -1287,9 +1607,26 @@ class OpenCodeClient:
 
             logger.info(f"[FILE_SCAN] Found {len(new_files)} new files: {new_files}")
 
+            # If tool-based previews already streamed, only emit file_generated
+            emit_preview = session_id not in self._skip_preview_sessions
+
             # 为每个新文件生成预览事件
             for filename in sorted(new_files):
                 file_path = os.path.join(session_dir, filename)
+
+                if not emit_preview:
+                    await self._broadcast_event(
+                        session_id,
+                        {
+                            "type": "file_generated",
+                            "file": {
+                                "name": filename,
+                                "path": f"/app/opencode/workspace/{session_id}/{filename}",
+                                "type": filename.split(".")[-1].lower() if "." in filename else "unknown",
+                            },
+                        },
+                    )
+                    continue
 
                 # 读取文件内容
                 try:
@@ -1311,6 +1648,9 @@ class OpenCodeClient:
                     status="completed"
                 )
                 logger.info(f"[FILE_SCAN] Generated preview for {filename}")
+
+            if not emit_preview and session_id in self._skip_preview_sessions:
+                self._skip_preview_sessions.discard(session_id)
 
         except Exception as e:
             logger.error(f"[FILE_SCAN] Error scanning new files: {e}")
@@ -1342,6 +1682,382 @@ class OpenCodeClient:
         except Exception as e:
             logger.error(f"Failed to broadcast event: {e}")
 
+    async def _execute_via_server_api(
+        self,
+        session_id: str,
+        assistant_message_id: str,
+        user_prompt: str,
+        mode: str,
+        model_id: str,
+    ) -> bool:
+        """
+        Execute message via opencode serve HTTP API.
+
+        Returns:
+            True if server API succeeds and events are broadcast, otherwise False.
+        """
+        use_server_api = os.getenv("OPENCODE_USE_SERVER_API", "true").lower() == "true"
+        if not use_server_api:
+            logger.info("[SERVER_API] Disabled via OPENCODE_USE_SERVER_API")
+            return False
+
+        base_url = self.server_api_base_url.rstrip("/")
+        logger.info(f"[SERVER_API] Attempting server API execution at {base_url}")
+        timeout = httpx.Timeout(300.0, connect=10.0)
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                session_dir = os.path.join(self.workspace_base, session_id)
+                os.makedirs(session_dir, exist_ok=True)
+                request_params = {
+                    "directory": session_dir,
+                    "workspace": session_id,
+                }
+
+                # Health check (retry to allow server warmup)
+                health_ok = False
+                for attempt in range(10):
+                    for health_path in ["/global/health", "/opencode/health"]:
+                        health_url = f"{base_url}{health_path}"
+                        try:
+                            health_response = await client.get(health_url)
+                            if health_response.status_code == 200:
+                                health_ok = True
+                                break
+                        except Exception:
+                            continue
+                    if health_ok:
+                        break
+                    await asyncio.sleep(1)
+                if not health_ok:
+                    logger.warning("[SERVER_API] Health check failed for all endpoints")
+                    return False
+
+                async def _create_server_session() -> Optional[str]:
+                    title = user_prompt[:100] if user_prompt else "New Session"
+                    session_payload = {"title": title}
+                    session_response = await client.post(
+                        f"{base_url}/session", json=session_payload, params=request_params
+                    )
+                    session_response.raise_for_status()
+                    session_data = session_response.json()
+                    new_server_session_id = (
+                        session_data.get("id")
+                        or session_data.get("session_id")
+                        or session_data.get("sessionID")
+                    )
+                    if not new_server_session_id:
+                        logger.error(
+                            f"[SERVER_API] Missing session id in response: {session_data}"
+                        )
+                        return None
+                    _SERVER_SESSION_ID_MAP[session_id] = new_server_session_id
+                    logger.info(
+                        f"[SERVER_API] Created and bound server session {new_server_session_id} for {session_id}"
+                    )
+                    return new_server_session_id
+
+                # Reuse server session if available; otherwise create once
+                server_session_id = _SERVER_SESSION_ID_MAP.get(session_id)
+                if server_session_id:
+                    logger.info(
+                        f"[SERVER_API] Reusing server session {server_session_id} for {session_id}"
+                    )
+                else:
+                    server_session_id = await _create_server_session()
+                    if not server_session_id:
+                        return False
+
+                # Start global event bridge (real-time SSE)
+                sse_state = {"events": 0, "failed": False, "saw_tool": False}
+                stop_event = asyncio.Event()
+                stream_task = asyncio.create_task(
+                    self._bridge_global_events(
+                        base_url,
+                        request_params,
+                        server_session_id,
+                        session_id,
+                        assistant_message_id,
+                        stop_event,
+                        sse_state,
+                    )
+                )
+
+                # Send message
+                agent_mode = mode if mode in ["plan", "build"] else "build"
+                if "/" in model_id:
+                    provider_id, model_name = model_id.split("/", 1)
+                else:
+                    provider_id, model_name = "openai", model_id
+                message_payload = {
+                    "messageID": assistant_message_id,
+                    "model": {"providerID": provider_id, "modelID": model_name},
+                    "agent": agent_mode,
+                    "parts": [{"type": "text", "text": user_prompt}],
+                }
+                request_start_ts = int(datetime.now().timestamp())
+                def _flatten_assistant_parts(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+                    parts_acc: List[Dict[str, Any]] = []
+                    for msg in messages or []:
+                        info = msg.get("info") or {}
+                        if info.get("role") != "assistant":
+                            continue
+                        msg_parts = msg.get("parts") or []
+                        parts_acc.extend(msg_parts)
+                    return parts_acc
+
+                async def _poll_parts() -> List[Dict[str, Any]]:
+                    parts = []
+                    for _ in range(60):
+                        await asyncio.sleep(2)
+                        try:
+                            messages_resp = await client.get(
+                                f"{base_url}/session/{server_session_id}/message",
+                                params={**request_params, "limit": 20},
+                            )
+                            if messages_resp.status_code != 200:
+                                continue
+                            messages = messages_resp.json()
+                            parts = _flatten_assistant_parts(messages)
+                            if parts:
+                                break
+                        except Exception:
+                            continue
+                    return parts
+
+                parts = None
+                try:
+                    message_response = await client.post(
+                        f"{base_url}/session/{server_session_id}/message",
+                        json=message_payload,
+                        params=request_params,
+                    )
+                    message_response.raise_for_status()
+                    message_data = message_response.json()
+
+                    parts = message_data.get("parts")
+                    if not parts and isinstance(message_data, dict):
+                        parts = message_data.get("message", {}).get("parts")
+                    # If POST response has no tool parts, fetch full message list
+                    if parts is not None:
+                        has_tool = any(p.get("type") == "tool" for p in parts if isinstance(p, dict))
+                    else:
+                        has_tool = False
+                    if not parts or not has_tool:
+                        try:
+                            messages_resp = await client.get(
+                                f"{base_url}/session/{server_session_id}/message",
+                                params={**request_params, "limit": 20},
+                            )
+                            if messages_resp.status_code == 200:
+                                parts = _flatten_assistant_parts(messages_resp.json())
+                        except Exception:
+                            pass
+                except httpx.HTTPStatusError as e:
+                    if e.response is not None and e.response.status_code == 404:
+                        logger.warning(
+                            f"[SERVER_API] Session {server_session_id} not found, recreating..."
+                        )
+                        server_session_id = await _create_server_session()
+                        if not server_session_id:
+                            return False
+                        # restart SSE bridge with new session id
+                        stop_event.set()
+                        try:
+                            await asyncio.wait_for(stream_task, timeout=2)
+                        except Exception:
+                            stream_task.cancel()
+                        stop_event = asyncio.Event()
+                        stream_task = asyncio.create_task(
+                            self._bridge_global_events(
+                                base_url,
+                                request_params,
+                                server_session_id,
+                                session_id,
+                                assistant_message_id,
+                                stop_event,
+                                sse_state,
+                            )
+                        )
+                        message_response = await client.post(
+                            f"{base_url}/session/{server_session_id}/message",
+                            json=message_payload,
+                            params=request_params,
+                        )
+                        message_response.raise_for_status()
+                        message_data = message_response.json()
+                        parts = message_data.get("parts")
+                        if not parts and isinstance(message_data, dict):
+                            parts = message_data.get("message", {}).get("parts")
+                        if not parts:
+                            try:
+                                messages_resp = await client.get(
+                                    f"{base_url}/session/{server_session_id}/message",
+                                    params={**request_params, "limit": 20},
+                                )
+                                if messages_resp.status_code == 200:
+                                    parts = _flatten_assistant_parts(messages_resp.json())
+                            except Exception:
+                                pass
+                except httpx.ReadTimeout as e:
+                    logger.warning(
+                        f"[SERVER_API] Message request timed out after {timeout.read}s, polling messages... ({type(e).__name__})"
+                    )
+                    parts = await _poll_parts()
+                except httpx.HTTPError as e:
+                    logger.error(
+                        f"[SERVER_API] HTTP error during message request: {type(e).__name__} {e!r}"
+                    )
+                    parts = await _poll_parts()
+
+                # Stop SSE bridge after message completes
+                stop_event.set()
+                try:
+                    await asyncio.wait_for(stream_task, timeout=5)
+                except Exception:
+                    stream_task.cancel()
+
+                # If SSE yielded events, skip manual part broadcasting to avoid duplicates
+                if sse_state.get("events", 0) > 0 and not sse_state.get("failed", False):
+                    parts = None
+                    if sse_state.get("saw_tool"):
+                        self._skip_preview_sessions.add(session_id)
+
+                if not parts:
+                    logger.warning(
+                        f"[SERVER_API] No parts returned for session {server_session_id}, polling messages..."
+                    )
+                    parts = await _poll_parts()
+
+                if not parts:
+                    logger.warning(
+                        f"[SERVER_API] No parts available after polling for session {server_session_id}"
+                    )
+                    return False
+
+                now_ts = int(datetime.now().timestamp())
+                step_context = {"mode": agent_mode}
+                for part in parts:
+                    part_type = part.get("type") or PART_TYPE_TEXT
+                    mapped_type = PART_TYPE_THOUGHT if part_type == "reasoning" else part_type
+                    if part_type == "tool":
+                        tool_name = part.get("tool") or ""
+                        state = part.get("state") or {}
+                        status = state.get("status")
+                        input_data = state.get("input") or {}
+                        output_data = state.get("output") or ""
+
+                        if status in ["pending", "running"]:
+                            async for event in self._handle_tool_use_event(
+                                {
+                                    "type": "tool_use",
+                                    "part": {
+                                        "tool": tool_name,
+                                        "state": {"status": status, "input": input_data},
+                                    },
+                                },
+                                session_id,
+                                assistant_message_id,
+                            ):
+                                await self._broadcast_event(session_id, event)
+                            continue
+
+                        if status == "completed":
+                            # 先发送 tool_use，确保前端和数据库记录工具调用
+                            async for event in self._handle_tool_use_event(
+                                {
+                                    "type": "tool_use",
+                                    "part": {
+                                        "tool": tool_name,
+                                        "state": {"status": "running", "input": input_data},
+                                    },
+                                },
+                                session_id,
+                                assistant_message_id,
+                            ):
+                                await self._broadcast_event(session_id, event)
+                            async for event in self._handle_tool_result_event(
+                                {
+                                    "type": "tool_result",
+                                    "part": {
+                                        "tool": tool_name,
+                                        "state": {
+                                            "status": status,
+                                            "input": input_data,
+                                            "output": output_data,
+                                        },
+                                    },
+                                },
+                                session_id,
+                                assistant_message_id,
+                            ):
+                                await self._broadcast_event(session_id, event)
+                            continue
+
+                    if part_type in ["step_start", "step-start", "step"]:
+                        async for event in self._handle_step_start_event(
+                            {"type": "step_start", "part": part},
+                            session_id,
+                            assistant_message_id,
+                            step_context,
+                        ):
+                            await self._broadcast_event(session_id, event)
+                        continue
+
+                    if part_type in ["step_finish", "step-finish"]:
+                        async for event in self._handle_step_finish_event(
+                            {"type": "step_finish", "part": part},
+                            session_id,
+                            assistant_message_id,
+                            step_context,
+                        ):
+                            await self._broadcast_event(session_id, event)
+                        continue
+
+                    text = part.get("text") or ""
+                    if not text and isinstance(part.get("content"), dict):
+                        text = part["content"].get("text") or part["content"].get("markdown") or ""
+                    if not text and part.get("content"):
+                        text = str(part.get("content"))
+
+                    if not text:
+                        continue
+
+                    event_type = (
+                        "message.part.updated"
+                        if part_type in [PART_TYPE_TEXT, PART_TYPE_THOUGHT]
+                        else "message.part.updated"
+                    )
+                    await self._broadcast_event(
+                        session_id,
+                        {
+                            "type": event_type,
+                            "properties": {
+                                "part": {
+                                    "id": generate_part_id(mapped_type),
+                                    "session_id": session_id,
+                                    "message_id": assistant_message_id,
+                                    "type": mapped_type
+                                    if mapped_type in [PART_TYPE_TEXT, PART_TYPE_THOUGHT]
+                                    else PART_TYPE_TEXT,
+                                    "content": {"text": text},
+                                    "time": {"start": now_ts},
+                                }
+                            },
+                        },
+                    )
+
+                logger.info(
+                    f"[SERVER_API] Completed message via server API for session {session_id}"
+                )
+                return True
+        except httpx.HTTPError as e:
+            logger.error(f"[SERVER_API] HTTP error: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"[SERVER_API] Unexpected error: {e}")
+            return False
+
 
 # ====================================================================
 # 辅助函数
@@ -1357,92 +2073,117 @@ async def execute_opencode_message(
 ):
     """
     后台执行 OpenCode 消息的入口函数
-
-    Args:
-        session_id: 会话ID
-        message_id: 消息ID
-        user_prompt: 用户提示词
-        workspace_base: 工作区基础路径
     """
+    # ✅ Code Review修复：确保opencode serve已启动，再执行任务
+    # 修复问题：--attach模式失败，因为opencode serve未启动
+    from app.managers_internal import get_opencode_server_manager
+    
+    logger.info(f"[Execute] Ensuring OpenCodeServer is started before running task...")
+    server_manager = await get_opencode_server_manager()
+    logger.info(f"[Execute] OpenCodeServer ready, starting task execution...")
+    
     client = OpenCodeClient(workspace_base)
     await client.execute_message(session_id, message_id, user_prompt, mode=mode)
 
 
-async def execute_opencode_message_with_manager(
-    session_id: str,
-    message_id: str,
-    user_prompt: str,
-    workspace_base: str,
-    mode: str = "auto",
-):
-    """
-    使用全局OpenCodeServerManager执行OpenCode消息（性能优化版本）
-    
-    优势：
-    - 复用全局opencode serve进程（首次15秒，后续2秒）
-    - 避免每个任务都启动新进程
-    - 适用于多任务场景
-    
-    Args:
-        session_id: 会话ID
-        message_id: 消息ID
-        user_prompt: 用户提示词
-        workspace_base: 工作区基础路径
-        mode: 运行模式
-    """
-    # ✅ 延迟导入，避免循环导入问题
-    # Import from managers_internal module to avoid circular imports
-    from app.managers_internal import get_opencode_server_manager
-    import logging
-    import json
-    
-    logger = logging.getLogger(__name__)
-    
-    try:
-        # 获取全局OpenCodeServerManager实例（懒加载）
-        manager = await get_opencode_server_manager()
-        
-        logger.info(f"[Perf] Using global OpenCodeServerManager for session {session_id}")
-        
-        # 创建client实例用于广播事件
-        client = OpenCodeClient(workspace_base)
-        
-        # 使用manager的execute方法（会复用已启动的opencode serve）
-        # manager.execute返回AsyncGenerator[str, None]，每个元素是SSE事件
-        async for response_chunk in manager.execute(session_id, user_prompt, mode):
-            # 解析SSE事件（格式：data: {...}）
-            line = response_chunk.strip()
-            
-            # 跳过空行和注释
-            if not line or line.startswith(':'):
-                continue
-            
-            # 处理data行
-            if line.startswith('data: '):
-                data_content = line[6:]  # 去掉 "data: " 前缀
-                
-                # 检查是否是结束标记
-                if data_content == '[DONE]':
-                    break
-                
-                # 解析JSON
-                try:
-                    event = json.loads(data_content)
-                    # 广播事件到前端
-                    await client._broadcast_event(session_id, event)
-                    
-                except json.JSONDecodeError as e:
-                    logger.warning(f"[Perf] Failed to parse SSE data: {e}")
-                except Exception as e:
-                    logger.error(f"[Perf] Error broadcasting event: {e}")
-            
-        logger.info(f"[Perf] Completed message execution for session {session_id}")
-        
-    except Exception as e:
-        logger.error(f"[Perf] Error in execute_opencode_message_with_manager: {e}", exc_info=True)
-        # 降级到原始方式
-        logger.warning(f"[Perf] Falling back to original execute_opencode_message")
-        await execute_opencode_message(session_id, message_id, user_prompt, workspace_base, mode)
+# 说明：当前已支持优先通过 Server HTTP API 执行，CLI 仅作为回退路径。
+#
+# async def execute_opencode_message_with_manager(
+#     session_id: str,
+#     message_id: str,
+#     user_prompt: str,
+#     workspace_base: str,
+#     mode: str = "auto",
+# ):
+#     """
+#     使用全局OpenCodeServerManager执行OpenCode消息（性能优化版本）
+#     
+#     优势：
+#     - 复用全局opencode serve进程（首次15秒，后续2秒）
+#     - 避免每个任务都启动新进程
+#     - 适用于多任务场景
+#     
+#     Args:
+#         session_id: 会话ID
+#         message_id: 消息ID
+#         user_prompt: 用户提示词
+#         workspace_base: 工作区基础路径
+#         mode: 运行模式
+#     
+#     注意：这是一个会阻塞的async函数，不是generator。
+#     所有SSE事件都通过_broadcast_event直接广播到前端。
+#     """
+#     # 延迟导入，避免循环导入问题
+#     # Import from managers_internal module to avoid circular imports
+#     from app.managers_internal import get_opencode_server_manager
+#     import logging
+#     import json
+# 
+#     logger = logging.getLogger(__name__)
+# 
+#     try:
+#         # 获取全局OpenCodeServerManager实例（懒加载）
+#         manager = await get_opencode_server_manager()
+# 
+#         logger.info(f"[Perf] Using global OpenCodeServerManager for session {session_id}")
+# 
+#         # 创建client实例用于广播事件
+#         client = OpenCodeClient(workspace_base)
+# 
+#         # 使用manager的execute方法（会复用已启动的opencode serve）
+#         # manager.execute返回AsyncGenerator[str, None]，每个元素是SSE事件
+#         event_count = 0
+#         async for response_chunk in manager.execute(session_id, user_prompt, mode):
+#             # 解析SSE事件（格式：data: {...}）
+#             line = response_chunk.strip()
+# 
+#             logger.debug(f"[Perf] SSE line received: {repr(line[:100])}")  # 只打印前100个字符
+# 
+#             # 跳过空行和注释
+#             if not line or line.startswith(':'):
+#                 logger.debug(f"[Perf] Skipping line: {repr(line)}")
+#                 continue
+# 
+#             # 处理data行
+#             if line.startswith('data: '):
+#                 data_content = line[6:]  # 去掉 "data: " 前缀
+#                 logger.debug(f"[Perf] SSE data: {repr(data_content[:100])}")  # 只打印前100个字符
+# 
+#                 # 检查是否是结束标记
+#                 if data_content == '[DONE]':
+#                     logger.info(f"[Perf] SSE stream ended with [DONE]")
+#                     break
+# 
+#                 # 解析JSON
+#                 try:
+#                     event = json.loads(data_content)
+#                     # 记录事件类型
+#                     event_type = event.get('type', 'unknown')
+#                     logger.debug(f"[Perf] Broadcasting event type: {event_type}")
+#                     # 广播事件到前端
+#                     await client._broadcast_event(session_id, event)
+#                     event_count += 1
+# 
+#                 except json.JSONDecodeError as e:
+#                     logger.warning(f"[Perf] Failed to parse SSE data: {e}, data: {data_content[:200]}")
+#                 except Exception as e:
+#                     logger.error(f"[Perf] Error broadcasting event: {e}", exc_info=True)
+#             else:
+#                 logger.debug(f"[Perf] Line does not start with 'data: ', line: {repr(line[:100])}")
+# 
+#         logger.info(f"[Perf] Completed message execution for session {session_id}, total events: {event_count}")
+# 
+#     except Exception as e:
+#         logger.error(f"[Perf] Error in execute_opencode_message_with_manager: {e}", exc_info=True)
+#         # 发送错误事件到前端
+#         client = OpenCodeClient(workspace_base)
+#         error_event = {
+#             "type": "error",
+#             "content": f"Error executing message: {str(e)}"
+#         }
+#         await client._broadcast_event(session_id, error_event)
+#         raise
+
 
 
 # ====================================================================
