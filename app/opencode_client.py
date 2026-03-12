@@ -271,6 +271,7 @@ class OpenCodeClient:
                                 if normalized.get("type") == "message.updated":
                                     info = (normalized.get("properties") or {}).get("info") or {}
                                     if info.get("id") == assistant_message_id and info.get("time", {}).get("completed"):
+                                        state["completed"] = True
                                         stop_event.set()
                                         break
                             continue
@@ -1769,7 +1770,7 @@ class OpenCodeClient:
                         return False
 
                 # Start global event bridge (real-time SSE)
-                sse_state = {"events": 0, "failed": False, "saw_tool": False}
+                sse_state = {"events": 0, "failed": False, "saw_tool": False, "completed": False}
                 stop_event = asyncio.Event()
                 stream_task = asyncio.create_task(
                     self._bridge_global_events(
@@ -1910,18 +1911,30 @@ class OpenCodeClient:
                     )
                     parts = await _poll_parts()
 
-                # Stop SSE bridge after message completes
+                # Wait for SSE completion (avoid premature stop/summary)
+                if not sse_state.get("failed", False):
+                    try:
+                        await asyncio.wait_for(stop_event.wait(), timeout=timeout.read)
+                    except asyncio.TimeoutError:
+                        pass
+
+                # Stop SSE bridge after completion or timeout
                 stop_event.set()
                 try:
                     await asyncio.wait_for(stream_task, timeout=5)
                 except Exception:
                     stream_task.cancel()
 
-                # If SSE yielded events, skip manual part broadcasting to avoid duplicates
+                # If SSE yielded events, avoid duplicate manual part broadcasting
                 if sse_state.get("events", 0) > 0 and not sse_state.get("failed", False):
-                    parts = None
                     if sse_state.get("saw_tool"):
                         self._skip_preview_sessions.add(session_id)
+                    if sse_state.get("completed"):
+                        logger.info(
+                            f"[SERVER_API] Completed message via SSE for session {session_id}"
+                        )
+                        return True
+                    parts = None
 
                 if not parts:
                     logger.warning(
