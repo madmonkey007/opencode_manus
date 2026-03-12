@@ -109,7 +109,45 @@ class EventAdapter {
             const part = newEvent.properties?.part;
             if (!part) return null;
 
+            // Track part types for delta mapping
+            if (session) {
+                if (!session._partTypeById) session._partTypeById = {};
+                if (part.id) {
+                    session._partTypeById[part.id] = part.type;
+                }
+            }
+
             return this.adaptPartEvent(part, session, options);
+        }
+
+        // 消息增量事件（delta）
+        if (eventType === 'message.part.delta') {
+            const props = newEvent.properties || {};
+            const partId = props.partID || props.partId;
+            const field = props.field;
+            const delta = props.delta;
+
+            if (!partId || field !== 'text' || typeof delta !== 'string') {
+                return null;
+            }
+
+            const partType = session?._partTypeById?.[partId];
+            if (partType === 'thought') {
+                return {
+                    type: 'thought_delta',
+                    text: delta,
+                    part_id: partId,
+                    message_id: props.messageID
+                };
+            }
+
+            return {
+                type: 'answer_chunk',
+                text: delta,
+                message_id: props.messageID,
+                part_id: partId,
+                _isDelta: true
+            };
         }
 
         // 文件预览事件
@@ -339,7 +377,8 @@ class EventAdapter {
         // TOOL 类型
         if (partType === 'tool') {
             const content = part.content || {};
-            const toolName = content.tool || 'unknown';
+            const metadata = part.metadata || {};
+            const toolName = content.tool || content.name || metadata.tool || metadata.name || 'unknown';
             const state = content.state || {};
             const status = state.status || 'running';
             const callId = content.call_id || part.call_id || part.callID || part.id;
@@ -353,7 +392,6 @@ class EventAdapter {
             const toolType = this.mapToolType(toolName);
 
             // 提取元数据中的标题
-            const metadata = part.metadata || {};
             const title = metadata.title || (isThought ? 'Thinking' : `Using ${toolName}`);
 
             const adaptedEvent = {

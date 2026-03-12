@@ -1949,6 +1949,9 @@ window.Logger = {
                     s._hasAnswerChunk = true;
                     s._usingThoughtAsAnswer = false;
                 }
+            } else if (adapted.type === 'thought_delta') {
+                // Ignore thought deltas to avoid leaking reasoning into the main response
+                return;
             } else if (adapted.type === 'phases_init') {
                 // 处理阶段初始化
                 const currentTurnIndex = window._turnIndex || 0;
@@ -2081,7 +2084,12 @@ window.Logger = {
                 }
             } else if (adapted.type === 'deliverables') {
                 s.deliverables = adapted.items || [];
-            } else if (adapted.type === 'status' || (adapted.type === 'message_updated' && adapted.time?.completed)) {
+            } else if (adapted.type === 'status' || adapted.type === 'message_updated') {
+                // Track the active assistant message to avoid premature stop button hiding
+                if (adapted.type === 'message_updated' && adapted.role === 'assistant' && adapted.message_id && !adapted.time?.completed) {
+                    s._activeAssistantMessageId = adapted.message_id;
+                }
+
                 // ✅ P0修复：处理status thinking事件（显示开场白/思考中消息）
                 const isThinking = adapted.status === 'thinking' || adapted.value === 'thinking';
 
@@ -2128,7 +2136,13 @@ window.Logger = {
                 }
 
                 const isError = adapted.value === 'error' || adapted.status === 'error';
-                const isDone = adapted.value === 'done' || adapted.value === 'completed' || (adapted.type === 'message_updated' && adapted.time?.completed);
+                const isAssistantCompletion = (
+                    adapted.type === 'message_updated' &&
+                    adapted.time?.completed &&
+                    adapted.role === 'assistant' &&
+                    (!s._activeAssistantMessageId || adapted.message_id === s._activeAssistantMessageId)
+                );
+                const isDone = adapted.value === 'done' || adapted.value === 'completed' || isAssistantCompletion;
 
                 if (isDone || isError) {
                     if (s.phases) {
@@ -2290,7 +2304,7 @@ window.Logger = {
                         // 实时显示到右侧面板
                         if (window.rightPanelManager) {
                             const data = adapted.data || {};
-                            const toolName = data.tool_name || adapted.tool || '';
+                            const toolName = data.tool_name || data.tool || data.name || data.action || adapted.tool || (adapted.data && adapted.data.tool) || '';
 
                             // ✅ 诊断：追踪思考内容是否误入回复
                             if (DEBUG_CONFIG.ENABLE_THOUGHT_DIAGNOSTIC && adapted.type === 'thought') {
@@ -2325,6 +2339,10 @@ window.Logger = {
                         
                         // ✅ v=35: 思考内容立即显示在主聊天区域（XSS安全）
                         const content = adapted.content || adapted.data?.text || '';
+                        if (!content || !content.trim()) {
+                            console.log('[NewAPI] Skipping empty thought content');
+                            return;
+                        }
 
                         // ✅ v=35: 改进日志 - 显示完整长度信息
                         const preview = content.length > 100
@@ -2378,7 +2396,7 @@ window.Logger = {
                     } else if (adapted.type === 'action') {
                         // 显示工具操作
                         const output = data.output || '';
-                        const toolLower = toolName.toLowerCase();
+                        const toolLower = (toolName || 'unknown').toLowerCase();
 
                         if (toolLower === 'question') {
                             try {
