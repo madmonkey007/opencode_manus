@@ -48,6 +48,11 @@ D:\manus\opencode\
 - 文件：app/opencode_client.py
 - SSE bridge 收到 assistant message.updated completed 时设置 completed 并 stop_event。
 - _execute_via_server_api：等待 SSE 完成或超时后再停止 bridge，避免“POST 后立刻结束”。
+4) 任务完成总结与事件静默检测
+- 文件：static/completion-logic.js、static/opencode-new-api-patch.js、tests/js/test_completion_logic.js
+- 新增 completion-logic 模块，对 `message.updated` completion 做集中判断：需满足 assistant completion、当前 message 完成且 session idle + 最近 delta 之后静默 ≥ quiet window 才在 UI 插 summary，其他情况下设置 `_pendingAssistantCompletion` 并通过定时器在静默窗口结束后重试；在 isDone 之外返回 `quietOk`/`shouldDefer`，便于 UI 复用。
+- opencode-new-api-patch 调整：每次调用 computeCompletionDecision 时传入 quiet window、`lastDeltaAt` 和 `Date.now()`；当 quiet window 未满足时保存 timer 并在超时后重新触发 event；完成或错误时清理 timer；同时新增 `_hasToolError`、`resetCompletionState` 等状态管理。
+- tests/js/test_completion_logic.js 覆盖 quiet window 逻辑、reset 以及错误标记，确保在 session idle 和 quiet window 双重条件下才算 true completion。
 
 ## 现存问题（需继续验证/修复）
 P0：
@@ -59,6 +64,7 @@ P1：
 4. thought 事件出现两个：一个无内容、一个有内容（已忽略空 thought，但需验证来源）。
 5. 右侧预览面板内容与事件不同步（疑似事件完成顺序和 deliverables 更新时机问题）。
 6. 交付面板偶发不展示（需看 deliverables 事件是否缺失）。
+7. 完成 summary 目前依赖 `lastDeltaAt` + quiet window 延迟，缺失 delta 或 timer 被清理后可能导致 summary 一直不触发，务必在 SSE 流中验证 `lastDeltaAt` 有值且 timer 不被意外取消。
 
 ## 关键日志与证据
 - 前端控制台长日志：D:\manus\opencode\logs\console-log.txt
@@ -67,6 +73,10 @@ P1：
   - thought 事件重复或空内容
   - stop 按钮提前消失
   - unknown tool
+
+## 验证与测试
+- `node tests/js/test_completion_logic.js`（通过）：覆盖 idle、quiet window、工具错误、reset 等路径，复原 SSE completion 行为。
+- Playwright/Chrome 自动化目前被 Python `sync_playwright()` 卡住（`output/playwright/diag_log.txt` 只记录到 `start`），CLI `npx @playwright/test` 也超时；建议在可以稳定调用浏览器 API 的环境下再执行完整一次 UI 验证。
 
 ## 容量告警（需要处理）
 - workspace/ 与 logs/ 下文件数量巨大（大量 ses_* 与前端日志），已明显影响 Git 状态与性能。

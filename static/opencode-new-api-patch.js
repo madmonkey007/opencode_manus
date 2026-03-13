@@ -1195,6 +1195,14 @@ window.Logger = {
                 _createdTime: Date.now()  // ✅ 添加创建时间，用于宽限期判断
             };
             // ✅ 从 session 恢复 turnIndex
+            if (window.OpenCodeCompletionLogic?.resetCompletionState) {
+                window.OpenCodeCompletionLogic.resetCompletionState(existing);
+            } else {
+                existing._sessionIdleSeen = false;
+                existing._pendingAssistantCompletion = false;
+                existing._lastAssistantCompletionAdapted = null;
+                existing._hasToolError = false;
+            }
             window._turnIndex = existing.turnIndex || 0;
             window.state.sessions.unshift(existing);
             window.state.activeId = existing.id;  // ✅ 立即更新activeId，防止临时session被误删
@@ -1233,6 +1241,14 @@ window.Logger = {
             if (typeof window.saveState === 'function') {
                 window.saveState();
             }
+        }
+        if (window.OpenCodeCompletionLogic?.resetCompletionState) {
+            window.OpenCodeCompletionLogic.resetCompletionState(existing);
+        } else {
+            existing._sessionIdleSeen = false;
+            existing._pendingAssistantCompletion = false;
+            existing._lastAssistantCompletionAdapted = null;
+            existing._hasToolError = false;
         }
         return existing;
     }
@@ -1368,6 +1384,42 @@ window.Logger = {
         window.state.activeSSE = window.apiClient.subscribeToEvents(
             s.id,
             (newEvent) => {
+                // 🔍 Diagnostics: capture event timing/order for summary issues
+                const nowTs = Date.now();
+                if (!s._diag) {
+                    s._diag = {
+                        firstEventAt: null,
+                        lastEventAt: null,
+                        lastEventType: null,
+                        lastDeltaAt: null,
+                        deltaCount: 0,
+                        updatedCount: 0,
+                        lastMessageUpdatedAt: null,
+                        lastStatus: null
+                    };
+                }
+                if (!s._diag.firstEventAt) s._diag.firstEventAt = nowTs;
+                s._diag.lastEventAt = nowTs;
+                s._diag.lastEventType = newEvent?.type || null;
+                if (newEvent?.type === 'session.idle') {
+                    s._sessionIdleSeen = true;
+                    if (s._pendingAssistantCompletion && s._lastAssistantCompletionAdapted) {
+                        const pending = s._lastAssistantCompletionAdapted;
+                        s._pendingAssistantCompletion = false;
+                        processEvent(s, pending);
+                    }
+                }
+                if (newEvent?.type === 'message.part.delta') {
+                    s._diag.lastDeltaAt = nowTs;
+                    s._diag.deltaCount += 1;
+                } else if (newEvent?.type === 'message.part.updated') {
+                    s._diag.updatedCount += 1;
+                } else if (newEvent?.type === 'message.updated') {
+                    s._diag.lastMessageUpdatedAt = nowTs;
+                } else if (newEvent?.type === 'session.status') {
+                    s._diag.lastStatus = newEvent?.properties?.status?.type || null;
+                }
+
                 const adapted = window.EventAdapter?.adaptEvent(newEvent, s);
                 if (!adapted) return;
 
@@ -1389,6 +1441,15 @@ window.Logger = {
 
                 // 检查是否完成
                 if (adapted.type === 'status' && (adapted.value === 'done' || adapted.value === 'completed')) {
+                    console.log('[NewAPI][Diag] Status completion received:', {
+                        session: s.id,
+                        status: adapted.value,
+                        lastEventType: s._diag?.lastEventType,
+                        lastDeltaAt: s._diag?.lastDeltaAt,
+                        deltaCount: s._diag?.deltaCount,
+                        updatedCount: s._diag?.updatedCount,
+                        responseLen: s.response?.length || 0
+                    });
                     if (stopBtn) stopBtn.classList.add('hidden');
                     if (runBtn) runBtn.classList.remove('hidden');
 
@@ -2088,6 +2149,7 @@ window.Logger = {
                 // Track the active assistant message to avoid premature stop button hiding
                 if (adapted.type === 'message_updated' && adapted.role === 'assistant' && adapted.message_id && !adapted.time?.completed) {
                     s._activeAssistantMessageId = adapted.message_id;
+                    s._sessionIdleSeen = false;
                 }
 
                 // ✅ P0修复：处理status thinking事件（显示开场白/思考中消息）
@@ -2135,16 +2197,61 @@ window.Logger = {
                     return;
                 }
 
-                const isError = adapted.value === 'error' || adapted.status === 'error';
-                const isAssistantCompletion = (
-                    adapted.type === 'message_updated' &&
-                    adapted.time?.completed &&
-                    adapted.role === 'assistant' &&
-                    (!s._activeAssistantMessageId || adapted.message_id === s._activeAssistantMessageId)
-                );
-                const isDone = adapted.value === 'done' || adapted.value === 'completed' || isAssistantCompletion;
+                const completionLogic = window.OpenCodeCompletionLogic?.computeCompletionDecision;
+                const quietWindowMs = window.OPENCODE_COMPLETION_QUIET_WINDOW_MS || 500;
+                const nowMs = Date.now();
+                const lastDeltaAt = s._diag?.lastDeltaAt;
+                const completion = completionLogic
+                    ? completionLogic(
+                        adapted,
+                        s._activeAssistantMessageId,
+                        s._hasToolError,
+                        s._sessionIdleSeen,
+                        lastDeltaAt,
+                        nowMs,
+                        quietWindowMs
+                    )
+                    : (() => {
+                        const isError = s._hasToolError || adapted.value === 'error' || adapted.status === 'error';
+                        const isAssistantCompletion = (
+                            adapted.type === 'message_updated' &&
+                            adapted.time?.completed &&
+                            adapted.role === 'assistant' &&
+                            (!s._activeAssistantMessageId || adapted.message_id === s._activeAssistantMessageId)
+                        );
+                        const hasQuietWindow = Number.isFinite(quietWindowMs) && quietWindowMs > 0;
+                        const hasLastDelta = typeof lastDeltaAt === 'number';
+                        const quietOk = !hasQuietWindow || !hasLastDelta || nowMs - lastDeltaAt >= quietWindowMs;
+                        const isDone = isAssistantCompletion && !!s._sessionIdleSeen && quietOk;
+                        const shouldDefer = isAssistantCompletion && (!s._sessionIdleSeen || !quietOk);
+                        return { isDone, isError, isAssistantCompletion, shouldDefer, quietOk };
+                    })();
+                const { isDone, isError, isAssistantCompletion, shouldDefer, quietOk } = completion;
+                if (shouldDefer) {
+                    s._pendingAssistantCompletion = true;
+                    s._lastAssistantCompletionAdapted = adapted;
+                    if (isAssistantCompletion && !quietOk && typeof lastDeltaAt === 'number') {
+                        const elapsed = nowMs - lastDeltaAt;
+                        const remaining = quietWindowMs - elapsed;
+                        if (remaining > 0) {
+                            if (s._completionTimer) {
+                                clearTimeout(s._completionTimer);
+                            }
+                            s._completionTimer = setTimeout(() => {
+                                if (!s._pendingAssistantCompletion || !s._lastAssistantCompletionAdapted) return;
+                                const pending = s._lastAssistantCompletionAdapted;
+                                s._pendingAssistantCompletion = false;
+                                processEvent(s, pending);
+                            }, remaining);
+                        }
+                    }
+                }
 
                 if (isDone || isError) {
+                    if (s._completionTimer) {
+                        clearTimeout(s._completionTimer);
+                        s._completionTimer = null;
+                    }
                     if (s.phases) {
                         s.phases.forEach(p => {
                             if (p.status === 'active' || p.status === 'pending') {
@@ -2164,7 +2271,7 @@ window.Logger = {
                 }
 
                 // ✅ v=33: 修复总结不显示 - 强制刷新UI确保总结可见（绕过节流）
-                if (!isError) {
+                if (isDone && !isError) {
                     // 双重检查：防止标志位丢失或response已包含总结
                     const SUMMARY_MARKER = '**✅ 任务完成**';
                     const hasSummaryInResponse = s.response && s.response.includes(SUMMARY_MARKER);
@@ -2177,6 +2284,19 @@ window.Logger = {
                         const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
 
                         // 添加总结到response末尾
+                        const diag = s._diag || {};
+                        console.log('[NewAPI][Diag] Adding task summary:', {
+                            session: s.id,
+                            responseLen: s.response?.length || 0,
+                            completedPhases,
+                            totalActions,
+                            lastEventType: diag.lastEventType,
+                            lastDeltaAt: diag.lastDeltaAt,
+                            deltaCount: diag.deltaCount,
+                            updatedCount: diag.updatedCount,
+                            lastMessageUpdatedAt: diag.lastMessageUpdatedAt,
+                            lastStatus: diag.lastStatus
+                        });
                         const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
                         s.response += summary;
                         s._hasCompletionSummary = true; // 设置标志位
@@ -2212,15 +2332,26 @@ window.Logger = {
                         }
                     } else {
                         if (hasSummaryInResponse && hasSummaryFlag) {
-                            console.log('[NewAPI] Task summary already exists (both flag and response)');
+                            console.log('[NewAPI] Task summary already exists (both flag and response)', {
+                                session: s.id,
+                                responseLen: s.response?.length || 0,
+                                lastEventType: s._diag?.lastEventType,
+                                deltaCount: s._diag?.deltaCount
+                            });
                         } else if (hasSummaryInResponse) {
-                            console.log('[NewAPI] Task summary exists in response but flag is missing, fixing flag');
+                            console.log('[NewAPI] Task summary exists in response but flag is missing, fixing flag', {
+                                session: s.id,
+                                responseLen: s.response?.length || 0
+                            });
                             s._hasCompletionSummary = true;
                             if (typeof window.saveState === 'function') {
                                 window.saveState();
                             }
                         } else {
-                            console.log('[NewAPI] Task summary flag exists but response missing summary, recreating...');
+                            console.log('[NewAPI] Task summary flag exists but response missing summary, recreating...', {
+                                session: s.id,
+                                responseLen: s.response?.length || 0
+                            });
                             const totalActions = s.actions ? s.actions.length : 0;
                             const completedPhases = s.phases ? s.phases.filter(p => p.status === 'completed').length : 0;
                             const summary = `\n\n---\n\n${SUMMARY_MARKER}\n\n- 完成阶段：${completedPhases}个\n- 工具调用：${totalActions}次\n`;
@@ -2242,7 +2373,7 @@ window.Logger = {
                             }
                         }
                     }
-                } else {
+                } else if (isError) {
                     // 错误总结
                     if (typeof window.addSystemMessage === 'function') {
                         window.addSystemMessage('❌ 任务执行失败', 'error');
@@ -2286,6 +2417,19 @@ window.Logger = {
                         id: adapted.id || adapted.call_id,
                         data: adapted.data || {}
                     };
+
+                    const actionData = actionEvent.data || {};
+                    const actionInput = actionData.input || {};
+                    const actionStatus = actionData.status || actionData.state || '';
+                    if (
+                        actionData.tool_name === 'invalid' ||
+                        actionData.tool === 'invalid' ||
+                        actionStatus === 'error' ||
+                        actionStatus === 'failed' ||
+                        actionInput.error
+                    ) {
+                        s._hasToolError = true;
+                    }
 
                     // 确保 actions 和 orphanEvents 数组存在
                     if (!s.actions) s.actions = [];
