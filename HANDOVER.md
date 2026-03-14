@@ -1,4 +1,4 @@
-﻿# OpenCode 项目 Handover（更新于 2026-03-12）
+﻿# OpenCode 项目 Handover（更新于 2026-03-14）
 
 ## 目标与背景
 - 目标：修复任务执行时前端事件/交付面板不同步、停止按钮过早结束、工具显示 unknown、thought 事件重复或不展示，以及 SSE 长时间无输出后一次性展示的问题。
@@ -32,6 +32,54 @@ D:\manus\opencode\
 ```
 
 ## 本次关键变更（已落地）
+
+### 2026-03-14 修复完成（P0 + P1）
+**修复问题**：
+- ✅ **P0-1**: Stop按钮过早结束 - 添加`isFromChildSession`检查阻止子会话事件干扰
+- ✅ **P0-2**: SSE事件批量出现 - 添加35处`await asyncio.sleep(0)`强制刷新缓冲区  
+- ✅ **P1-4**: Thought事件重复 - 添加thought事件去重逻辑，过滤空内容和重复thought
+
+**修改文件**：
+1. `static/opencode-new-api-patch.js` - Stop按钮、thought去重
+2. `app/opencode_client.py` - SSE flush修复（35处）
+
+**验证状态**：✅ Chrome DevTools测试通过
+
+---
+
+### 历史变更（2026-03-12及之前）
+
+### 2026-03-14 修复完成（P0 + P1）
+**修复问题**：
+- ✅ **P0-1**: Stop按钮过早结束 - 添加`isFromChildSession`检查阻止子会话事件干扰
+- ✅ **P0-2**: SSE事件批量出现 - 添加35处`await asyncio.sleep(0)`强制刷新缓冲区  
+- ✅ **P1-4**: Thought事件重复 - 添加thought事件去重逻辑，过滤空内容和重复thought
+
+**修改文件**：
+1. `static/opencode-new-api-patch.js` - Stop按钮、thought去重
+2. `app/opencode_client.py` - SSE flush修复（35处）
+
+**验证状态**：✅ Chrome DevTools测试通过
+
+---
+
+### 历史变更（2026-03-12及之前）
+
+### 2026-03-14 修复完成（P0 + P1）
+**修复问题**：
+- ✅ **P0-1**: Stop按钮过早结束 - 添加`isFromChildSession`检查阻止子会话事件干扰
+- ✅ **P0-2**: SSE事件批量出现 - 添加35处`await asyncio.sleep(0)`强制刷新缓冲区  
+- ✅ **P1-4**: Thought事件重复 - 添加thought事件去重逻辑，过滤空内容和重复thought
+
+**修改文件**：
+1. `static/opencode-new-api-patch.js` - Stop按钮、thought去重
+2. `app/opencode_client.py` - SSE flush修复（35处）
+
+**验证状态**：✅ Chrome DevTools测试通过
+
+---
+
+### 历史变更（2026-03-12及之前）
 1) 前端增量渲染（解决“等很久才一下全展示”）
 - 文件：static/event-adapter.js
 - 新增处理 message.part.delta，把 text delta 转为 answer_chunk；thought delta 单独事件。
