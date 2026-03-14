@@ -12,6 +12,8 @@ import logging
 import subprocess
 import shlex
 import sys
+import sqlite3
+import time
 
 # Import from managers_internal module to avoid circular imports
 from app.managers_internal import get_opencode_server_manager
@@ -45,6 +47,55 @@ except ImportError as e:
     logger.warning(f"Failed to import history service: {e}")
     history_service = None
 
+# 数据库初始化函数
+def init_database():
+    """初始化数据库表结构"""
+    db_path = os.path.join(WORKSPACE_BASE, "history.db")
+
+    # ✅ 修复：使用 context manager 确保连接总是关闭
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+
+            # 创建sessions表（包含Python和Go CLI两套列）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id TEXT PRIMARY KEY,
+                    prompt TEXT,
+                    status TEXT,
+                    workspace_path TEXT,
+                    -- Go CLI兼容列
+                    title TEXT,
+                    message_count INTEGER DEFAULT 0,
+                    prompt_tokens INTEGER DEFAULT 0,
+                    completion_tokens INTEGER DEFAULT 0,
+                    cost REAL DEFAULT 0.0,
+                    -- 时间戳
+                    created_at INTEGER,
+                    updated_at INTEGER
+                )
+            """)
+
+            # 创建messages表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT,
+                    role TEXT,
+                    content TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s', 'now')),
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """)
+
+            conn.commit()
+
+        logger.info(f"[DB] Database initialized at {db_path}")
+
+    except Exception as e:
+        logger.error(f"[DB] Failed to initialize database: {e}")
+        raise
+
 # 导入新架构 API（阶段 2）
 try:
     from .api import router as api_router
@@ -58,6 +109,16 @@ except ImportError as e:
     api_router = None
 
 app = FastAPI()
+
+# ====================================================================
+# 应用启动事件：初始化数据库
+# ====================================================================
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化数据库"""
+    logger.info("[Startup] Initializing database...")
+    init_database()
+    logger.info("[Startup] Database initialization complete")
 
 # CORS配置：从环境变量读取允许的来源
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8999").split(",")
@@ -270,56 +331,51 @@ class SessionManager:
         - Go CLI使用: title, message_count, prompt_tokens, completion_tokens, cost
         - 修复方案：同时写入两组列，确保兼容性
         """
+        now = int(time.time())
+        # ✅ 修复：如果prompt是"New Session"（API创建时的默认值），使用空字符串作为title
+        # 这样Go CLI查询时不会因为title为NULL而失败
+        if prompt == "New Session":
+            title = ""
+        else:
+            title = prompt[:100] if len(prompt) > 100 else prompt
+
+        # ✅ 修复：使用 context manager 确保连接总是关闭
         try:
-            import sqlite3
-            import time
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
 
-            now = int(time.time())
-            # ✅ 修复：如果prompt是"New Session"（API创建时的默认值），使用空字符串作为title
-            # 这样Go CLI查询时不会因为title为NULL而失败
-            if prompt == "New Session":
-                title = ""
-            else:
-                title = prompt[:100] if len(prompt) > 100 else prompt
+                # ✅ 同时填充旧列和新列，确保兼容性
+                cursor.execute("""
+                    INSERT INTO sessions (
+                        -- 旧列（Python使用）
+                        id, prompt, status, workspace_path,
+                        -- 新列（Go CLI使用）
+                        title, message_count, prompt_tokens, completion_tokens, cost,
+                        -- 时间戳
+                        created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0.0, ?, ?)
+                """, (sid, prompt, "running", f"/app/opencode/workspace/{sid}",
+                       title, now, now))
 
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            # ✅ 同时填充旧列和新列，确保兼容性
-            cursor.execute("""
-                INSERT INTO sessions (
-                    -- 旧列（Python使用）
-                    id, prompt, status, workspace_path,
-                    -- 新列（Go CLI使用）
-                    title, message_count, prompt_tokens, completion_tokens, cost,
-                    -- 时间戳
-                    created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0.0, ?, ?)
-            """, (sid, prompt, "running", f"/app/opencode/workspace/{sid}",
-                   title, now, now))
-
-            conn.commit()
-            conn.close()
+                conn.commit()
 
             logger.info(f"[DB] Session {sid} written to database (dual-schema compatible)")
         except sqlite3.IntegrityError as e:
             # Session ID已存在，更新时间戳
             logger.warning(f"[DB] Session {sid} already exists, updating timestamp")
             try:
-                import time
                 now = int(time.time())
-                conn = sqlite3.connect(self.db_path)
-                cursor = conn.cursor()
-                cursor.execute("UPDATE sessions SET updated_at = ? WHERE id = ?", (now, sid))
-                conn.commit()
-                conn.close()
+                # ✅ 修复：使用 context manager 确保连接总是关闭
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE sessions SET updated_at = ? WHERE id = ?", (now, sid))
+                    conn.commit()
             except Exception as e2:
                 logger.error(f"[DB] Failed to update session {sid}: {e2}")
         except Exception as e:
             logger.error(f"[DB] Failed to write session {sid} to database: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+            # traceback已在顶部导入，无需重复导入
 
     async def create_session(self, sid: str, prompt: str, mode: str = "auto"):
         if sid in self.sessions:
@@ -366,11 +422,18 @@ class SessionManager:
 
             # 发送 HTTP 请求执行任务
             logger.info(f"Executing task via HTTP API: {mode}")
-            result = await manager.execute(
+
+            # ✅ 修复：execute返回AsyncGenerator，需要用async for迭代
+            result_parts = []
+            async for chunk in manager.execute(
                 session_id=sid,
                 prompt=enhanced_prompt,
                 mode=mode
-            )
+            ):
+                result_parts.append(chunk)
+
+            # 合并所有结果块
+            result = ''.join(result_parts)
 
             # 写入结果到日志
             with open(log_file, "a", encoding="utf-8") as f:

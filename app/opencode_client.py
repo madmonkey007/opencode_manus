@@ -63,7 +63,17 @@ KNOWN_TOOLS = [
 ]
 
 # ✅ JSON大小限制（防止DoS）
-MAX_JSON_SIZE = 10240  # 10KB
+MAX_JSON_SIZE = 10240  # 10KB - 基于单次事件合理大小的安全限制
+
+# 正则表达式模式（预编译以提高性能）
+THOUGHT_PATTERN = re.compile(
+    r"(?:🤔\s*Thought:|Thought:|Thought\s*>\s*|思考[:：])\s*(.*)",
+    re.IGNORECASE
+)
+PHASE_HEADER_PATTERN = re.compile(
+    r"^(?:\[\d+/\d+\]|(?:\d+\.))\s*(.*)",
+    re.IGNORECASE
+)
 
 
 # ====================================================================
@@ -162,7 +172,8 @@ class OpenCodeClient:
                         "type": "message.part.updated",
                         "properties": {"part": part},
                     }
-            except Exception:
+            except (KeyError, TypeError, ValueError) as e:
+                logger.error(f"Failed to normalize question.asked event: {e}")
                 return None
             return None
 
@@ -249,7 +260,8 @@ class OpenCodeClient:
                                 continue
                             try:
                                 event = json.loads(data_str)
-                            except Exception:
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"Failed to parse SSE event JSON: {e}, data: {data_str[:200]}")
                                 continue
                             payload = event.get("payload") or event
                             sid = self._extract_session_id_from_payload(payload)
@@ -263,7 +275,8 @@ class OpenCodeClient:
                                         part = (normalized.get("properties") or {}).get("part") or {}
                                         if part.get("type") == "tool":
                                             state["saw_tool"] = True
-                                except Exception:
+                                except (KeyError, TypeError, AttributeError) as e:
+                                    logger.debug(f"Failed to track tool event: {e}")
                                     pass
                                 await self._broadcast_event(session_id, normalized)
                                 state["events"] += 1
@@ -285,7 +298,7 @@ class OpenCodeClient:
             try:
                 await _stream_events(url)
                 return
-            except Exception as e:
+            except (httpx.HTTPError, asyncio.TimeoutError, ConnectionError) as e:
                 logger.warning(f"[SERVER_API] Event stream failed at {path}: {e}")
                 continue
         state["failed"] = True
@@ -632,6 +645,298 @@ class OpenCodeClient:
             with open(status_file, "w", encoding="utf-8") as f:
                 f.write("error")
 
+    # ====================================================================
+    # Helper Functions for _process_line
+    # ====================================================================
+
+    def _detect_thought_in_text(self, text: str) -> Optional[str]:
+        """
+        从文本中启发式检测thought内容
+
+        Args:
+            text: 待检测的文本
+
+        Returns:
+            如果检测到thought则返回内容，否则返回None
+        """
+        thought_match = THOUGHT_PATTERN.search(text)
+        if thought_match:
+            return thought_match.group(1).strip()
+        return None
+
+    def _detect_phase_header(self, text: str) -> Optional[str]:
+        """
+        从文本中启发式检测phase标题
+
+        Args:
+            text: 待检测的文本
+
+        Returns:
+            如果检测到phase标题则返回标题，否则返回None
+        """
+        phase_header_match = PHASE_HEADER_PATTERN.search(text)
+        if phase_header_match:
+            return phase_header_match.group(1).strip()
+        return None
+
+    def _should_filter_as_noise(self, text: str) -> bool:
+        """
+        判断文本是否应该被过滤为噪音
+
+        Args:
+            text: 待检测的文本
+
+        Returns:
+            如果是噪音则返回True（应该过滤），否则返回False
+        """
+        # 特殊处理：数据库迁移消息需要显示
+        if "database migration" in text.lower():
+            return False
+
+        # 过滤ANSI颜色代码
+        ansi_patterns = ["[0m", "[93m", "[1m", "\x1b[", "[?25"]
+        if any(pattern in text for pattern in ansi_patterns):
+            return True
+
+        # 过滤已知的噪音关键词
+        noise_keywords = [
+            "opencode run",
+            "options:",
+            "positionals:",
+            "message  message to send",
+            "run opencode with",
+            # 过滤 OpenCode CLI 的警告信息
+            "agent \"plan\" is a subagent",
+            "is a subagent, not a primary agent",
+            "falling back to default agent",
+        ]
+        return any(keyword in text.lower() for keyword in noise_keywords)
+
+    async def _try_parse_cli_event(self, text: str, session_id: str) -> bool:
+        """
+        尝试解析为CLI工具事件
+
+        Args:
+            text: 待解析的文本
+            session_id: 会话ID
+
+        Returns:
+            如果成功解析并处理了CLI事件则返回True，否则返回False
+        """
+        stripped_text = text.strip()
+
+        # Early Exit: 检查是否可能是JSON
+        if not stripped_text.startswith(('{', '[')):
+            return False
+
+        # Early Exit: JSON大小限制
+        if len(stripped_text) > MAX_JSON_SIZE:
+            logger.warning(f"[_try_parse_cli_event] JSON too large: {len(stripped_text)}, skipping")
+            return False
+
+        try:
+            event_data = json.loads(stripped_text)
+
+            # 验证事件数据结构
+            if not isinstance(event_data, dict):
+                logger.debug(f"[_try_parse_cli_event] Event is not dict, skipping")
+                return False
+
+            # 验证事件类型
+            if event_data.get('type') != CLI_EVENT_TYPE_TOOL_USE:
+                logger.debug(f"[_try_parse_cli_event] Event type is not tool_use, skipping")
+                return False
+
+            part = event_data.get('part', {})
+
+            # 验证part类型
+            if part.get('type') != PART_TYPE_TOOL:
+                logger.debug(f"[_try_parse_cli_event] Part type is not tool, skipping")
+                return False
+
+            # 提取工具信息
+            tool_name = part.get('tool') or 'unknown'
+            tool_state = part.get('state', {})
+
+            # 验证工具名称
+            if tool_name == 'unknown':
+                logger.warning(f"[_try_parse_cli_event] Missing tool name in part: {part.get('tool')}")
+            elif tool_name not in KNOWN_TOOLS and not tool_name.startswith('common_search__'):
+                logger.warning(f"[_try_parse_cli_event] Unknown tool: {tool_name}")
+
+            # 处理timestamp
+            event_timestamp = event_data.get('timestamp')
+            if event_timestamp is None:
+                event_timestamp = int(datetime.now().timestamp() * 1000)
+
+            # 处理output
+            output_raw = tool_state.get('output')
+            output = str(output_raw) if output_raw is not None else ''
+
+            # 处理input
+            input_raw = tool_state.get('input')
+            if input_raw is None:
+                input_data = {}
+            elif not isinstance(input_raw, dict):
+                logger.warning(f"[_try_parse_cli_event] Invalid input type: {type(input_raw)}, using empty dict")
+                input_data = {}
+            else:
+                input_data = input_raw
+
+            # 发送tool_event到前端
+            await self._broadcast_event(session_id, {
+                "type": "tool_event",
+                "data": {
+                    "type": "tool",
+                    "tool": tool_name,
+                    "tool_name": tool_name,
+                    "status": tool_state.get('status', 'running'),
+                    "input": input_data,
+                    "output": output,
+                    "title": tool_state.get('title', f'Using {tool_name}')
+                },
+                "timestamp": event_timestamp
+            })
+
+            logger.debug(f"[_try_parse_cli_event] Parsed tool_event: {tool_name}")
+            return True
+
+        except json.JSONDecodeError:
+            # 不是有效的JSON，继续作为文本处理
+            logger.debug(f"[_try_parse_cli_event] JSON decode error")
+            return False
+        except Exception as e:
+            logger.warning(f"[_try_parse_cli_event] Error parsing JSON: {e}")
+            return False
+
+    async def _handle_database_migration_message(self, text: str, session_id: str, message_id: str) -> Optional[Dict[str, Any]]:
+        """
+        处理数据库迁移消息（清理ANSI序列）
+
+        Args:
+            text: 原始文本
+            session_id: 会话ID
+            message_id: 消息ID
+
+        Returns:
+            如果是数据库迁移消息则返回事件，否则返回None
+        """
+        if "database migration" not in text.lower():
+            return None
+
+        # 清理ANSI转义序列但保留消息
+        cleaned_text = re.sub(r'\[[?0-9;]+[a-zA-Z]', '', text)
+        if not cleaned_text.strip():
+            return None
+
+        return {
+            "type": "message.part.updated",
+            "properties": {
+                "part": {
+                    "id": generate_part_id("text"),
+                    "session_id": session_id,
+                    "message_id": message_id,
+                    "type": "text",
+                    "content": {"text": cleaned_text.strip() + " "},
+                    "time": {"start": int(datetime.now().timestamp())},
+                }
+            },
+        }
+
+    async def _try_parse_json_event(
+        self,
+        text: str,
+        session_id: str,
+        message_id: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        尝试解析为标准JSON事件
+
+        Args:
+            text: 待解析的文本
+            session_id: 会话ID
+            message_id: 消息ID
+            context: 会话上下文
+
+        Yields:
+            SSE 事件字典
+        """
+        try:
+            event = json.loads(text)
+            event_type = event.get("type")
+            logger.info(f"[_try_parse_json_event] Parsed JSON event: type={event_type}, sessionID={event.get('sessionID')}, my session_id={session_id}")
+
+            # ✅ CRITICAL-001修复：记录CLI sessionID，但不过滤事件
+            # CLI进程有内部sessionID，与API sessionID不同是正常的
+            # 我们只记录它用于调试，但仍然使用API session_id来广播事件
+            event_cli_session_id = event.get('sessionID')
+            if event_cli_session_id and event_cli_session_id != session_id:
+                logger.debug(
+                    f"[_try_parse_json_event] CLI internal sessionID differs from API sessionID:\n"
+                    f"  CLI SessionID: {event_cli_session_id}\n"
+                    f"  API SessionID: {session_id}\n"
+                    f"  This is expected. Using API session_id for broadcasting."
+                )
+
+            # 处理不同类型的事件
+            if event_type == "text":
+                logger.info(f"[_try_parse_json_event] Handling text event")
+                async for e in self._handle_text_event(
+                    event, session_id, message_id, context
+                ):
+                    yield e
+
+            elif event_type == "tool_use":
+                logger.info(f"[_try_parse_json_event] Handling tool_use event, tool={event.get('part', {}).get('tool')}")
+                async for e in self._handle_tool_use_event(
+                    event, session_id, message_id
+                ):
+                    yield e
+
+            elif event_type == "thought":
+                logger.info(f"[_try_parse_json_event] Handling thought event")
+                async for e in self._handle_thought_event(
+                    event, session_id, message_id
+                ):
+                    yield e
+            elif event_type == "reasoning" or event_type == "thinking":
+                logger.info(f"[_try_parse_json_event] Handling {event_type} event")
+                async for e in self._handle_thought_event(
+                    event, session_id, message_id
+                ):
+                    yield e
+
+            elif event_type == "step_start" or event_type == "step-start":
+                logger.info(f"[_try_parse_json_event] Handling step_start event")
+                async for e in self._handle_step_start_event(
+                    event, session_id, message_id, context
+                ):
+                    yield e
+
+            elif event_type == "step_finish" or event_type == "step-finish":
+                logger.info(f"[_try_parse_json_event] Handling step_finish event, reason={event.get('reason')}")
+                async for e in self._handle_step_finish_event(
+                    event, session_id, message_id, context
+                ):
+                    yield e
+
+            elif event_type == "error":
+                logger.info(f"[_try_parse_json_event] Handling error event")
+                yield self._handle_error_event(event, session_id)
+
+            else:
+                logger.warning(f"[_try_parse_json_event] Unknown event type: {event_type}")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"[_try_parse_json_event] JSON decode error: {e}, text: {text[:100]}")
+        except Exception as e:
+            logger.error(f"[_try_parse_json_event] Error processing JSON event: {e}", exc_info=True)
+
+    # ====================================================================
+    # Main Line Processing Function
+    # ====================================================================
+
     async def _process_line(
         self,
         text: str,
@@ -646,6 +951,7 @@ class OpenCodeClient:
             text: 输出行
             session_id: 会话ID
             message_id: 消息ID
+            context: 会话上下文
 
         Yields:
             SSE 事件字典
@@ -653,131 +959,42 @@ class OpenCodeClient:
         # MARKER: 调试日志
         logger.info(f"[_process_line] Processing line: {text[:100]}...")
 
-        # 尝试解析为 JSON
+        # ====================================================================
+        # 路径1: 尝试解析为标准JSON事件
+        # ====================================================================
         if text.startswith("{") and text.endswith("}"):
-            try:
-                event = json.loads(text)
-                event_type = event.get("type")
-                logger.info(f"[_process_line] Parsed JSON event: type={event_type}, sessionID={event.get('sessionID')}, my session_id={session_id}")
-
-                # ✅ CRITICAL-001修复：记录CLI sessionID，但不过滤事件
-                # CLI进程有内部sessionID，与API sessionID不同是正常的
-                # 我们只记录它用于调试，但仍然使用API session_id来广播事件
-                event_cli_session_id = event.get('sessionID')
-                if event_cli_session_id and event_cli_session_id != session_id:
-                    logger.debug(
-                        f"[_process_line] CLI internal sessionID differs from API sessionID:\n"
-                        f"  CLI SessionID: {event_cli_session_id}\n"
-                        f"  API SessionID: {session_id}\n"
-                        f"  This is expected. Using API session_id for broadcasting."
-                    )
-                    # ✅ 不要拒绝事件，继续使用API的session_id处理
-
-                # 处理不同类型的事件
-                if event_type == "text":
-                    logger.info(f"[_process_line] Handling text event")
-                    async for e in self._handle_text_event(
-                        event, session_id, message_id, context
-                    ):
-                        yield e
-                        # 立即刷新，防止SSE事件批量累积
-                        await asyncio.sleep(0)
-
-                elif event_type == "tool_use":
-                    logger.info(f"[_process_line] Handling tool_use event, tool={event.get('part', {}).get('tool')}")
-                    async for e in self._handle_tool_use_event(
-                        event, session_id, message_id
-                    ):
-                        yield e
-                        # 立即刷新，防止SSE事件批量累积
-                        await asyncio.sleep(0)
-
-                elif event_type == "thought":
-                    logger.info(f"[_process_line] Handling thought event")
-                    async for e in self._handle_thought_event(
-                        event, session_id, message_id
-                    ):
-                        yield e
-                        # 立即刷新，防止SSE事件批量累积
-                        await asyncio.sleep(0)
-                elif event_type == "reasoning" or event_type == "thinking":
-                    logger.info(f"[_process_line] Handling {event_type} event")
-                    async for e in self._handle_thought_event(
-                        event, session_id, message_id
-                    ):
-                        yield e
-                        # 立即刷新，防止SSE事件批量累积
-                        await asyncio.sleep(0)
-
-                elif event_type == "step_start" or event_type == "step-start":
-                    logger.info(f"[_process_line] Handling step_start event")
-                    async for e in self._handle_step_start_event(
-                        event, session_id, message_id, context
-                    ):
-                        yield e
-                        # 立即刷新，防止SSE事件批量累积
-                        await asyncio.sleep(0)
-
-                elif event_type == "step_finish" or event_type == "step-finish":
-                    logger.info(f"[_process_line] Handling step_finish event, reason={event.get('reason')}")
-                    async for e in self._handle_step_finish_event(
-                        event, session_id, message_id, context
-                    ):
-                        yield e
-                        # 立即刷新，防止SSE事件批量累积
-                        await asyncio.sleep(0)
-
-                elif event_type == "error":
-                    logger.info(f"[_process_line] Handling error event")
-                    yield self._handle_error_event(event, session_id)
-                    # 立即刷新，防止SSE事件批量累积
-                    await asyncio.sleep(0)
-
-                else:
-                    logger.warning(f"[_process_line] Unknown event type: {event_type}")
-                # 其他类型忽略
-                return
-
-            except json.JSONDecodeError as e:
-                logger.error(f"[_process_line] JSON decode error: {e}, text: {text[:100]}")
-            except Exception as e:
-                logger.error(f"[_process_line] Error processing JSON event: {e}", exc_info=True)
-
-        # 处理非 JSON 行（Thought 等）
-        thought_match = re.search(
-            r"(?:🤔\s*Thought:|Thought:|Thought\s*>\s*|思考[:：])\s*(.*)",
-            text,
-            re.IGNORECASE,
-        )
-        if thought_match:
-            content = thought_match.group(1).strip()
-            if content:
-                yield {
-                    "type": "message.part.updated",
-                    "properties": {
-                        "part": {
-                            "id": generate_part_id("thought"),
-                            "session_id": session_id,
-                            "message_id": message_id,
-                            "type": "thought",
-                            "content": {"text": content},
-                            "time": {"start": int(datetime.now().timestamp())},
-                        }
-                    },
-                }
-                # 立即刷新，防止SSE事件批量累积
-                await asyncio.sleep(0)
+            async for event in self._try_parse_json_event(text, session_id, message_id, context):
+                yield event
             return
 
-        # 启发式 Phase 标题检测：捕获形如 "[1/10] Plan" 或 "1. 系统检查" 的行
-        phase_header_match = re.search(
-            r"^(?:\[\d+/\d+\]|(?:\d+\.))\s*(.*)", text, re.IGNORECASE
-        )
-        if phase_header_match and context and context.get("current_step_id"):
-            new_title = phase_header_match.group(1).strip()
-            if new_title and new_title != context.get("current_step_title"):
-                context["current_step_title"] = new_title
-                logger.info(f"Heuristic title detection: {new_title}")
+        # ====================================================================
+        # 路径2: 处理非JSON行 - Thought检测
+        # ====================================================================
+        thought_content = self._detect_thought_in_text(text)
+        if thought_content:
+            yield {
+                "type": "message.part.updated",
+                "properties": {
+                    "part": {
+                        "id": generate_part_id("thought"),
+                        "session_id": session_id,
+                        "message_id": message_id,
+                        "type": "thought",
+                        "content": {"text": thought_content},
+                        "time": {"start": int(datetime.now().timestamp())},
+                    }
+                },
+            }
+            return
+
+        # ====================================================================
+        # 路径3: 启发式Phase标题检测
+        # ====================================================================
+        phase_title = self._detect_phase_header(text)
+        if phase_title and context and context.get("current_step_id"):
+            if phase_title != context.get("current_step_title"):
+                context["current_step_title"] = phase_title
+                logger.info(f"[_process_line] Heuristic title detection: {phase_title}")
                 yield {
                     "type": "message.part.updated",
                     "properties": {
@@ -786,157 +1003,52 @@ class OpenCodeClient:
                             "session_id": session_id,
                             "message_id": message_id,
                             "type": "step-start",
-                            "content": {"text": new_title},
-                            "metadata": {"title": new_title},
+                            "content": {"text": phase_title},
+                            "metadata": {"title": phase_title},
                         }
                     },
                 }
-                # 立即刷新，防止SSE事件批量累积
-                await asyncio.sleep(0)
+                return
 
-        # ✅ 阶段2原型 + 优化：尝试解析JSON格式的子代理事件
-        # CLI可能输出JSON格式的tool_use事件
-        
-        # ✅ 修复可读性：缓存strip结果（避免多次调用）
-        stripped_text = text.strip()
-        
-        # ✅ 修复可读性 + 性能：使用早期返回减少嵌套
-        # 检查1：是否可能是JSON（启发式）
-        if not stripped_text.startswith(('{', '[')):
-            pass  # 不是JSON，继续文本处理
-        else:
-            # 检查2：JSON大小限制
-            if len(stripped_text) > MAX_JSON_SIZE:
-                logger.warning(f"[_process_line] JSON too large: {len(stripped_text)}, skipping")
-            else:
-                # 尝试解析JSON
-                try:
-                    event_data = json.loads(stripped_text)
-                    
-                    # 检查3：验证是字典类型
-                    if not isinstance(event_data, dict):
-                        logger.debug(f"[_process_line] Event is not dict, skipping")
-                    # 检查4：验证事件类型
-                    elif event_data.get('type') != CLI_EVENT_TYPE_TOOL_USE:
-                        logger.debug(f"[_process_line] Event type is not tool_use, skipping")
-                    else:
-                        part = event_data.get('part', {})
-                        
-                        # 检查5：验证part类型
-                        if part.get('type') != PART_TYPE_TOOL:
-                            logger.debug(f"[_process_line] Part type is not tool, skipping")
-                        else:
-                            # ✅ 修复正确性：提取工具名称并验证
-                            tool_name = part.get('tool') or 'unknown'
-                            tool_state = part.get('state', {})
-                            
-                            # ✅ 修复正确性：验证工具名称
-                            if tool_name == 'unknown':
-                                logger.warning(f"[_process_line] Missing tool name in part: {part.get('tool')}")
-                            elif tool_name not in KNOWN_TOOLS and not tool_name.startswith('common_search__'):
-                                logger.info(f"[_process_line] Unknown tool: {tool_name}")
-                            
-                            # ✅ 修复正确性：正确处理timestamp（避免0被替换）
-                            # 只有当timestamp不存在或为None时才使用当前时间
-                            event_timestamp = event_data.get('timestamp')
-                            if event_timestamp is None:
-                                event_timestamp = int(datetime.now().timestamp() * 1000)
-                            
-                            # ✅ 修复正确性：添加类型验证和转换
-                            output_raw = tool_state.get('output')
-                            output = str(output_raw) if output_raw is not None else ''
-                            
-                            input_raw = tool_state.get('input')
-                            if input_raw is None:
-                                input_data = {}
-                            elif not isinstance(input_raw, dict):
-                                logger.warning(f"[_process_line] Invalid input type: {type(input_raw)}, using empty dict")
-                                input_data = {}
-                            else:
-                                input_data = input_raw
-                            
-                            # ✅ 解析成功，发送tool_event到前端
-                            await self._broadcast_event(session_id, {
-                                "type": "tool_event",
-                                "data": {
-                                    "type": "tool",
-                                    "tool": tool_name,
-                                    "tool_name": tool_name,
-                                    "status": tool_state.get('status', 'running'),
-                                    "input": input_data,
-                                    "output": output,
-                                    "title": tool_state.get('title', f'Using {tool_name}')
-                                },
-                                "timestamp": event_timestamp
-                            })
-                            
-                            logger.debug(f"[_process_line] Parsed tool_event: {tool_name}")
-                            return  # 已处理，不再作为文本
-                
-                except json.JSONDecodeError as e:
-                    # 不是有效的JSON，继续作为文本处理
-                    logger.debug(f"[_process_line] JSON decode error: {e}")
-                except Exception as e:
-                    logger.warning(f"[_process_line] Error parsing JSON: {e}")
-                    # 继续作为文本处理
-        
-        # 过滤噪音
-        # ✅ 修复：特殊处理数据库迁移消息（即使包含ANSI序列也要显示）
-        if "database migration" in text.lower():
-            # 清理ANSI转义序列但保留消息
-            import re as _re
-            cleaned_text = _re.sub(r'\[[?0-9;]+[a-zA-Z]', '', text)
-            if cleaned_text.strip():
-                yield {
-                    "type": "message.part.updated",
-                    "properties": {
-                        "part": {
-                            "id": generate_part_id("text"),
-                            "session_id": session_id,
-                            "message_id": message_id,
-                            "type": "text",
-                            "content": {"text": cleaned_text.strip() + " "},
-                            "time": {"start": int(datetime.now().timestamp())},
-                        }
-                    },
+        # ====================================================================
+        # 路径4: 尝试解析CLI工具事件
+        # ====================================================================
+        if await self._try_parse_cli_event(text, session_id):
+            return
+
+        # ====================================================================
+        # 路径5: 特殊处理数据库迁移消息
+        # ====================================================================
+        db_event = await self._handle_database_migration_message(text, session_id, message_id)
+        if db_event:
+            yield db_event
+            return
+
+        # ====================================================================
+        # 路径6: 过滤噪音
+        # ====================================================================
+        if self._should_filter_as_noise(text):
+            # ANSI代码已被过滤，直接返回
+            if any(pattern in text for pattern in ["[0m", "[93m", "[1m", "\x1b[", "[?25"]):
+                logger.debug(f"[_process_line] Filtered ANSI color code line")
+            return
+
+        # ====================================================================
+        # 路径7: 默认作为普通文本处理
+        # ====================================================================
+        yield {
+            "type": "message.part.updated",
+            "properties": {
+                "part": {
+                    "id": generate_part_id("text"),
+                    "session_id": session_id,
+                    "message_id": message_id,
+                    "type": "text",
+                    "content": {"text": text + " "},
+                    "time": {"start": int(datetime.now().timestamp())},
                 }
-                # 立即刷新，防止SSE事件批量累积
-                await asyncio.sleep(0)
-            return
-
-        # 先检查 ANSI 颜色代码和 CLI 警告（使用原始文本）
-        if any(pattern in text for pattern in ["[0m", "[93m", "[1m", "\x1b[", "[?25"]):
-            logger.debug(f"[_process_line] Filtered ANSI color code line")
-            return
-
-        noise_keywords = [
-            "opencode run",
-            "options:",
-            "positionals:",
-            "message  message to send",
-            "run opencode with",
-            # 过滤 OpenCode CLI 的警告信息
-            "agent \"plan\" is a subagent",
-            "is a subagent, not a primary agent",
-            "falling back to default agent",
-        ]
-        if not any(keyword in text.lower() for keyword in noise_keywords):
-            # 作为普通文本处理
-            yield {
-                "type": "message.part.updated",
-                "properties": {
-                    "part": {
-                        "id": generate_part_id("text"),
-                        "session_id": session_id,
-                        "message_id": message_id,
-                        "type": "text",
-                        "content": {"text": text + " "},
-                        "time": {"start": int(datetime.now().timestamp())},
-                    }
-                },
-            }
-            # 立即刷新，防止SSE事件批量累积
-            await asyncio.sleep(0)
+            },
+        }
 
     async def _handle_text_event(
         self,
@@ -970,8 +1082,6 @@ class OpenCodeClient:
                                 }
                             },
                         }
-                        # 立即刷新，防止SSE事件批量累积
-                        await asyncio.sleep(0)
 
             # 同时检查是否有 reasoning_content
             reasoning = event.get("part", {}).get("reasoning_content") or event.get(
@@ -991,8 +1101,6 @@ class OpenCodeClient:
                         }
                     },
                 }
-                # 立即刷新，防止SSE事件批量累积
-                await asyncio.sleep(0)
 
             yield {
                 "type": "message.part.updated",
@@ -1007,8 +1115,6 @@ class OpenCodeClient:
                     }
                 },
             }
-            # 立即刷新，防止SSE事件批量累积
-            await asyncio.sleep(0)
 
     async def _handle_tool_use_event(
         self, event: Dict[str, Any], session_id: str, message_id: str
@@ -1028,8 +1134,6 @@ class OpenCodeClient:
                     "message": "Invalid tool_use event: missing 'part' field"
                 }
             }
-            # 立即刷新，防止SSE事件批量累积
-            await asyncio.sleep(0)
             return
 
         tool_name = part.get("tool", "unknown")
@@ -1112,8 +1216,6 @@ class OpenCodeClient:
                 "message_id": message_id,
             },
         }
-        # 立即刷新，防止SSE事件批量累积
-        await asyncio.sleep(0)
 
         # ✅ v=38修复：保存tool part到数据库
         if self.history_service:
@@ -1521,6 +1623,13 @@ class OpenCodeClient:
             or part.get("step_id")
             or (context.get("current_step_id") if context else None)
         )
+
+        # 提取步骤完成信息
+        result = part.get("result") or event.get("result") or ""
+        status = part.get("status") or event.get("status") or "completed"
+        reason = part.get("reason") or event.get("reason") or ""
+        timestamp = part.get("timestamp") or event.get("timestamp") or int(datetime.now().timestamp())
+
         tokens = event.get("tokens", {}) or part.get("tokens", {})
         reasoning_tokens = tokens.get("reasoning", 0)
 
@@ -1538,6 +1647,38 @@ class OpenCodeClient:
 
         # 如果没有实际思考内容，跳过（不显示 token 数的占位消息）
         if not thought_content:
+            # 但仍然发送完成信号
+            if step_id:
+                yield {
+                    "type": "message.part.updated",
+                    "properties": {
+                        "part": {
+                            "id": step_id,
+                            "session_id": session_id,
+                            "message_id": message_id,
+                            "type": "step-finish",
+                            "content": {"text": result or "Step completed"},
+                            "metadata": {"result": result, "status": status},
+                            "time": {"end": timestamp},
+                        }
+                    },
+                }
+
+                # 如果reason提供了，发送一个thought事件
+                if reason:
+                    yield {
+                        "type": "message.part.updated",
+                        "properties": {
+                            "part": {
+                                "id": generate_part_id("thought"),
+                                "session_id": session_id,
+                                "message_id": message_id,
+                                "type": "thought",
+                                "content": {"text": f"Step finished: {reason}"},
+                                "time": {"start": timestamp},
+                            }
+                        },
+                    }
             return
 
         # 如果有任何思考信息，生成思考事件
@@ -1557,7 +1698,6 @@ class OpenCodeClient:
             }
 
         # 发送阶段完成信号
-        step_id = part.get("id") or part.get("step_id")
         if step_id:
             yield {
                 "type": "message.part.updated",
@@ -1573,8 +1713,6 @@ class OpenCodeClient:
                     }
                 },
             }
-            # 立即刷新，防止SSE事件批量累积
-            await asyncio.sleep(0)
 
             # 如果reason提供了，发送一个thought事件
             if reason:
@@ -1591,10 +1729,6 @@ class OpenCodeClient:
                         }
                     },
                 }
-                # 立即刷新，防止SSE事件批量累积
-                await asyncio.sleep(0)
-            except Exception as e:
-                logger.error(f"[_handle_step_finish_event] Error: {e}")
 
     def _handle_error_event(
         self, event: Dict[str, Any], session_id: str
@@ -1787,7 +1921,8 @@ class OpenCodeClient:
                             if health_response.status_code == 200:
                                 health_ok = True
                                 break
-                        except Exception:
+                        except (httpx.HTTPError, asyncio.TimeoutError) as e:
+                            logger.debug(f"Health check failed: {e}")
                             continue
                     if health_ok:
                         break
@@ -1884,7 +2019,8 @@ class OpenCodeClient:
                             parts = _flatten_assistant_parts(messages)
                             if parts:
                                 break
-                        except Exception:
+                        except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
+                            logger.debug(f"Poll parts attempt failed: {e}")
                             continue
                     return parts
 
@@ -1914,7 +2050,8 @@ class OpenCodeClient:
                             )
                             if messages_resp.status_code == 200:
                                 parts = _flatten_assistant_parts(messages_resp.json())
-                        except Exception:
+                        except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
+                            logger.debug(f"Fetch additional parts failed: {e}")
                             pass
                 except httpx.HTTPStatusError as e:
                     if e.response is not None and e.response.status_code == 404:
@@ -1928,7 +2065,8 @@ class OpenCodeClient:
                         stop_event.set()
                         try:
                             await asyncio.wait_for(stream_task, timeout=2)
-                        except Exception:
+                        except (asyncio.TimeoutError, asyncio.CancelledError) as e:
+                            logger.debug(f"Stream task wait failed: {e}")
                             stream_task.cancel()
                         stop_event = asyncio.Event()
                         stream_task = asyncio.create_task(
@@ -1960,7 +2098,8 @@ class OpenCodeClient:
                                 )
                                 if messages_resp.status_code == 200:
                                     parts = _flatten_assistant_parts(messages_resp.json())
-                            except Exception:
+                            except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
+                                logger.debug(f"Fetch message parts failed: {e}")
                                 pass
                 except httpx.ReadTimeout as e:
                     logger.warning(
@@ -1984,7 +2123,8 @@ class OpenCodeClient:
                 stop_event.set()
                 try:
                     await asyncio.wait_for(stream_task, timeout=5)
-                except Exception:
+                except (asyncio.TimeoutError, asyncio.CancelledError) as e:
+                    logger.debug(f"Stream task cleanup failed: {e}")
                     stream_task.cancel()
 
                 # If SSE yielded events, avoid duplicate manual part broadcasting
@@ -2161,103 +2301,7 @@ async def execute_opencode_message(
     await client.execute_message(session_id, message_id, user_prompt, mode=mode)
 
 
-# 说明：当前已支持优先通过 Server HTTP API 执行，CLI 仅作为回退路径。
-#
-# async def execute_opencode_message_with_manager(
-#     session_id: str,
-#     message_id: str,
-#     user_prompt: str,
-#     workspace_base: str,
-#     mode: str = "auto",
-# ):
-#     """
-#     使用全局OpenCodeServerManager执行OpenCode消息（性能优化版本）
-#     
-#     优势：
-#     - 复用全局opencode serve进程（首次15秒，后续2秒）
-#     - 避免每个任务都启动新进程
-#     - 适用于多任务场景
-#     
-#     Args:
-#         session_id: 会话ID
-#         message_id: 消息ID
-#         user_prompt: 用户提示词
-#         workspace_base: 工作区基础路径
-#         mode: 运行模式
-#     
-#     注意：这是一个会阻塞的async函数，不是generator。
-#     所有SSE事件都通过_broadcast_event直接广播到前端。
-#     """
-#     # 延迟导入，避免循环导入问题
-#     # Import from managers_internal module to avoid circular imports
-#     from app.managers_internal import get_opencode_server_manager
-#     import logging
-#     import json
-# 
-#     logger = logging.getLogger(__name__)
-# 
-#     try:
-#         # 获取全局OpenCodeServerManager实例（懒加载）
-#         manager = await get_opencode_server_manager()
-# 
-#         logger.info(f"[Perf] Using global OpenCodeServerManager for session {session_id}")
-# 
-#         # 创建client实例用于广播事件
-#         client = OpenCodeClient(workspace_base)
-# 
-#         # 使用manager的execute方法（会复用已启动的opencode serve）
-#         # manager.execute返回AsyncGenerator[str, None]，每个元素是SSE事件
-#         event_count = 0
-#         async for response_chunk in manager.execute(session_id, user_prompt, mode):
-#             # 解析SSE事件（格式：data: {...}）
-#             line = response_chunk.strip()
-# 
-#             logger.debug(f"[Perf] SSE line received: {repr(line[:100])}")  # 只打印前100个字符
-# 
-#             # 跳过空行和注释
-#             if not line or line.startswith(':'):
-#                 logger.debug(f"[Perf] Skipping line: {repr(line)}")
-#                 continue
-# 
-#             # 处理data行
-#             if line.startswith('data: '):
-#                 data_content = line[6:]  # 去掉 "data: " 前缀
-#                 logger.debug(f"[Perf] SSE data: {repr(data_content[:100])}")  # 只打印前100个字符
-# 
-#                 # 检查是否是结束标记
-#                 if data_content == '[DONE]':
-#                     logger.info(f"[Perf] SSE stream ended with [DONE]")
-#                     break
-# 
-#                 # 解析JSON
-#                 try:
-#                     event = json.loads(data_content)
-#                     # 记录事件类型
-#                     event_type = event.get('type', 'unknown')
-#                     logger.debug(f"[Perf] Broadcasting event type: {event_type}")
-#                     # 广播事件到前端
-#                     await client._broadcast_event(session_id, event)
-#                     event_count += 1
-# 
-#                 except json.JSONDecodeError as e:
-#                     logger.warning(f"[Perf] Failed to parse SSE data: {e}, data: {data_content[:200]}")
-#                 except Exception as e:
-#                     logger.error(f"[Perf] Error broadcasting event: {e}", exc_info=True)
-#             else:
-#                 logger.debug(f"[Perf] Line does not start with 'data: ', line: {repr(line[:100])}")
-# 
-#         logger.info(f"[Perf] Completed message execution for session {session_id}, total events: {event_count}")
-# 
-#     except Exception as e:
-#         logger.error(f"[Perf] Error in execute_opencode_message_with_manager: {e}", exc_info=True)
-#         # 发送错误事件到前端
-#         client = OpenCodeClient(workspace_base)
-#         error_event = {
-#             "type": "error",
-#             "content": f"Error executing message: {str(e)}"
-#         }
-#         await client._broadcast_event(session_id, error_event)
-#         raise
+
 
 
 
@@ -2293,3 +2337,54 @@ def map_tool_to_type(tool_name: str) -> str:
         return "file_editor"
 
     return "file_editor"  # Default fallback
+
+# ====================================================================
+# 修复500错误：恢复execute_opencode_message_with_manager函数
+# ====================================================================
+# 这个函数被意外注释掉，导致api.py导入失败，返回500错误
+# 简化版本：直接调用OpenCodeClient.execute_message
+
+async def execute_opencode_message_with_manager(
+    session_id: str,
+    message_id: str,
+    user_prompt: str,
+    workspace_base: str,
+    mode: str = "auto",
+) -> None:
+    """
+    使用OpenCodeClient执行OpenCode消息（通过Server HTTP API）
+
+    这是api.py中调用的入口函数，简化为直接调用OpenCodeClient.execute_message。
+
+    执行流程：
+    1. 创建OpenCodeClient实例
+    2. 调用execute_message（优先使用Server HTTP API，CLI作为回退）
+    3. 所有SSE事件通过_broadcast_event广播到EventStreamManager
+
+    Args:
+        session_id: Session ID
+        message_id: Message ID
+        user_prompt: 用户提示词
+        workspace_base: 工作区基础路径
+        mode: 运行模式（auto/plan/build）
+
+    Returns:
+        None
+
+    Raises:
+        Exception: 如果execute_message失败（会记录日志并重新抛出）
+
+    Note:
+        这是一个会阻塞的async函数，必须在BackgroundTasks中调用以避免阻塞响应。
+        与旧版本（已注释）不同，这个简化版本直接调用execute_message，
+        不再通过OpenCodeServerManager包装。
+    """
+    logger = logging.getLogger(__name__)
+
+    try:
+        client = OpenCodeClient(workspace_base)
+        await client.execute_message(session_id, message_id, user_prompt, mode=mode)
+        logger.info(f"[execute_opencode_message_with_manager] Successfully executed message {message_id} for session {session_id}")
+    except Exception as e:
+        logger.error(f"[execute_opencode_message_with_manager] Failed to execute message {message_id} for session {session_id}: {e}", exc_info=True)
+        raise

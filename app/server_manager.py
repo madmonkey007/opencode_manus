@@ -130,11 +130,30 @@ class OpenCodeServerManager:
                 logger.info(f"Using config: {config_file}")
 
             # 创建进程组，便于信号控制
+            # ✅ 修复：将资源限制整合到preexec_fn中
+            def set_limits_and_session():
+                """设置进程组和资源限制"""
+                # 1. 创建新会话（进程组）
+                os.setsid()
+                
+                # 2. 设置资源限制
+                try:
+                    # 限制CPU时间为5分钟
+                    resource.setrlimit(resource.RLIMIT_CPU, (300, 300))
+                    # 限制内存使用为1GB
+                    resource.setrlimit(resource.RLIMIT_AS, (1024*1024*1024, 1024*1024*1024))
+                    # 限制文件描述符数量
+                    resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))
+                except (OSError, ValueError) as e:
+                    # 资源限制失败不应该阻止进程启动
+                    pass
+            
             preexec_fn = None
             if os.name != 'nt':  # Unix-like systems
-                preexec_fn = os.setsid
+                preexec_fn = set_limits_and_session
             
-            # 启动进程（后台，不阻塞），添加资源限制
+            # ✅ 修复：移除start_new_session参数（与preexec_fn冲突）
+            # 启动进程（后台，不阻塞）
             self.process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -143,22 +162,10 @@ class OpenCodeServerManager:
                 bufsize=1,
                 universal_newlines=True,
                 preexec_fn=preexec_fn,
-                # 资源限制（防止资源滥用）
-                start_new_session=True,  # 创建新的会话
             )
             
-            # 在Unix系统上设置资源限制
-            if os.name != 'nt':
-                try:
-                    # 限制CPU时间为5分钟
-                    resource.setrlimit(resource.RLIMIT_CPU, (300, 300))
-                    # 限制内存使用为1GB
-                    resource.setrlimit(resource.RLIMIT_AS, (1024*1024*1024, 1024*1024*1024))
-                    # 限制文件描述符数量
-                    resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))
-                    logger.debug("Process resource limits applied")
-                except (OSError, ValueError) as e:
-                    logger.warning(f"Failed to set resource limits: {e}")
+            # ❌ 删除：资源限制已在preexec_fn中设置，不需要在这里重复设置
+            # （之前的代码在Popen之后设置，实际上限制的是当前进程，不是子进程）
 
             # 等待服务器启动（最多30秒）
             for i in range(30):
@@ -183,6 +190,20 @@ class OpenCodeServerManager:
             return False
         except PermissionError as e:
             logger.error(f"Permission denied: {e}")
+            return False
+        except OSError as e:
+            if "Address already in use" in str(e) or "port" in str(e).lower():
+                logger.error(f"Port {self.port} is already in use or unavailable")
+            else:
+                logger.error(f"OS error starting server: {e}")
+            return False
+        except ValueError as e:
+            # ✅ 改进：区分不同类型的ValueError
+            if "preexec_fn" in str(e) and "start_new_session" in str(e):
+                logger.error(f"subprocess.Popen parameter conflict: {e}")
+                logger.error(f"Bug: preexec_fn and start_new_session cannot be used together")
+            else:
+                logger.error(f"ValueError starting server: {e}")
             return False
         except OSError as e:
             if "Address already in use" in str(e) or "port" in str(e).lower():
