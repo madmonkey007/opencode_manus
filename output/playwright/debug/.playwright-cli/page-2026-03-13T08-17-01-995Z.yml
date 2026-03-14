@@ -1,0 +1,167 @@
+- generic [ref=e1]:
+  - complementary [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - generic [ref=e6]: eco
+          - generic [ref=e7]: OpenCode
+        - button "left_panel_close" [ref=e8] [cursor=pointer]:
+          - generic [ref=e9]: left_panel_close
+      - generic [ref=e10]:
+        - button "edit_square 新任务" [ref=e12] [cursor=pointer]:
+          - generic [ref=e13]: edit_square
+          - generic [ref=e14]: 新任务
+        - button "create_new_folder 新建项目" [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: create_new_folder
+          - generic [ref=e17]: 新建项目
+        - generic [ref=e18]:
+          - text: 所有任务
+          - generic [ref=e19]: filter_list
+        - generic [ref=e461]:
+          - generic [ref=e462] [cursor=pointer]:
+            - generic [ref=e463]: folder
+            - generic "双击重命名" [ref=e464]: 默认项目
+            - generic [ref=e465]: "6"
+          - generic [ref=e466]:
+            - generic [ref=e468] [cursor=pointer]:
+              - generic [ref=e469]:
+                - generic [ref=e470]: task
+                - generic [ref=e471]: 写一个简单的网页版闹钟...
+              - button "delete" [ref=e472]:
+                - generic [ref=e473]: delete
+            - generic [ref=e475] [cursor=pointer]:
+              - generic [ref=e476]:
+                - generic [ref=e477]: task
+                - generic [ref=e478]: 写一个简单的网页版闹钟...
+              - button "delete" [ref=e479]:
+                - generic [ref=e480]: delete
+            - generic [ref=e482] [cursor=pointer]:
+              - generic [ref=e483]:
+                - generic [ref=e484]: task
+                - generic [ref=e485]: 写一个简单的网页版闹钟...
+              - button "delete" [ref=e486]:
+                - generic [ref=e487]: delete
+            - generic [ref=e489] [cursor=pointer]:
+              - generic [ref=e490]:
+                - generic [ref=e491]: task
+                - generic [ref=e492]: New Session...
+              - button "delete" [ref=e493]:
+                - generic [ref=e494]: delete
+            - generic [ref=e496] [cursor=pointer]:
+              - generic [ref=e497]:
+                - generic [ref=e498]: task
+                - generic [ref=e499]: New Session...
+              - button "delete" [ref=e500]:
+                - generic [ref=e501]: delete
+            - generic [ref=e503] [cursor=pointer]:
+              - generic [ref=e504]:
+                - generic [ref=e505]: task
+                - generic [ref=e506]: New Session...
+              - button "delete" [ref=e507]:
+                - generic [ref=e508]: delete
+      - generic [ref=e69]:
+        - button "O 我的 设置" [ref=e70] [cursor=pointer]:
+          - generic [ref=e71]: O
+          - generic [ref=e72]:
+            - generic [ref=e73]: 我的
+            - generic [ref=e74]: 设置
+        - button "dark_mode" [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: dark_mode
+  - main [ref=e77]:
+    - generic [ref=e78]:
+      - generic [ref=e80] [cursor=pointer]:
+        - generic [ref=e81]: OpenCode 1.0
+        - generic [ref=e82]: expand_more
+      - generic [ref=e94]: UVN Projection Active
+    - generic [ref=e509]:
+      - heading "今天可以帮你做什么？" [level=1] [ref=e510]
+      - generic [ref=e513]:
+        - button "psychology Plan 分析" [ref=e514] [cursor=pointer]:
+          - generic [ref=e515]:
+            - generic [ref=e516]: psychology
+            - generic [ref=e517]: Plan 分析
+        - button "build Build 开发" [ref=e518] [cursor=pointer]:
+          - generic [ref=e519]:
+            - generic [ref=e520]: build
+            - generic [ref=e521]: Build 开发
+        - button "auto_awesome Auto 智能" [ref=e522] [cursor=pointer]:
+          - generic [ref=e523]:
+            - generic [ref=e524]: auto_awesome
+            - generic [ref=e525]: Auto 智能
+      - generic [ref=e526]:
+        - generic [ref=e527]:
+          - textbox "输入 '/' 选择技能" [active] [ref=e528]
+          - generic [ref=e529]:
+            - generic [ref=e530]:
+              - button "add" [ref=e531] [cursor=pointer]:
+                - generic [ref=e532]: add
+              - button "hub" [ref=e533] [cursor=pointer]:
+                - generic [ref=e534]: hub
+              - button "bolt" [ref=e535] [cursor=pointer]:
+                - generic [ref=e536]: bolt
+              - button "description" [ref=e537] [cursor=pointer]:
+                - generic [ref=e538]: description
+            - generic [ref=e539]:
+              - button "mic" [ref=e540] [cursor=pointer]:
+                - generic [ref=e541]: mic
+              - button "arrow_upward" [ref=e542] [cursor=pointer]:
+                - generic [ref=e543]: arrow_upward
+        - generic [ref=e544]:
+          - generic [ref=e545]:
+            - button "present_to_all 生成幻灯片" [ref=e546] [cursor=pointer]:
+              - generic [ref=e547]: present_to_all
+              - generic [ref=e548]: 生成幻灯片
+            - button "description 撰写文档" [ref=e549] [cursor=pointer]:
+              - generic [ref=e550]: description
+              - generic [ref=e551]: 撰写文档
+            - button "palette 生成设计" [ref=e552] [cursor=pointer]:
+              - generic [ref=e553]: palette
+              - generic [ref=e554]: 生成设计
+            - button "auto_stories 创建故事绘本" [ref=e555] [cursor=pointer]:
+              - generic [ref=e556]: auto_stories
+              - generic [ref=e557]: 创建故事绘本
+            - button "manage_search 批量调研" [ref=e558] [cursor=pointer]:
+              - generic [ref=e559]: manage_search
+              - generic [ref=e560]: 批量调研
+          - generic [ref=e561]:
+            - button "bar_chart 分析数据" [ref=e562] [cursor=pointer]:
+              - generic [ref=e563]: bar_chart
+              - generic [ref=e564]: 分析数据
+            - button "language 创建网页" [ref=e565] [cursor=pointer]:
+              - generic [ref=e566]: language
+              - generic [ref=e567]: 创建网页
+            - button "picture_as_pdf 翻译 PDF" [ref=e568] [cursor=pointer]:
+              - generic [ref=e569]: picture_as_pdf
+              - generic [ref=e570]: 翻译 PDF
+            - button "movie 总结视频" [ref=e571] [cursor=pointer]:
+              - generic [ref=e572]: movie
+              - generic [ref=e573]: 总结视频
+            - button "audio_file 转写音频" [ref=e574] [cursor=pointer]:
+              - generic [ref=e575]: audio_file
+              - generic [ref=e576]: 转写音频
+  - generic [ref=e416]:
+    - generic [ref=e417]:
+      - generic [ref=e418]:
+        - button "computer Manus's Computer" [ref=e419] [cursor=pointer]:
+          - generic [ref=e420]:
+            - generic [ref=e421]: computer
+            - generic [ref=e422]: Manus's Computer
+        - button "folder Files" [ref=e423] [cursor=pointer]:
+          - generic [ref=e424]:
+            - generic [ref=e425]: folder
+            - generic [ref=e426]: Files
+      - button "close" [ref=e427] [cursor=pointer]:
+        - generic [ref=e428]: close
+    - generic:
+      - generic:
+        - generic [ref=e429]:
+          - button "All" [ref=e430] [cursor=pointer]
+          - button "Documents" [ref=e431] [cursor=pointer]
+          - button "Images" [ref=e432] [cursor=pointer]
+          - button "Code" [ref=e433] [cursor=pointer]
+          - button "Links" [ref=e434] [cursor=pointer]
+        - generic [ref=e435]:
+          - generic:
+            - generic [ref=e437]: search
+            - textbox "Search files..." [ref=e438]
+        - generic [ref=e577]: No files generated yet.

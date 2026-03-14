@@ -1,0 +1,30 @@
+{
+  "name": "opencode-im-bridge-server",
+  "version": "1.0.0",
+  "description": "IM Bridge Server for OpenCode EventBroadcaster integration",
+  "main": "im-bridge-server.js",
+  "scripts": {
+    "start": "node im-bridge-server.js",
+    "dev": "nodemon im-bridge-server.js",
+    "test": "python tests/test_im_integration.py"
+  },
+  "keywords": [
+    "opencode",
+    "im-bridge",
+    "webhook",
+    "events"
+  ],
+  "author": "OpenCode Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

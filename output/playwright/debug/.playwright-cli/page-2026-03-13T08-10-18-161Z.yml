@@ -1,0 +1,134 @@
+- generic [active] [ref=e1]:
+  - complementary [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - generic [ref=e6]: eco
+          - generic [ref=e7]: OpenCode
+        - button "left_panel_close" [ref=e8] [cursor=pointer]:
+          - generic [ref=e9]: left_panel_close
+      - generic [ref=e10]:
+        - button "edit_square 新任务" [ref=e12] [cursor=pointer]:
+          - generic [ref=e13]: edit_square
+          - generic [ref=e14]: 新任务
+        - button "create_new_folder 新建项目" [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: create_new_folder
+          - generic [ref=e17]: 新建项目
+        - generic [ref=e18]:
+          - text: 所有任务
+          - generic [ref=e19]: filter_list
+        - generic [ref=e1219]:
+          - generic [ref=e1220] [cursor=pointer]:
+            - generic [ref=e1221]: folder
+            - generic "双击重命名" [ref=e1222]: 默认项目
+            - generic [ref=e1223]: "6"
+          - generic [ref=e1224]:
+            - generic [ref=e1226] [cursor=pointer]:
+              - generic [ref=e1227]:
+                - generic [ref=e1228]: task
+                - generic [ref=e1229]: 写一个简单的网页版闹钟...
+              - button "delete" [ref=e1230]:
+                - generic [ref=e1231]: delete
+            - generic [ref=e1233] [cursor=pointer]:
+              - generic [ref=e1234]:
+                - generic [ref=e1235]: task
+                - generic [ref=e1236]: 写一个简单的网页版闹钟...
+              - button "delete" [ref=e1237]:
+                - generic [ref=e1238]: delete
+            - generic [ref=e1240] [cursor=pointer]:
+              - generic [ref=e1241]:
+                - generic [ref=e1242]: task
+                - generic [ref=e1243]: 写一个简单的网页版闹钟...
+              - button "delete" [ref=e1244]:
+                - generic [ref=e1245]: delete
+            - generic [ref=e1247] [cursor=pointer]:
+              - generic [ref=e1248]:
+                - generic [ref=e1249]: task
+                - generic [ref=e1250]: New Session...
+              - button "delete" [ref=e1251]:
+                - generic [ref=e1252]: delete
+            - generic [ref=e1254] [cursor=pointer]:
+              - generic [ref=e1255]:
+                - generic [ref=e1256]: task
+                - generic [ref=e1257]: New Session...
+              - button "delete" [ref=e1258]:
+                - generic [ref=e1259]: delete
+            - generic [ref=e1261] [cursor=pointer]:
+              - generic [ref=e1262]:
+                - generic [ref=e1263]: task
+                - generic [ref=e1264]: New Session...
+              - button "delete" [ref=e1265]:
+                - generic [ref=e1266]: delete
+      - generic [ref=e62]:
+        - button "O 我的 设置" [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: O
+          - generic [ref=e65]:
+            - generic [ref=e66]: 我的
+            - generic [ref=e67]: 设置
+        - button "dark_mode" [ref=e68] [cursor=pointer]:
+          - generic [ref=e69]: dark_mode
+  - main [ref=e70]:
+    - generic [ref=e71]:
+      - generic [ref=e73] [cursor=pointer]:
+        - generic [ref=e74]: OpenCode 1.0
+        - generic [ref=e75]: expand_more
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - button "description 文件" [ref=e78] [cursor=pointer]:
+            - generic [ref=e79]: description
+            - generic [ref=e80]: 文件
+          - button "visibility 预览" [ref=e81] [cursor=pointer]:
+            - generic [ref=e82]: visibility
+            - generic [ref=e83]: 预览
+        - generic [ref=e87]: UVN Projection Active
+    - generic [ref=e1268]:
+      - generic [ref=e1269]: 写一个简单的网页版闹钟
+      - paragraph [ref=e1272]: 任务正在执行中...
+    - generic [ref=e559]:
+      - generic [ref=e560]:
+        - textbox "给 OpenCode 发送消息..." [ref=e561]
+        - generic [ref=e562]:
+          - generic [ref=e563]:
+            - button "attach_file" [ref=e564] [cursor=pointer]:
+              - generic [ref=e565]: attach_file
+            - generic [ref=e566]:
+              - generic [ref=e567] [cursor=pointer]:
+                - generic [ref=e568]: build
+                - generic [ref=e569]: Build (开发)
+                - generic [ref=e570]: expand_more
+              - generic:
+                - generic:
+                  - generic: Plan (分析模式)
+                  - generic: 仅制定计划和分析，不修改文件
+                - generic:
+                  - generic: Build (开发模式)
+                  - generic: 全自动执行，支持读写文件及运行代码
+                - generic:
+                  - generic: Auto (智能模式)
+                  - generic: 由 OpenCode 根据任务自动选择
+          - button "stop" [ref=e1273] [cursor=pointer]:
+            - generic [ref=e1274]: stop
+      - paragraph [ref=e574]: 按 Enter 执行任务 · Shift + Enter 换行 · 拖拽文件到输入框可快速上传
+  - generic [ref=e575]:
+    - generic [ref=e576]:
+      - generic [ref=e577]:
+        - button "computer Manus's Computer" [ref=e578] [cursor=pointer]:
+          - generic [ref=e579]:
+            - generic [ref=e580]: computer
+            - generic [ref=e581]: Manus's Computer
+        - button "folder Files" [ref=e582] [cursor=pointer]:
+          - generic [ref=e583]:
+            - generic [ref=e584]: folder
+            - generic [ref=e585]: Files
+      - button "close" [ref=e586] [cursor=pointer]:
+        - generic [ref=e587]: close
+    - generic [ref=e1276]:
+      - iframe [ref=e1277]:
+        
+      - generic [ref=e1278]:
+        - generic [ref=e1279]:
+          - generic [ref=e1280]: sync
+          - generic [ref=e1281]:
+            - generic [ref=e1282]: UVN System Status
+            - generic [ref=e1283]: OPERATING
+        - generic [ref=e1284]: Playwright in Docker
