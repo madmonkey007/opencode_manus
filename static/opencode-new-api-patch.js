@@ -54,6 +54,10 @@ window.Logger = {
         console.log('🔍 [DEBUG] To disable: window._DEBUG_THOUGHT_EVENTS = false');
     }
 
+    // ✅ 常量定义：修复Magic Number问题，提高可维护性
+    const THINKING_MESSAGE_TIMEOUT_MS = 15000; // 15秒thinking消息超时时间
+    const DEFAULT_QUIET_WINDOW_MS = 500; // 默认静默窗口500ms
+
     // ✅ 修复1：提取重复的icons和labels定义为常量，消除重复代码
     const MODE_CONFIG = {
         plan: {
@@ -2011,7 +2015,8 @@ window.Logger = {
                     s._usingThoughtAsAnswer = false;
                 }
             } else if (adapted.type === 'thought_delta') {
-                // Ignore thought deltas to avoid leaking reasoning into the main response
+                // ✅ P1 FIX: Ignore thought deltas to avoid leaking reasoning into the main response
+                // This prevents the "thinking" content from appearing in the visible chat output
                 return;
             } else if (adapted.type === 'phases_init') {
                 // 处理阶段初始化
@@ -2146,8 +2151,10 @@ window.Logger = {
             } else if (adapted.type === 'deliverables') {
                 s.deliverables = adapted.items || [];
             } else if (adapted.type === 'status' || adapted.type === 'message_updated') {
-                // Track the active assistant message to avoid premature stop button hiding
-                if (adapted.type === 'message_updated' && adapted.role === 'assistant' && adapted.message_id && !adapted.time?.completed) {
+                // ✅ P0 FIX: Track the active assistant message ONLY if it's from the current session
+                // Prevent child session message events from incorrectly updating the main session state
+                // 注意：isFromChildSession变量在函数顶部统一声明，此处直接使用
+                if (adapted.type === 'message_updated' && adapted.role === 'assistant' && adapted.message_id && !adapted.time?.completed && !isFromChildSession) {
                     s._activeAssistantMessageId = adapted.message_id;
                     s._sessionIdleSeen = false;
                 }
@@ -2185,9 +2192,9 @@ window.Logger = {
 
                         // ✅ P1修复：15秒超时自动移除
                         s._thinkingTimeout = setTimeout(() => {
-                            console.log('[Status] Thinking message timeout (15s), auto-removing');
+                            console.log(`[Status] Thinking message timeout (${THINKING_MESSAGE_TIMEOUT_MS}ms), auto-removing`);
                             cleanupThinkingMessage(s);
-                        }, 15000);
+                        }, THINKING_MESSAGE_TIMEOUT_MS);
                     } else {
                         console.error('[Status] Failed to create thinking message element');
                     }
@@ -2201,10 +2208,16 @@ window.Logger = {
                 const quietWindowMs = window.OPENCODE_COMPLETION_QUIET_WINDOW_MS || 500;
                 const nowMs = Date.now();
                 const lastDeltaAt = s._diag?.lastDeltaAt;
+                
+                // ✅ P0 FIX: Filter out child session events from affecting completion logic
+                // Only consider completion events that are from the main session (not child sessions)
+                // 注意：isFromChildSession变量在函数顶部统一声明，此处直接使用
+                const effectiveActiveAssistantMessageId = isFromChildSession ? null : s._activeAssistantMessageId;
+                
                 const completion = completionLogic
                     ? completionLogic(
                         adapted,
-                        s._activeAssistantMessageId,
+                        effectiveActiveAssistantMessageId,
                         s._hasToolError,
                         s._sessionIdleSeen,
                         lastDeltaAt,
@@ -2213,11 +2226,13 @@ window.Logger = {
                     )
                     : (() => {
                         const isError = s._hasToolError || adapted.value === 'error' || adapted.status === 'error';
+                        // ✅ P0 FIX: Only check completion for non-child-session events
                         const isAssistantCompletion = (
+                            !isFromChildSession &&
                             adapted.type === 'message_updated' &&
                             adapted.time?.completed &&
                             adapted.role === 'assistant' &&
-                            (!s._activeAssistantMessageId || adapted.message_id === s._activeAssistantMessageId)
+                            (!effectiveActiveAssistantMessageId || adapted.message_id === effectiveActiveAssistantMessageId)
                         );
                         const hasQuietWindow = Number.isFinite(quietWindowMs) && quietWindowMs > 0;
                         const hasLastDelta = typeof lastDeltaAt === 'number';
@@ -2481,10 +2496,25 @@ window.Logger = {
                             });
                         }
                         
-                        // ✅ v=35: 思考内容立即显示在主聊天区域（XSS安全）
+                        // ✅ P1 FIX: 思考内容立即显示在主聊天区域（XSS安全）
                         const content = adapted.content || adapted.data?.text || '';
                         if (!content || !content.trim()) {
                             console.log('[NewAPI] Skipping empty thought content');
+                            return;
+                        }
+
+                        // ✅ P1 FIX: 检查是否已存在相同内容的thought事件，避免重复
+                        const allThoughtEvents = [
+                            ...(s.thoughtEvents || []),
+                            ...(s.orphanEvents || []).filter(e => e.type === 'thought'),
+                            ...(s.phases || []).flatMap(p => (p.events || []).filter(e => e.type === 'thought'))
+                        ];
+                        const isDuplicate = allThoughtEvents.some(existing => 
+                            existing.content === content || 
+                            (existing.content && existing.content.trim() === content.trim())
+                        );
+                        if (isDuplicate) {
+                            console.log('[NewAPI] Duplicate thought detected, skipping:', content.substring(0, 50) + '...');
                             return;
                         }
 

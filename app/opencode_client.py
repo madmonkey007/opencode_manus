@@ -232,10 +232,9 @@ class OpenCodeClient:
         stop_event: asyncio.Event,
         state: Dict[str, Any],
     ) -> None:
-        url = f"{base_url}/global/event"
-        try:
+        async def _stream_events(event_url: str) -> None:
             async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream("GET", url, params=request_params) as resp:
+                async with client.stream("GET", event_url, params=request_params) as resp:
                     resp.raise_for_status()
                     data_buf: List[str] = []
                     async for line in resp.aiter_lines():
@@ -279,9 +278,17 @@ class OpenCodeClient:
                             continue
                         if line.startswith("data:"):
                             data_buf.append(line[5:].lstrip())
-        except Exception as e:
-            logger.warning(f"[SERVER_API] Global event stream failed: {e}")
-            state["failed"] = True
+
+        # Prefer /event (scoped stream), fallback to /global/event
+        for path in ["/event", "/global/event"]:
+            url = f"{base_url}{path}"
+            try:
+                await _stream_events(url)
+                return
+            except Exception as e:
+                logger.warning(f"[SERVER_API] Event stream failed at {path}: {e}")
+                continue
+        state["failed"] = True
 
     async def execute_message(
         self,
@@ -673,6 +680,8 @@ class OpenCodeClient:
                         event, session_id, message_id, context
                     ):
                         yield e
+                        # 立即刷新，防止SSE事件批量累积
+                        await asyncio.sleep(0)
 
                 elif event_type == "tool_use":
                     logger.info(f"[_process_line] Handling tool_use event, tool={event.get('part', {}).get('tool')}")
@@ -680,6 +689,8 @@ class OpenCodeClient:
                         event, session_id, message_id
                     ):
                         yield e
+                        # 立即刷新，防止SSE事件批量累积
+                        await asyncio.sleep(0)
 
                 elif event_type == "thought":
                     logger.info(f"[_process_line] Handling thought event")
@@ -687,12 +698,16 @@ class OpenCodeClient:
                         event, session_id, message_id
                     ):
                         yield e
+                        # 立即刷新，防止SSE事件批量累积
+                        await asyncio.sleep(0)
                 elif event_type == "reasoning" or event_type == "thinking":
                     logger.info(f"[_process_line] Handling {event_type} event")
                     async for e in self._handle_thought_event(
                         event, session_id, message_id
                     ):
                         yield e
+                        # 立即刷新，防止SSE事件批量累积
+                        await asyncio.sleep(0)
 
                 elif event_type == "step_start" or event_type == "step-start":
                     logger.info(f"[_process_line] Handling step_start event")
@@ -700,6 +715,8 @@ class OpenCodeClient:
                         event, session_id, message_id, context
                     ):
                         yield e
+                        # 立即刷新，防止SSE事件批量累积
+                        await asyncio.sleep(0)
 
                 elif event_type == "step_finish" or event_type == "step-finish":
                     logger.info(f"[_process_line] Handling step_finish event, reason={event.get('reason')}")
@@ -707,10 +724,14 @@ class OpenCodeClient:
                         event, session_id, message_id, context
                     ):
                         yield e
+                        # 立即刷新，防止SSE事件批量累积
+                        await asyncio.sleep(0)
 
                 elif event_type == "error":
                     logger.info(f"[_process_line] Handling error event")
                     yield self._handle_error_event(event, session_id)
+                    # 立即刷新，防止SSE事件批量累积
+                    await asyncio.sleep(0)
 
                 else:
                     logger.warning(f"[_process_line] Unknown event type: {event_type}")
@@ -744,6 +765,8 @@ class OpenCodeClient:
                         }
                     },
                 }
+                # 立即刷新，防止SSE事件批量累积
+                await asyncio.sleep(0)
             return
 
         # 启发式 Phase 标题检测：捕获形如 "[1/10] Plan" 或 "1. 系统检查" 的行
@@ -768,6 +791,8 @@ class OpenCodeClient:
                         }
                     },
                 }
+                # 立即刷新，防止SSE事件批量累积
+                await asyncio.sleep(0)
 
         # ✅ 阶段2原型 + 优化：尝试解析JSON格式的子代理事件
         # CLI可能输出JSON格式的tool_use事件
@@ -875,6 +900,8 @@ class OpenCodeClient:
                         }
                     },
                 }
+                # 立即刷新，防止SSE事件批量累积
+                await asyncio.sleep(0)
             return
 
         # 先检查 ANSI 颜色代码和 CLI 警告（使用原始文本）
@@ -908,6 +935,8 @@ class OpenCodeClient:
                     }
                 },
             }
+            # 立即刷新，防止SSE事件批量累积
+            await asyncio.sleep(0)
 
     async def _handle_text_event(
         self,
@@ -941,6 +970,8 @@ class OpenCodeClient:
                                 }
                             },
                         }
+                        # 立即刷新，防止SSE事件批量累积
+                        await asyncio.sleep(0)
 
             # 同时检查是否有 reasoning_content
             reasoning = event.get("part", {}).get("reasoning_content") or event.get(
@@ -960,6 +991,8 @@ class OpenCodeClient:
                         }
                     },
                 }
+                # 立即刷新，防止SSE事件批量累积
+                await asyncio.sleep(0)
 
             yield {
                 "type": "message.part.updated",
@@ -974,6 +1007,8 @@ class OpenCodeClient:
                     }
                 },
             }
+            # 立即刷新，防止SSE事件批量累积
+            await asyncio.sleep(0)
 
     async def _handle_tool_use_event(
         self, event: Dict[str, Any], session_id: str, message_id: str
@@ -993,6 +1028,8 @@ class OpenCodeClient:
                     "message": "Invalid tool_use event: missing 'part' field"
                 }
             }
+            # 立即刷新，防止SSE事件批量累积
+            await asyncio.sleep(0)
             return
 
         tool_name = part.get("tool", "unknown")
@@ -1075,6 +1112,8 @@ class OpenCodeClient:
                 "message_id": message_id,
             },
         }
+        # 立即刷新，防止SSE事件批量累积
+        await asyncio.sleep(0)
 
         # ✅ v=38修复：保存tool part到数据库
         if self.history_service:
@@ -1528,11 +1567,34 @@ class OpenCodeClient:
                         "session_id": session_id,
                         "message_id": message_id,
                         "type": "step-finish",
-                        "content": {"text": "Completed"},
-                        "time": {"end": int(datetime.now().timestamp())},
+                        "content": {"text": result or "Step completed"},
+                        "metadata": {"result": result, "status": status},
+                        "time": {"end": timestamp},
                     }
                 },
             }
+            # 立即刷新，防止SSE事件批量累积
+            await asyncio.sleep(0)
+
+            # 如果reason提供了，发送一个thought事件
+            if reason:
+                yield {
+                    "type": "message.part.updated",
+                    "properties": {
+                        "part": {
+                            "id": generate_part_id("thought"),
+                            "session_id": session_id,
+                            "message_id": message_id,
+                            "type": "thought",
+                            "content": {"text": f"Step finished: {reason}"},
+                            "time": {"start": timestamp},
+                        }
+                    },
+                }
+                # 立即刷新，防止SSE事件批量累积
+                await asyncio.sleep(0)
+        except Exception as e:
+            logger.error(f"[_handle_step_finish_event] Error: {e}")
 
     def _handle_error_event(
         self, event: Dict[str, Any], session_id: str
