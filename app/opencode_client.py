@@ -1593,8 +1593,8 @@ class OpenCodeClient:
                 }
                 # 立即刷新，防止SSE事件批量累积
                 await asyncio.sleep(0)
-        except Exception as e:
-            logger.error(f"[_handle_step_finish_event] Error: {e}")
+            except Exception as e:
+                logger.error(f"[_handle_step_finish_event] Error: {e}")
 
     def _handle_error_event(
         self, event: Dict[str, Any], session_id: str
