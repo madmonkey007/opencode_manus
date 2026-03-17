@@ -278,11 +278,18 @@ class OpenCodeClient:
                                 except (KeyError, TypeError, AttributeError) as e:
                                     logger.debug(f"Failed to track tool event: {e}")
                                     pass
+                                logger.info(f"[BRIDGE] Broadcasting normalized event type={normalized.get('type')} to session {session_id}")
                                 await self._broadcast_event(session_id, normalized)
                                 state["events"] += 1
+                                # session.idle 是最可靠的完成信号（无论 message ID 是否匹配）
+                                if normalized.get("type") == "session.idle":
+                                    logger.info(f"[BRIDGE] session.idle detected, setting completed for session {session_id}")
+                                    state["completed"] = True
+                                    stop_event.set()
+                                    break
                                 if normalized.get("type") == "message.updated":
                                     info = (normalized.get("properties") or {}).get("info") or {}
-                                    if info.get("id") == assistant_message_id and info.get("time", {}).get("completed"):
+                                    if info.get("time", {}).get("completed"):
                                         state["completed"] = True
                                         stop_event.set()
                                         break
@@ -444,42 +451,25 @@ class OpenCodeClient:
             env["FORCE_COLOR"] = "1"
             env["OPENCODE_CONFIG_FILE"] = config_file
 
-            # 构建命令行
+            # 构建命令行（CLI 回退路径，server 不可用时使用，不依赖 server）
             safe_prompt = shlex.quote(user_prompt)
             agent_flag = f" --agent {mode}" if mode in ["plan", "build"] else ""
-            
-            # ✅ Phase 1 修复：使用--attach参数附加到运行中的opencode serve服务器
-            # 强制使用127.0.0.1避免localhost解析问题
-            # 
-            # ⚠️ 已修复：通过分离stderr/stdout和容错解析，现在可以获取完整输出
-            attach_flag = " --attach http://127.0.0.1:4096"  # ✅ 重新启用--attach
-            
-            # 传递session参数以保持会话连贯性
-            session_flag = f" --session {session_id}"
-            
-            # 设置session标题
-            title_flag = f" --title {shlex.quote(user_prompt[:50])}"
-            
-            # ✅ Phase 1 修复：正确拼接命令参数
-            inner_cmd = f"opencode run --model {model_id} --format json --thinking{agent_flag}{attach_flag}{session_flag}{title_flag} {safe_prompt}"
 
             # 添加调试日志
-            logger.info(f"CLI command - Mode: '{mode}', Python Session: '{session_id}', Agent flag: '{agent_flag}', Attach: '{attach_flag}', Full cmd: {inner_cmd[:200]}...")
+            logger.info(f"CLI fallback - Mode: '{mode}', Session: '{session_id}', Agent flag: '{agent_flag}'")
 
-
-            # ✅ Phase 1 修复：使用list参数构建命令，避免shell解析问题
-            # 构建命令参数
+            # 构建命令参数（不加 --attach，因为 server 不可用）
             cmd = [
                 "opencode", "run",
-                "--attach", "http://127.0.0.1:4096",  # 核心：复用Server
                 "--model", model_id,
                 "--format", "json",
                 "--thinking",
-                "--agent", mode,
                 "--session", session_id,
                 "--title", user_prompt[:50],
                 user_prompt
             ]
+            if mode in ["plan", "build"]:
+                cmd = cmd[:2] + ["--agent", mode] + cmd[2:]
             
             logger.info(f"[CLI Command] {' '.join(cmd)}")
 
@@ -1911,21 +1901,24 @@ class OpenCodeClient:
                     "workspace": session_id,
                 }
 
+                # 先触发 server 启动（通过全局 manager）
+                try:
+                    from app.managers_internal import get_opencode_server_manager
+                    manager = await get_opencode_server_manager()
+                    await manager.start()
+                except Exception as e:
+                    logger.warning(f"[SERVER_API] Failed to start server via manager: {e}")
+
                 # Health check (retry to allow server warmup)
                 health_ok = False
                 for attempt in range(10):
-                    for health_path in ["/global/health", "/opencode/health"]:
-                        health_url = f"{base_url}{health_path}"
-                        try:
-                            health_response = await client.get(health_url)
-                            if health_response.status_code == 200:
-                                health_ok = True
-                                break
-                        except (httpx.HTTPError, asyncio.TimeoutError) as e:
-                            logger.debug(f"Health check failed: {e}")
-                            continue
-                    if health_ok:
-                        break
+                    try:
+                        health_response = await client.get(f"{base_url}/session")
+                        if health_response.status_code == 200:
+                            health_ok = True
+                            break
+                    except (httpx.HTTPError, asyncio.TimeoutError) as e:
+                        logger.debug(f"Health check failed: {e}")
                     await asyncio.sleep(1)
                 if not health_ok:
                     logger.warning("[SERVER_API] Health check failed for all endpoints")
@@ -1988,7 +1981,6 @@ class OpenCodeClient:
                 else:
                     provider_id, model_name = "openai", model_id
                 message_payload = {
-                    "messageID": assistant_message_id,
                     "model": {"providerID": provider_id, "modelID": model_name},
                     "parts": [{"type": "text", "text": user_prompt}],
                 }
@@ -2005,8 +1997,10 @@ class OpenCodeClient:
 
                 async def _poll_parts() -> List[Dict[str, Any]]:
                     parts = []
-                    for _ in range(60):
-                        await asyncio.sleep(2)
+                    for i in range(60):
+                        # 第一次立即查询（AI 已完成），后续每 2 秒重试
+                        if i > 0:
+                            await asyncio.sleep(2)
                         try:
                             messages_resp = await client.get(
                                 f"{base_url}/session/{server_session_id}/message",
@@ -2132,8 +2126,42 @@ class OpenCodeClient:
                         self._skip_preview_sessions.add(session_id)
                     if sse_state.get("completed"):
                         logger.info(
-                            f"[SERVER_API] Completed message via SSE for session {session_id}"
+                            f"[SERVER_API] SSE completed for session {session_id}, fetching text parts..."
                         )
+                        # SSE 流里 message.part.updated 只有初始化事件，AI 文本回复需要通过 message API 获取
+                        text_parts = await _poll_parts()
+                        if text_parts:
+                            now_ts = int(datetime.now().timestamp())
+                            for part in text_parts:
+                                part_type = part.get("type") or PART_TYPE_TEXT
+                                # 只广播 text/thought/reasoning 类型，工具事件已通过 SSE 广播
+                                if part_type not in [PART_TYPE_TEXT, PART_TYPE_THOUGHT, "reasoning"]:
+                                    continue
+                                mapped_type = PART_TYPE_THOUGHT if part_type == "reasoning" else part_type
+                                text = part.get("text") or ""
+                                if not text and isinstance(part.get("content"), dict):
+                                    text = part["content"].get("text") or part["content"].get("markdown") or ""
+                                if not text:
+                                    continue
+                                logger.info(f"[SERVER_API] Broadcasting text part (type={mapped_type}, len={len(text)}) for session {session_id}")
+                                await self._broadcast_event(
+                                    session_id,
+                                    {
+                                        "type": "message.part.updated",
+                                        "properties": {
+                                            "part": {
+                                                "id": generate_part_id(mapped_type),
+                                                "session_id": session_id,
+                                                "message_id": assistant_message_id,
+                                                "type": mapped_type,
+                                                "content": {"text": text},
+                                                "time": {"start": now_ts},
+                                            }
+                                        },
+                                    },
+                                )
+                        else:
+                            logger.warning(f"[SERVER_API] No text parts found after SSE completion for session {session_id}")
                         return True
                     parts = None
 
@@ -2260,6 +2288,22 @@ class OpenCodeClient:
                             },
                         },
                     )
+
+                # ✅ 发送完成事件（包含completed时间戳）
+                await self._broadcast_event(
+                    session_id,
+                    {
+                        "type": "message.updated",
+                        "properties": {
+                            "message_id": assistant_message_id,
+                            "info": {
+                                "time": {
+                                    "completed": int(time.time() * 1000)
+                                }
+                            }
+                        }
+                    }
+                )
 
                 logger.info(
                     f"[SERVER_API] Completed message via server API for session {session_id}"
