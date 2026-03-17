@@ -1351,26 +1351,9 @@ window.Logger = {
     async function handleNewAPIConnection(s, isNewSubmission = false) {
         console.log('[NewAPI] Establishing SSE for:', s.id, 'isNewSubmission:', isNewSubmission);
 
-        // ✅ C2修复：正确关闭EventSource并清理Map引用
-        // 先保存session ID，避免访问已关闭对象的属性
-        const oldSessionId = window.state.activeSSE && window.state.activeSSE.url
-            ? window.state.activeSSE.url.match(/session_id=([^&]+)/)?.[1]
-            : null;
-
         if (window.state.activeSSE) {
-            try {
-                window.state.activeSSE.close();
-            } catch (e) {
-                console.warn('[NewAPI] Error closing SSE:', e);
-            }
-
-            // 从api-client的Map中移除引用，防止内存泄漏
-            if (oldSessionId && window.apiClient && window.apiClient.eventSources) {
-                window.apiClient.eventSources.delete(oldSessionId);
-                console.log('[NewAPI] Cleaned up SSE mapping for session:', oldSessionId);
-            }
-
-            window.state.activeSSE = null;
+            console.log('[NewAPI] Closing existing SSE');
+            window.state.activeSSE.close();
         }
 
         // ✅ P1修复：网络重连时清理thinking消息
@@ -1399,131 +1382,6 @@ window.Logger = {
                     window.rightPanelManager.switchTab('preview');
                 }
                 console.log('[NewAPI] Right panel auto-expanded (isNewSubmission:', isNewSubmission, ', isRunning:', isRunning, ')');
-            }
-        }
-
-        // ✅ 关键修复：如果是新提交，先检查session是否存在，不存在则创建
-        if (isNewSubmission) {
-            try {
-                console.log('[NewAPI] Checking if session exists on backend...');
-
-                // 尝试获取session
-                let sessionData = null;
-                try {
-                    sessionData = await window.apiClient.getSession(s.id);
-                } catch (e) {
-                    console.log('[NewAPI] Session not found on backend, will create new one');
-                }
-
-                // ✅ C1修复：使用完整的session对象确保数据一致性
-                // 如果session不存在，创建新的
-                if (!sessionData) {
-                    console.log('[NewAPI] Creating new session on backend...');
-
-                    try {
-                        const newSession = await window.apiClient.createSession(s.prompt || 'New Session', s.mode || DEFAULT_MODE);
-
-                        // 验证返回的session对象
-                        if (!newSession || !newSession.id) {
-                            throw new Error('Invalid session response from server');
-                        }
-
-                        console.log('[NewAPI] Created session:', newSession.id);
-
-                        // ✅ M1修复：验证session真正可用
-                        const validationResponse = await window.apiClient.getSession(newSession.id);
-                        if (!validationResponse) {
-                            throw new Error('Session created but not accessible');
-                        }
-
-                        // ✅ C1修复：完整更新session ID映射
-                        const oldId = s.id;
-                        const newId = newSession.id;
-
-                        // 重新从后端获取完整的session数据
-                        const fullSession = await window.apiClient.getSession(newId);
-
-                        // 更新state中的activeId
-                        if (window.state.activeId === oldId) {
-                            window.state.activeId = newId;
-                        }
-
-                        // 在sessions数组中找到并完整更新session对象
-                        const idx = window.state.sessions.findIndex(x => x.id === oldId);
-                        if (idx !== -1) {
-                            // 使用完整的新session对象替换
-                            window.state.sessions[idx] = fullSession;
-                        }
-
-                        // 更新当前session对象的引用（确保后续使用正确的ID）
-                        s.id = fullSession.id;
-                        s.mode = fullSession.mode || DEFAULT_MODE;
-                        s.title = fullSession.title;
-
-                        console.log('[NewAPI] Mapped local session', oldId, '->', newId);
-
-                        // 立即保存状态
-                        if (typeof window.saveState === 'function') {
-                            window.saveState();
-                        }
-
-                    } catch (createErr) {
-                        // ✅ N2修复：Session创建失败后的降级方案
-                        console.error('[NewAPI] Failed to create session:', createErr);
-                        
-                        // 尝试使用临时ID继续（允许用户继续使用，但历史可能不会持久化）
-                        const tempId = 'temp_' + Date.now();
-                        const oldId = s.id;
-                        
-                        console.warn('[NewAPI] Using temporary session ID:', tempId);
-                        console.warn('[NewAPI] Your conversation history may not be saved. Please refresh page if you encounter issues.');
-                        
-                        s.id = tempId;
-                        s._isTemporary = true;  // 标记为临时session
-                        
-                        if (window.state.activeId === oldId) {
-                            window.state.activeId = tempId;
-                        }
-                        
-                        // 不抛出异常，允许用户继续使用
-                        // 但在控制台给出明确提示
-                    }
-                }
-
-                // 发送消息到后端
-                console.log('[NewAPI] Sending message to backend...');
-                const mode = s.mode || window._currentMode || DEFAULT_MODE;
-
-                // ✅ C1修复：使用当前输入框的prompt，而不是session中的prompt
-                // 获取实际的输入框内容
-                const primaryInput = document.getElementById('prompt');
-                const welcomeInput = document.getElementById('prompt-welcome');
-                const currentPrompt = (primaryInput?.value || welcomeInput?.value || s.prompt || '').trim();
-
-                if (!currentPrompt) {
-                    throw new Error('Prompt is empty');
-                }
-
-                // ✅ M3修复：使用session前缀确保唯一性
-                const message_id = `msg_${s.id}_${Date.now()}`;
-                const part_id = `part_${s.id}_${Date.now()}`;
-
-                console.log('[NewAPI] Sending message:', { session_id: s.id, message_id, prompt_length: currentPrompt.length });
-
-                const response = await window.apiClient.sendMessage(s.id, {
-                    message_id: message_id,
-                    parts: [{
-                        id: part_id,
-                        type: 'text',
-                        text: currentPrompt  // ✅ 使用实际输入的内容
-                    }],
-                    mode: mode
-                });
-
-                console.log('[NewAPI] Message sent successfully:', response);
-            } catch (err) {
-                console.error('[NewAPI] Failed to send message:', err);
-                throw err;
             }
         }
 
@@ -1924,10 +1782,6 @@ window.Logger = {
             // 记录当前深度
             eventDepthMap.set(s.id, depth);
 
-            // ✅ 修复：在函数顶部统一声明 isFromChildSession 变量
-            // 这样整个函数都可以使用这个变量，避免 ReferenceError
-            const isFromChildSession = adapted._isFromChildSession || false;
-
             // ====================================================================
             // 子会话事件处理 - 检测并自动订阅子session
             // ====================================================================
@@ -2167,77 +2021,6 @@ window.Logger = {
             } else if (adapted.type === 'phases_init') {
                 // 处理阶段初始化
                 const currentTurnIndex = window._turnIndex || 0;
-
-                // ✅ P0 FIX: 智能phase循环检测（而非硬性限制）
-                const MAX_PHASES_HARD_LIMIT = 200;  // 绝对上限，防止极端情况
-                const LOOP_DETECTION_WINDOW = 15;   // 检测最近15个phase
-
-                const currentPhases = s.phases?.filter(p => {
-                    const phaseTurn = parseInt(p.turn_index, 10) || 0;
-                    return phaseTurn === currentTurnIndex;
-                }) || [];
-
-                const currentPhasesCount = currentPhases.length;
-
-                // 检测1: 绝对上限（极端情况保护）
-                if (currentPhasesCount >= MAX_PHASES_HARD_LIMIT) {
-                    console.error(
-                        `[PhaseLimit] Hard limit reached (${currentPhasesCount}/${MAX_PHASES_HARD_LIMIT})`
-                    );
-
-                    const errorMsg =
-                        `\n\n❌ **Task Complexity Limit**: This task has exceeded the maximum ` +
-                        `number of phases (${MAX_PHASES_HARD_LIMIT}). Please break it into smaller sub-tasks.`;
-
-                    if (s.response && !s.response.includes(errorMsg)) {
-                        s.response += errorMsg;
-                        throttledRenderResults();
-                    }
-
-                    return;
-                }
-
-                // 检测2: 循环检测（检查phase标题是否重复）
-                if (currentPhasesCount >= LOOP_DETECTION_WINDOW) {
-                    const recentPhases = currentPhases.slice(-LOOP_DETECTION_WINDOW);
-                    const recentTitles = recentPhases.map(p =>
-                        (p.title || 'unknown').toLowerCase().trim().replace(/[^\w\s]/g, '')
-                    );
-
-                    // 检查是否有连续10个完全相同的标题
-                    let consecutiveSame = 1;
-                    for (let i = recentTitles.length - 1; i > 0; i--) {
-                        if (recentTitles[i] === recentTitles[i - 1]) {
-                            consecutiveSame++;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    if (consecutiveSame >= 10) {
-                        console.warn(
-                            `[PhaseLoop] Detected ${consecutiveSame} identical phase titles: "${recentTitles[recentTitles.length - 1]}"`
-                        );
-
-                        const loopMsg =
-                            `\n\n⚠️ **Loop Detected**: The AI seems stuck repeating the same phase ` +
-                            `"${recentPhases[recentPhases.length - 1]?.title || 'unknown'}" ` +
-                            `(${consecutiveSame} times). Consider reformulating your request.`;
-
-                        if (s.response && !s.response.includes(loopMsg)) {
-                            s.response += loopMsg;
-                            throttledRenderResults();
-                        }
-
-                        // 发送警告事件但不停止执行
-                        console.warn('[PhaseLoop] Warning sent to user, but execution continues');
-                    }
-                }
-
-                // 只在超过100个phase时显示进度提示
-                if (currentPhasesCount === 100) {
-                    console.log(`[PhaseProgress] Task is complex: ${currentPhasesCount} phases created so far`);
-                }
 
                 // ✅ P0修复：追问时强制创建新phase对象，不复用旧phase
                 // 判断是否是新对话轮次（通过比较prompt数量和现有phases的最大turn_index）

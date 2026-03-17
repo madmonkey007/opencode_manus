@@ -2700,3 +2700,491 @@ if (document.readyState === 'loading') {
 // Version 38.3.4 - Fixed promptWelcome duplicate declaration issue
 // Build timestamp: 1770561617
 console.log('[OpenCode] Loaded opencode.js v38.3.4');
+
+// ==========================================
+// P0 FIX: 添加缺失的渲染函数
+// 这些函数被 opencode-new-api-patch.js 调用
+// ==========================================
+
+/**
+ * 清理 thinking 消息
+ * @param {Object} s - session 对象
+ */
+function cleanupThinkingMessage(s) {
+    if (!s) return;
+    
+    console.log('[Cleanup] Cleaning up thinking message for session:', s.id);
+    
+    // 清除超时定时器
+    if (s._thinkingTimeout) {
+        clearTimeout(s._thinkingTimeout);
+        s._thinkingTimeout = null;
+    }
+    
+    // 移除消息元素
+    if (s._thinkingMessageElement && s._thinkingMessageElement.parentNode) {
+        s._thinkingMessageElement.parentNode.removeChild(s._thinkingMessageElement);
+        console.log('[Cleanup] Removed thinking message element');
+    }
+    
+    // 重置状态标志
+    s._isLoadingThinking = false;
+    s._thinkingMessageId = null;
+    s._thinkingMessageElement = null;
+}
+
+/**
+ * 渲染消息列表到 UI
+ * 这是核心渲染函数，被 throttledRenderResults 调用
+ * @param {string} sessionId - 会话 ID
+ */
+function renderMessages(sessionId) {
+    console.log('[Render] Rendering messages for session:', sessionId);
+    
+    // 获取 session 状态
+    const state = window.opencodeState;
+    if (!state) {
+        console.warn('[Render] State not available');
+        return;
+    }
+    
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) {
+        console.warn('[Render] Session not found:', sessionId);
+        return;
+    }
+    
+    // 触发 UI 更新
+    if (typeof window.renderAll === 'function') {
+        window.renderAll();
+    }
+    
+    console.log('[Render] Messages rendered successfully for session:', sessionId);
+}
+
+/**
+ * 节流控制的渲染函数
+ * 防止过于频繁的 UI 更新
+ * @param {string} sessionId - 会话 ID
+ */
+function throttledRenderResults(sessionId) {
+    const RENDER_THROTTLE_MS = 100; // 100ms 节流间隔
+    
+    // 获取 state
+    const state = window.opencodeState;
+    if (!state) {
+        console.warn('[ThrottledRender] State not available');
+        return;
+    }
+    
+    // 获取或创建 session 的渲染状态
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) {
+        console.warn('[ThrottledRender] Session not found:', sessionId);
+        return;
+    }
+    
+    // 清除现有的待处理渲染
+    if (s._pendingRenderTimeout) {
+        clearTimeout(s._pendingRenderTimeout);
+        s._pendingRenderTimeout = null;
+    }
+    
+    // 如果距离上次渲染时间足够长，立即渲染
+    const now = Date.now();
+    const lastRenderTime = s._lastRenderTime || 0;
+    const timeSinceLastRender = now - lastRenderTime;
+    
+    if (timeSinceLastRender >= RENDER_THROTTLE_MS) {
+        // 立即执行渲染
+        renderMessages(sessionId);
+        s._lastRenderTime = now;
+        s._pendingRender = false;
+    } else {
+        // 延迟到节流间隔后执行
+        const delay = RENDER_THROTTLE_MS - timeSinceLastRender;
+        s._pendingRender = true;
+        
+        s._pendingRenderTimeout = setTimeout(() => {
+            renderMessages(sessionId);
+            s._lastRenderTime = Date.now();
+            s._pendingRender = false;
+            s._pendingRenderTimeout = null;
+        }, delay);
+        
+        console.log('[ThrottledRender] Render delayed by', delay, 'ms for session:', sessionId);
+    }
+}
+
+// 将函数暴露到全局作用域，供其他脚本使用
+window.cleanupThinkingMessage = cleanupThinkingMessage;
+window.renderMessages = renderMessages;
+window.throttledRenderResults = throttledRenderResults;
+
+console.log('[Fix] Rendering functions loaded successfully');
+
+// ==========================================
+// P0 FIX: 添加缺失的渲染函数
+// 这些函数被 opencode-new-api-patch.js 调用
+// ==========================================
+
+/**
+ * 清理 thinking 消息
+ * @param {Object} s - session 对象
+ */
+function cleanupThinkingMessage(s) {
+    if (!s) return;
+    
+    console.log('[Cleanup] Cleaning up thinking message for session:', s.id);
+    
+    // 清除超时定时器
+    if (s._thinkingTimeout) {
+        clearTimeout(s._thinkingTimeout);
+        s._thinkingTimeout = null;
+    }
+    
+    // 移除消息元素
+    if (s._thinkingMessageElement && s._thinkingMessageElement.parentNode) {
+        s._thinkingMessageElement.parentNode.removeChild(s._thinkingMessageElement);
+        console.log('[Cleanup] Removed thinking message element');
+    }
+    
+    // 重置状态标志
+    s._isLoadingThinking = false;
+    s._thinkingMessageId = null;
+    s._thinkingMessageElement = null;
+}
+
+/**
+ * 渲染消息列表到 UI
+ * 这是核心渲染函数，被 throttledRenderResults 调用
+ * @param {string} sessionId - 会话 ID
+ */
+function renderMessages(sessionId) {
+    console.log('[Render] Rendering messages for session:', sessionId);
+    
+    // 获取 session 状态
+    const state = window.opencodeState;
+    if (!state) {
+        console.warn('[Render] State not available');
+        return;
+    }
+    
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) {
+        console.warn('[Render] Session not found:', sessionId);
+        return;
+    }
+    
+    // 触发 UI 更新
+    if (typeof window.renderAll === 'function') {
+        window.renderAll();
+    }
+    
+    console.log('[Render] Messages rendered successfully for session:', sessionId);
+}
+
+/**
+ * 节流控制的渲染函数
+ * 防止过于频繁的 UI 更新
+ * @param {string} sessionId - 会话 ID
+ */
+function throttledRenderResults(sessionId) {
+    const RENDER_THROTTLE_MS = 100; // 100ms 节流间隔
+    
+    // 获取 state
+    const state = window.opencodeState;
+    if (!state) {
+        console.warn('[ThrottledRender] State not available');
+        return;
+    }
+    
+    // 获取或创建 session 的渲染状态
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) {
+        console.warn('[ThrottledRender] Session not found:', sessionId);
+        return;
+    }
+    
+    // 清除现有的待处理渲染
+    if (s._pendingRenderTimeout) {
+        clearTimeout(s._pendingRenderTimeout);
+        s._pendingRenderTimeout = null;
+    }
+    
+    // 如果距离上次渲染时间足够长，立即渲染
+    const now = Date.now();
+    const lastRenderTime = s._lastRenderTime || 0;
+    const timeSinceLastRender = now - lastRenderTime;
+    
+    if (timeSinceLastRender >= RENDER_THROTTLE_MS) {
+        // 立即执行渲染
+        renderMessages(sessionId);
+        s._lastRenderTime = now;
+        s._pendingRender = false;
+    } else {
+        // 延迟到节流间隔后执行
+        const delay = RENDER_THROTTLE_MS - timeSinceLastRender;
+        s._pendingRender = true;
+        
+        s._pendingRenderTimeout = setTimeout(() => {
+            renderMessages(sessionId);
+            s._lastRenderTime = Date.now();
+            s._pendingRender = false;
+            s._pendingRenderTimeout = null;
+        }, delay);
+        
+        console.log('[ThrottledRender] Render delayed by', delay, 'ms for session:', sessionId);
+    }
+}
+
+// 将函数暴露到全局作用域，供其他脚本使用
+window.cleanupThinkingMessage = cleanupThinkingMessage;
+window.renderMessages = renderMessages;
+window.throttledRenderResults = throttledRenderResults;
+
+console.log('[Fix] Rendering functions loaded successfully');
+
+// ==========================================
+// P0 FIX: 添加缺失的渲染函数
+// 这些函数被 opencode-new-api-patch.js 调用
+// ==========================================
+
+/**
+ * 清理 thinking 消息
+ * @param {Object} s - session 对象
+ */
+function cleanupThinkingMessage(s) {
+    if (!s) return;
+    
+    console.log('[Cleanup] Cleaning up thinking message for session:', s.id);
+    
+    // 清除超时定时器
+    if (s._thinkingTimeout) {
+        clearTimeout(s._thinkingTimeout);
+        s._thinkingTimeout = null;
+    }
+    
+    // 移除消息元素
+    if (s._thinkingMessageElement && s._thinkingMessageElement.parentNode) {
+        s._thinkingMessageElement.parentNode.removeChild(s._thinkingMessageElement);
+        console.log('[Cleanup] Removed thinking message element');
+    }
+    
+    // 重置状态标志
+    s._isLoadingThinking = false;
+    s._thinkingMessageId = null;
+    s._thinkingMessageElement = null;
+}
+
+/**
+ * 渲染消息列表到 UI
+ * 这是核心渲染函数，被 throttledRenderResults 调用
+ * @param {string} sessionId - 会话 ID
+ */
+function renderMessages(sessionId) {
+    console.log('[Render] Rendering messages for session:', sessionId);
+    
+    // 获取 session 状态
+    const state = window.opencodeState;
+    if (!state) {
+        console.warn('[Render] State not available');
+        return;
+    }
+    
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) {
+        console.warn('[Render] Session not found:', sessionId);
+        return;
+    }
+    
+    // 触发 UI 更新
+    if (typeof window.renderAll === 'function') {
+        window.renderAll();
+    }
+    
+    console.log('[Render] Messages rendered successfully for session:', sessionId);
+}
+
+/**
+ * 节流控制的渲染函数
+ * 防止过于频繁的 UI 更新
+ * @param {string} sessionId - 会话 ID
+ */
+function throttledRenderResults(sessionId) {
+    const RENDER_THROTTLE_MS = 100; // 100ms 节流间隔
+    
+    // 获取 state
+    const state = window.opencodeState;
+    if (!state) {
+        console.warn('[ThrottledRender] State not available');
+        return;
+    }
+    
+    // 获取或创建 session 的渲染状态
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) {
+        console.warn('[ThrottledRender] Session not found:', sessionId);
+        return;
+    }
+    
+    // 清除现有的待处理渲染
+    if (s._pendingRenderTimeout) {
+        clearTimeout(s._pendingRenderTimeout);
+        s._pendingRenderTimeout = null;
+    }
+    
+    // 如果距离上次渲染时间足够长，立即渲染
+    const now = Date.now();
+    const lastRenderTime = s._lastRenderTime || 0;
+    const timeSinceLastRender = now - lastRenderTime;
+    
+    if (timeSinceLastRender >= RENDER_THROTTLE_MS) {
+        // 立即执行渲染
+        renderMessages(sessionId);
+        s._lastRenderTime = now;
+        s._pendingRender = false;
+    } else {
+        // 延迟到节流间隔后执行
+        const delay = RENDER_THROTTLE_MS - timeSinceLastRender;
+        s._pendingRender = true;
+        
+        s._pendingRenderTimeout = setTimeout(() => {
+            renderMessages(sessionId);
+            s._lastRenderTime = Date.now();
+            s._pendingRender = false;
+            s._pendingRenderTimeout = null;
+        }, delay);
+        
+        console.log('[ThrottledRender] Render delayed by', delay, 'ms for session:', sessionId);
+    }
+}
+
+// 将函数暴露到全局作用域，供其他脚本使用
+window.cleanupThinkingMessage = cleanupThinkingMessage;
+window.renderMessages = renderMessages;
+window.throttledRenderResults = throttledRenderResults;
+
+console.log('[Fix] Rendering functions loaded successfully');
+
+// ==========================================
+// P0 FIX: 添加缺失的渲染函数
+// 这些函数被 opencode-new-api-patch.js 调用
+// ==========================================
+
+/**
+ * 清理 thinking 消息
+ * @param {Object} s - session 对象
+ */
+function cleanupThinkingMessage(s) {
+    if (!s) return;
+    
+    console.log('[Cleanup] Cleaning up thinking message for session:', s.id);
+    
+    // 清除超时定时器
+    if (s._thinkingTimeout) {
+        clearTimeout(s._thinkingTimeout);
+        s._thinkingTimeout = null;
+    }
+    
+    // 移除消息元素
+    if (s._thinkingMessageElement && s._thinkingMessageElement.parentNode) {
+        s._thinkingMessageElement.parentNode.removeChild(s._thinkingMessageElement);
+        console.log('[Cleanup] Removed thinking message element');
+    }
+    
+    // 重置状态标志
+    s._isLoadingThinking = false;
+    s._thinkingMessageId = null;
+    s._thinkingMessageElement = null;
+}
+
+/**
+ * 渲染消息列表到 UI
+ * 这是核心渲染函数，被 throttledRenderResults 调用
+ * @param {string} sessionId - 会话 ID
+ */
+function renderMessages(sessionId) {
+    console.log('[Render] Rendering messages for session:', sessionId);
+    
+    // 获取 session 状态
+    const state = window.opencodeState;
+    if (!state) {
+        console.warn('[Render] State not available');
+        return;
+    }
+    
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) {
+        console.warn('[Render] Session not found:', sessionId);
+        return;
+    }
+    
+    // 触发 UI 更新
+    if (typeof window.renderAll === 'function') {
+        window.renderAll();
+    }
+    
+    console.log('[Render] Messages rendered successfully for session:', sessionId);
+}
+
+/**
+ * 节流控制的渲染函数
+ * 防止过于频繁的 UI 更新
+ * @param {string} sessionId - 会话 ID
+ */
+function throttledRenderResults(sessionId) {
+    const RENDER_THROTTLE_MS = 100; // 100ms 节流间隔
+    
+    // 获取 state
+    const state = window.opencodeState;
+    if (!state) {
+        console.warn('[ThrottledRender] State not available');
+        return;
+    }
+    
+    // 获取或创建 session 的渲染状态
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) {
+        console.warn('[ThrottledRender] Session not found:', sessionId);
+        return;
+    }
+    
+    // 清除现有的待处理渲染
+    if (s._pendingRenderTimeout) {
+        clearTimeout(s._pendingRenderTimeout);
+        s._pendingRenderTimeout = null;
+    }
+    
+    // 如果距离上次渲染时间足够长，立即渲染
+    const now = Date.now();
+    const lastRenderTime = s._lastRenderTime || 0;
+    const timeSinceLastRender = now - lastRenderTime;
+    
+    if (timeSinceLastRender >= RENDER_THROTTLE_MS) {
+        // 立即执行渲染
+        renderMessages(sessionId);
+        s._lastRenderTime = now;
+        s._pendingRender = false;
+    } else {
+        // 延迟到节流间隔后执行
+        const delay = RENDER_THROTTLE_MS - timeSinceLastRender;
+        s._pendingRender = true;
+        
+        s._pendingRenderTimeout = setTimeout(() => {
+            renderMessages(sessionId);
+            s._lastRenderTime = Date.now();
+            s._pendingRender = false;
+            s._pendingRenderTimeout = null;
+        }, delay);
+        
+        console.log('[ThrottledRender] Render delayed by', delay, 'ms for session:', sessionId);
+    }
+}
+
+// 将函数暴露到全局作用域，供其他脚本使用
+window.cleanupThinkingMessage = cleanupThinkingMessage;
+window.renderMessages = renderMessages;
+window.throttledRenderResults = throttledRenderResults;
+
+console.log('[Fix] Rendering functions loaded successfully');

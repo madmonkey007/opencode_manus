@@ -115,11 +115,6 @@ class OpenCodeClient:
         # Sessions that already emitted tool-based previews via global SSE
         self._skip_preview_sessions = set()
 
-        # ✅ P0 FIX: Loop detection to prevent infinite thinking
-        self._session_step_history = {}  # {session_id: [step_titles]}
-        self._MAX_CONSECUTIVE_SIMILAR_STEPS = 10  # 检测连续10个相似step认为是循环
-        self._MAX_TOTAL_STEPS = 200  # 绝对上限，防止极端情况
-
     def _extract_session_id_from_payload(self, payload: Dict[str, Any]) -> Optional[str]:
         props = payload.get("properties") or {}
         if isinstance(props, dict) and props.get("sessionID"):
@@ -147,46 +142,6 @@ class OpenCodeClient:
                 if questions:
                     q = questions[0] or {}
                     tool_meta = props.get("tool") or {}
-                    question_text = q.get("question") or q.get("header") or ""
-                    session_id = props.get("sessionID")
-
-                    # ✅ 真正修复：自动检测并拒绝doom_loop权限请求
-                    if "loop" in question_text.lower() or "repetition" in question_text.lower():
-                        logger.warning(
-                            f"[DOOM_LOOP] Detected infinite loop question: {question_text}"
-                        )
-
-                        # 自动发送拒绝响应
-                        question_id = props.get("id")
-                        call_id = tool_meta.get("callID") or question_id
-
-                        # 使用permissions API自动拒绝
-                        try:
-                            import httpx
-                            async with httpx.AsyncClient(timeout=10.0) as client:
-                                await client.post(
-                                    f"{self.server_api_base_url}/session/{session_id}/permissions/{call_id}",
-                                    json={"response": "deny", "remember": False}
-                                )
-                                logger.info(f"[DOOM_LOOP] Automatically denied loop permission")
-                        except Exception as e:
-                            logger.error(f"[DOOM_LOOP] Failed to send deny response: {e}")
-
-                        # 返回错误事件，停止执行
-                        return {
-                            "type": "error",
-                            "properties": {
-                                "error": (
-                                    "Infinite loop detected and automatically stopped. "
-                                    "The AI model appears to be stuck in a repetitive cycle. "
-                                    "Please try rephrasing your prompt or breaking it into smaller steps."
-                                ),
-                                "session_id": session_id,
-                                "question_id": question_id
-                            }
-                        }
-
-                    # 其他问题正常显示
                     input_data = {
                         "question": q.get("question") or q.get("header") or "请回答以下问题",
                         "choices": [
@@ -398,10 +353,6 @@ class OpenCodeClient:
             f"Executing message {assistant_message_id} for session {session_id}"
         )
 
-        # ✅ P0 FIX: Initialize loop detection and set timeout
-        self._session_step_history[session_id] = []
-        _EXECUTION_TIMEOUT = 300  # 5 minutes timeout
-
         # ✅ v=38修复：保存assistant message到数据库
         if self.history_service:
             await self.history_service.save_message(
@@ -428,32 +379,14 @@ class OpenCodeClient:
                 },
             )
 
-            # ✅ P0 FIX: Execute with timeout to prevent infinite loops
-            try:
-                server_api_ok = await asyncio.wait_for(
-                    self._execute_via_server_api(
-                        session_id=session_id,
-                        assistant_message_id=assistant_message_id,
-                        user_prompt=user_prompt,
-                        mode=mode,
-                        model_id=model_id,
-                    ),
-                    timeout=_EXECUTION_TIMEOUT
-                )
-            except asyncio.TimeoutError:
-                logger.error(f"Execution timeout after {_EXECUTION_TIMEOUT}s for session {session_id}")
-                await self._broadcast_event(
-                    session_id,
-                    {
-                        "type": "error",
-                        "properties": {
-                            "error": f"Execution timeout after {_EXECUTION_TIMEOUT} seconds",
-                            "session_id": session_id,
-                            "message_id": assistant_message_id
-                        }
-                    }
-                )
-                raise TimeoutError(f"Message execution exceeded {_EXECUTION_TIMEOUT} seconds")
+            # Prefer Server API execution path, fallback to CLI if it fails.
+            server_api_ok = await self._execute_via_server_api(
+                session_id=session_id,
+                assistant_message_id=assistant_message_id,
+                user_prompt=user_prompt,
+                mode=mode,
+                model_id=model_id,
+            )
             if server_api_ok:
                 await self._scan_and_preview_new_files(
                     session_id, assistant_message_id, session_dir, initial_files
@@ -694,19 +627,6 @@ class OpenCodeClient:
                     },
                 },
             )
-
-            # ✅ 修复：发送session.idle事件，通知前端消息已完成
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "session.idle",
-                    "properties": {
-                        "session_id": session_id,
-                        "timestamp": int(datetime.now().timestamp())
-                    }
-                }
-            )
-            logger.info(f"Sent session.idle event for {session_id}")
 
             logger.info(f"Message {assistant_message_id} execution completed")
 
@@ -1595,113 +1515,6 @@ class OpenCodeClient:
         part = event.get("part", {}) or event
         step_id = part.get("id") or part.get("step_id") or generate_part_id("step")
 
-        # ✅ P0 FIX: 智能循环检测（而非简单计数）
-        step_history = self._session_step_history.get(session_id, [])
-
-        # 提取step标题（用于循环检测）
-        step_title = (
-            (part.get("content", {}).get("text")
-                if isinstance(part.get("content"), dict)
-                else None)
-            or part.get("metadata", {}).get("title")
-            or part.get("title")
-            or part.get("label")
-            or "unknown"
-        )
-
-        # 归一化标题用于比较（去除空格、标点，统一小写）
-        def normalize_title(title: str) -> str:
-            import re
-            title = title.lower().strip()
-            title = re.sub(r'[^\w\s]', '', title)  # 移除标点
-            title = re.sub(r'\s+', ' ', title)     # 合并空格
-            return title
-
-        normalized_title = normalize_title(step_title)
-        step_history.append(normalized_title)
-
-        # 检测1: 绝对上限（极端情况保护）
-        if len(step_history) > self._MAX_TOTAL_STEPS:
-            logger.error(
-                f"Absolute step limit reached ({len(step_history)}) "
-                f"for session {session_id}. This may indicate a runaway process."
-            )
-            yield {
-                "type": "error",
-                "properties": {
-                    "error": (
-                        f"Task has exceeded maximum complexity limit ({self._MAX_TOTAL_STEPS} steps). "
-                        f"Please break down your task into smaller sub-tasks."
-                    ),
-                    "session_id": session_id,
-                    "message_id": message_id
-                }
-            }
-            return
-
-        # 检测2: 循环检测（检查最近N个step是否高度相似）
-        if len(step_history) >= self._MAX_CONSECUTIVE_SIMILAR_STEPS:
-            recent_steps = step_history[-self._MAX_CONSECUTIVE_SIMILAR_STEPS:]
-
-            # 方法A: 检查是否完全相同
-            if len(set(recent_steps)) == 1:
-                logger.error(
-                    f"Loop detected: {self._MAX_CONSECUTIVE_SIMILAR_STEPS} identical steps "
-                    f"for session {session_id}"
-                )
-                yield {
-                    "type": "error",
-                    "properties": {
-                        "error": (
-                            f"The AI model appears to be stuck in a repetitive loop "
-                            f"({self._MAX_CONSECUTIVE_SIMILAR_STEPS} identical steps: \"{step_title}\"). "
-                            f"This usually happens when the model cannot make progress. "
-                            f"Please try rephrasing your prompt or providing more specific guidance."
-                        ),
-                        "session_id": session_id,
-                        "message_id": message_id
-                    }
-                }
-                return
-
-            # 方法B: 检查是否高度相似（使用Jaccard相似度）
-            def similarity_score(s1: str, s2: str) -> float:
-                """计算两个字符串的相似度（0-1）"""
-                words1 = set(s1.split())
-                words2 = set(s2.split())
-                if not words1 or not words2:
-                    return 0.0
-                intersection = words1 & words2
-                union = words1 | words2
-                return len(intersection) / len(union)
-
-            # 计算相邻step之间的相似度
-            similar_count = 0
-            for i in range(len(recent_steps) - 1):
-                if similarity_score(recent_steps[i], recent_steps[i + 1]) > 0.7:  # 70%相似度阈值
-                    similar_count += 1
-
-            if similar_count >= self._MAX_CONSECUTIVE_SIMILAR_STEPS - 2:
-                logger.warning(
-                    f"Near-loop detected: {similar_count}/{len(recent_steps)-1} "
-                    f"recent steps are highly similar for session {session_id}"
-                )
-                # 输出警告但不停止，让任务继续执行
-                yield {
-                    "type": "warning",
-                    "properties": {
-                        "warning": (
-                            f"The AI model seems to be repeating itself ({similar_count} similar steps). "
-                            f"If this continues, consider breaking down your task or providing clearer instructions."
-                        ),
-                        "session_id": session_id,
-                        "message_id": message_id
-                    }
-                }
-
-        # 更新历史记录
-        self._session_step_history[session_id] = step_history
-
         # 深度标题提取策略
         default_title = (
             "Planning & Analysis"
@@ -2177,7 +1990,6 @@ class OpenCodeClient:
                 message_payload = {
                     "messageID": assistant_message_id,
                     "model": {"providerID": provider_id, "modelID": model_name},
-                    "agent": agent_mode,
                     "parts": [{"type": "text", "text": user_prompt}],
                 }
                 request_start_ts = int(datetime.now().timestamp())
@@ -2452,21 +2264,6 @@ class OpenCodeClient:
                 logger.info(
                     f"[SERVER_API] Completed message via server API for session {session_id}"
                 )
-
-                # ✅ 修复：发送session.idle事件，通知前端消息已完成
-                # 这是前端completion logic判断消息完成的关键事件
-                await self._broadcast_event(
-                    session_id,
-                    {
-                        "type": "session.idle",
-                        "properties": {
-                            "session_id": session_id,
-                            "timestamp": int(datetime.now().timestamp())
-                        }
-                    }
-                )
-                logger.info(f"[SERVER_API] Sent session.idle event for {session_id}")
-
                 return True
         except httpx.HTTPError as e:
             logger.error(f"[SERVER_API] HTTP error: {e}")
@@ -2551,63 +2348,42 @@ async def execute_opencode_message_with_manager(
     message_id: str,
     user_prompt: str,
     workspace_base: str,
-    run_mode: str = "auto",
-):
+    mode: str = "auto",
+) -> None:
     """
-    使用OpenCodeServerManager执行消息
+    使用OpenCodeClient执行OpenCode消息（通过Server HTTP API）
 
-    这是Server API模式下的执行入口
+    这是api.py中调用的入口函数，简化为直接调用OpenCodeClient.execute_message。
+
+    执行流程：
+    1. 创建OpenCodeClient实例
+    2. 调用execute_message（优先使用Server HTTP API，CLI作为回退）
+    3. 所有SSE事件通过_broadcast_event广播到EventStreamManager
 
     Args:
-        session_id: 会话ID
-        message_id: 消息ID
+        session_id: Session ID
+        message_id: Message ID
         user_prompt: 用户提示词
-        run_mode: 运行模式 (默认: "auto")
+        workspace_base: 工作区基础路径
+        mode: 运行模式（auto/plan/build）
 
     Returns:
-        执行结果
+        None
+
+    Raises:
+        Exception: 如果execute_message失败（会记录日志并重新抛出）
+
+    Note:
+        这是一个会阻塞的async函数，必须在BackgroundTasks中调用以避免阻塞响应。
+        与旧版本（已注释）不同，这个简化版本直接调用execute_message，
+        不再通过OpenCodeServerManager包装。
     """
-    # ✅ 修复：使用正确的导入
-    from app.managers_internal import get_opencode_server_manager
-
-    # ✅ BUG修复：OpenCodeClient需要workspace_base参数
-    client = OpenCodeClient(workspace_base)
-
-    # ✅ get_opencode_server_manager()是单例，不需要参数
-    server_manager = await get_opencode_server_manager()
-
-    # ✅ M2修复：使用锁防止并发启动
-    # 创建一个启动锁（需要在模块级别或使用类变量）
-    if not hasattr(execute_opencode_message_with_manager, '_startup_lock'):
-        execute_opencode_message_with_manager._startup_lock = asyncio.Lock()
-
-    async with execute_opencode_message_with_manager._startup_lock:
-        # ✅ 修复：确保opencode serve服务器已启动
-        if not server_manager.is_running:
-            logger.info("[execute] Server not running, starting opencode serve...")
-            try:
-                success = await server_manager.start()
-                if not success:
-                    # ✅ M3修复：启动失败时明确使用CLI模式
-                    logger.warning("[execute] Server API unavailable, switching to CLI mode")
-                    client.use_server_api = False
-                else:
-                    logger.info(f"[execute] ✅ Server started at {server_manager.base_url}")
-            except (OSError, ConnectionError) as e:
-                # 网络相关错误，可能可以重试
-                logger.warning(f"[execute] ❌ Server connection failed: {e}")
-                logger.warning("[execute] Falling back to CLI mode")
-                client.use_server_api = False
-            except Exception as e:
-                # 其他错误，记录并继续尝试Server API
-                logger.error(f"[execute] ❌ Server start error: {e}")
-                # 不禁用Server API，让它自然fallback
+    logger = logging.getLogger(__name__)
 
     try:
-        # 执行消息（优先尝试Server API，失败时自动fallback到CLI）
-        result = await client.execute_message(session_id, message_id, user_prompt, mode=run_mode)
-        logger.info(f"[execute] ✅ Successfully executed message {message_id}")
-        return result
+        client = OpenCodeClient(workspace_base)
+        await client.execute_message(session_id, message_id, user_prompt, mode=mode)
+        logger.info(f"[execute_opencode_message_with_manager] Successfully executed message {message_id} for session {session_id}")
     except Exception as e:
-        logger.error(f"[execute] ❌ Failed to execute message {message_id}: {e}", exc_info=True)
+        logger.error(f"[execute_opencode_message_with_manager] Failed to execute message {message_id} for session {session_id}: {e}", exc_info=True)
         raise
