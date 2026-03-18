@@ -424,25 +424,39 @@ class SessionManager:
             logger.info(f"Executing task via HTTP API: {mode}")
 
             # ✅ 修复：execute返回AsyncGenerator，需要用async for迭代
-            result_parts = []
+            # manager.execute()返回SSE事件流，需要解析并广播到前端
             async for chunk in manager.execute(
                 session_id=sid,
                 prompt=enhanced_prompt,
                 mode=mode
             ):
-                result_parts.append(chunk)
+                # 解析SSE事件流并广播到前端队列
+                # SSE格式: "data:{json}" 或 "event:xxx\ndata:{json}"
+                if isinstance(chunk, str) and chunk.strip():
+                    logger.debug(f"[SSE-DEBUG] Received SSE chunk: {chunk[:100]}")
 
-            # 合并所有结果块
-            result = ''.join(result_parts)
+                    # 解析SSE行
+                    if chunk.startswith('data:'):
+                        # 提取JSON数据
+                        data_part = chunk[5:].strip()  # 移除"data:"前缀
+                        if data_part and data_part != '[DONE]':
+                            try:
+                                # 解析JSON事件
+                                event = json.loads(data_part)
+                                logger.debug(f"[SSE-DEBUG] Parsed SSE event: {event.get('type', 'unknown')}")
 
-            # 写入结果到日志
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(result + "\n")
-
-            # 广播结果到队列（保持与原代码一致的接口）
-            if sid in self.sessions:
-                for q in self.sessions[sid]["queues"]:
-                    await q.put(result)
+                                # 广播事件到session的所有队列（保持SSE格式）
+                                if sid in self.sessions:
+                                    for q in self.sessions[sid]["queues"]:
+                                        await q.put(json.dumps(event))
+                                    logger.debug(f"[SSE-DEBUG] Broadcasted event to {len(self.sessions[sid]['queues'])} queues")
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"[SSE-DEBUG] Failed to parse SSE JSON: {e}, data: {data_part[:100]}")
+                    else:
+                        # 非SSE格式的文本，记录到日志
+                        logger.debug(f"[SSE-DEBUG] Non-SSE chunk: {chunk[:100]}")
+                        # 可选：将非SSE文本也广播（作为消息事件）
+                        # 但目前先忽略，避免混乱
 
             with open(status_file, "w", encoding="utf-8") as f:
                 f.write("completed")
@@ -531,7 +545,7 @@ async def run_agent(prompt: str, sid: str, mode: str = "auto"):
         try:
             while True:
                 try:
-                    text = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    text = await asyncio.wait_for(queue.get(), timeout=5.0)
                     last_activity = asyncio.get_running_loop().time()
 
                     async for event in process_log_line(text, sid):
@@ -724,11 +738,30 @@ async def process_log_line(text: str, sid: str = None):
         if content: yield format_sse({"type": "tool_event", "data": {"type": "thought", "content": content}})
         return
 
-    if not text.startswith("{"):
-        noise_keywords = ["opencode run", "options:", "positionals:", "message", "run opencode with"]
-        if not any(x in text.lower() for x in noise_keywords):
-            yield format_sse({"type": "answer_chunk", "text": text + " "})
+    # ✅ 修复：删除普通文本处理，防止日志文件中的调试信息被误当作answer_chunk发送
+    # 原因：日志文件包含 "Session started: ses_xxx" 和其他初始化信息
+    # 问题：process_log_line 会读取日志文件的每一行，并将所有非JSON、非噪音的行作为 answer_chunk 发送
+    # 影响：前端显示 "Session started" 和 HTML 代码，而不是 AI 的真实回答
+    # 解决：普通文本已经在 Line 443-445 通过队列正确处理了，这里不应该重复发送
+    # 
+    # 注释掉以下代码：
+    # if not text.startswith("{"):
+    #     noise_keywords = ["opencode run", "options:", "positionals:", "message", "run opencode with"]
+    #     if not any(x in text.lower() for x in noise_keywords):
+    #         yield format_sse({"type": "answer_chunk", "text": text + " "})
 
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("[Shutdown] Cleaning up resources...")
+    try:
+        # Cleanup ServerManager
+        from app.managers_internal import cleanup_opencode_server_manager
+        await cleanup_opencode_server_manager()
+        logger.info("[Shutdown] ServerManager cleanup complete")
+    except Exception as e:
+        logger.error(f"[Shutdown] Error during cleanup: {e}")
+    logger.info("[Shutdown] Cleanup complete")
 
 @app.get("/opencode/run_sse")
 async def run_sse(prompt: str, sid: str | None = None, mode: str = "auto"):
@@ -740,10 +773,17 @@ async def run_sse(prompt: str, sid: str | None = None, mode: str = "auto"):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "app.main:app",
+
+    # Configure graceful shutdown
+    config = uvicorn.Config(
+        app=app,
         host="0.0.0.0",
         port=8089,
         reload=False,
-        log_level="info"
+        log_level="info",
+        timeout_graceful_shutdown=30  # 30秒优雅关闭超时
     )
+    server = uvicorn.Server(config)
+
+    logger.info("[Main] Starting uvicorn server with graceful shutdown support...")
+    server.run()
