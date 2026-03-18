@@ -447,7 +447,7 @@ async function loadState() {
                                         s.orphanEvents = [];
 
                                         data.messages.forEach(msg => {
-                                            if (msg.role === 'user') {
+                                            if ((msg.info?.role || msg.role) === 'user') {
                                                 const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
                                                 if (userText) s.prompt = userText;
                                             } else {
@@ -721,7 +721,7 @@ async function loadState() {
                                 session.actions = [];
 
                                 data.messages.forEach(msg => {
-                                    if (msg.role === 'user') {
+                                    if ((msg.info?.role || msg.role) === 'user') {
                                         const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
                                         if (userText) session.prompt = userText;
                                     } else {
@@ -934,7 +934,7 @@ function renderSidebar() {
                                         s.actions = [];
 
                                         data.messages.forEach(msg => {
-                                            if (msg.role === 'user') {
+                                            if ((msg.info?.role || msg.role) === 'user') {
                                                 // 更新 Prompt（如果有的话）
                                                 const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
                                                 if (userText) s.prompt = userText;
@@ -1066,7 +1066,7 @@ function renderSidebar() {
                             s.actions = [];
 
                             data.messages.forEach(msg => {
-                                if (msg.role === 'user') {
+                                if ((msg.info?.role || msg.role) === 'user') {
                                     // 更新 Prompt（如果有的话）
                                     const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
                                     if (userText) s.prompt = userText;

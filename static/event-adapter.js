@@ -11,14 +11,34 @@ class EventAdapter {
      * Different backends may use different shapes.
      */
     static extractText(part) {
-        if (!part) return '';
+        if (!part) {
+            console.warn('[Event-Adapter] extractText: part is null/undefined');
+            return '';
+        }
+
         const content = part.content;
-        if (typeof content === 'string') return content;
+        if (typeof content === 'string') {
+            console.log('[Event-Adapter] extractText: content is string', content.substring(0, 50));
+            return content;
+        }
 
         const text = content?.text ?? content?.content ?? content?.value;
-        if (typeof text === 'string') return text;
+        if (typeof text === 'string') {
+            console.log('[Event-Adapter] extractText: found text in content', text.substring(0, 50));
+            return text;
+        }
 
-        if (typeof part.text === 'string') return part.text;
+        if (typeof part.text === 'string') {
+            console.log('[Event-Adapter] extractText: found text in part', part.text.substring(0, 50));
+            return part.text;
+        }
+
+        console.error('[Event-Adapter] extractText: FAILED to extract text!', {
+            hasContent: !!content,
+            hasPartText: !!part.text,
+            partKeys: Object.keys(part),
+            contentKeys: content ? Object.keys(content) : []
+        });
         return '';
     }
     /**
@@ -107,7 +127,18 @@ class EventAdapter {
         // 消息部分更新事件（核心事件）
         if (eventType === 'message.part.updated') {
             const part = newEvent.properties?.part;
-            if (!part) return null;
+            if (!part) {
+                console.warn('[Event-Adapter] message.part.updated but no part found');
+                return null;
+            }
+
+            // 诊断日志
+            console.log('[Event-Adapter] message.part.updated received:', {
+                partType: part.type,
+                hasText: !!part.text,
+                textLength: part.text?.length || 0,
+                partId: part.id
+            });
 
             // Track part types for delta mapping
             if (session) {
@@ -117,7 +148,9 @@ class EventAdapter {
                 }
             }
 
-            return this.adaptPartEvent(part, session, options);
+            const adapted = this.adaptPartEvent(part, session, options);
+            console.log('[Event-Adapter] adaptPartEvent returned:', adapted ? adapted.type : 'null');
+            return adapted;
         }
 
         // 消息增量事件（delta）
@@ -205,6 +238,11 @@ class EventAdapter {
                 type: 'error',
                 message: newEvent.properties?.message || newEvent.message || 'Unknown error'
             };
+        }
+
+        // session.status / session.diff - opencode server 内部事件，前端无需处理
+        if (eventType === 'session.status' || eventType === 'session.diff' || eventType === 'session.idle') {
+            return null;
         }
 
         // 阶段初始化事件 (处理后端 phases_init)
