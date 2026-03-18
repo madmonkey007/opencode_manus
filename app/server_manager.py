@@ -136,31 +136,25 @@ class OpenCodeServerManager:
                 # 1. 创建新会话（进程组）
                 os.setsid()
                 
-                # 2. 设置资源限制
+                # 2. 只设置 CPU 时间限制，不限制内存（Bun/JavaScriptCore 需要较多内存）
                 try:
-                    # 限制CPU时间为5分钟
-                    resource.setrlimit(resource.RLIMIT_CPU, (300, 300))
-                    # 限制内存使用为1GB
-                    resource.setrlimit(resource.RLIMIT_AS, (1024*1024*1024, 1024*1024*1024))
-                    # 限制文件描述符数量
-                    resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))
-                except (OSError, ValueError) as e:
-                    # 资源限制失败不应该阻止进程启动
+                    # 限制CPU时间为10分钟
+                    resource.setrlimit(resource.RLIMIT_CPU, (600, 600))
+                except (OSError, ValueError):
                     pass
             
             preexec_fn = None
             if os.name != 'nt':  # Unix-like systems
                 preexec_fn = set_limits_and_session
             
-            # ✅ 修复：移除start_new_session参数（与preexec_fn冲突）
             # 启动进程（后台，不阻塞）
+            # 把输出写到日志文件，方便诊断崩溃原因
+            serve_log = open("/app/opencode/logs/serve_startup.log", "a")
             self.process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stdout=serve_log,
+                stderr=serve_log,
                 env=env,
-                bufsize=1,
-                universal_newlines=True,
                 preexec_fn=preexec_fn,
             )
             
@@ -223,12 +217,11 @@ class OpenCodeServerManager:
             return False
             
         try:
-            # Configure SSL verification for production
-            verify_ssl = os.getenv('OPENCODE_SSL_VERIFY', 'true').lower() == 'true'
             timeout = httpx.Timeout(5.0, connect=3.0)
             
-            async with httpx.AsyncClient(timeout=timeout, verify=verify_ssl) as client:
-                response = await client.get(f"{self.base_url}/opencode/health")
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                # opencode serve 的 /session 端点返回 200 表示服务器就绪
+                response = await client.get(f"{self.base_url}/session")
                 if response.status_code == 200:
                     logger.debug(f"Health check successful: {self.base_url}")
                     return True

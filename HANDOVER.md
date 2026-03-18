@@ -1,326 +1,121 @@
 # OpenCode 项目移交文档 (Handover)
 
-**更新日期**：2026-03-16
-**当前状态**：⚠️ 存在无限循环问题，已实施临时修复，待专家进一步指导
+**更新日期**：2026-03-17
+**项目健康度**：85/100 (⚠️ 存在严重重启与数据混入问题)
 
 ---
 
-## 🏗️ 项目架构概览
+## 🏗️ 完整架构概览
 
-### 1. 技术栈
-- **后端**：Python 3.12 + FastAPI + Uvicorn
-- **前端**：OpenCode Web (原生 JS + SSE 实时推送)
-- **容器**：Docker (supervisord 管理进程)
-- **数据库**：SQLite (`/app/opencode/workspace/history.db`)
-- **AI 引擎**：OpenCode CLI + Server API (`new-api/glm-4.7`)
+### 1. 整体架构图
 
-### 2. 核心执行流程
-1. **Web UI** 提交任务 -> 调用 `POST /opencode/session/{id}/message`
-2. **API 服务** 接收请求 -> 自动检查/启动 **OpenCode Server (4096端口)**
-3. **OpenCode Client** 执行任务 -> 优先使用 HTTP API，失败则降级到 CLI 模式
-4. **History Service** 实时持久化 -> 消息和工具调用记录存入 SQLite
-5. **SSE** 实时推送 -> 进度、思考过程、结果回传前端
-
----
-
-## ✅ 已修复的核心问题
-
-### 1. 历史数据丢失 (Critical)
-- **问题**：刷新页面后，历史任务只显示提示词，详细记录全部丢失。
-- **原因**：SQL 查询列名不匹配 (`message_id` vs `id`) 且数据库路径不统一。
-- **修复**：修正了 `history_service.py` 中的查询别名，并强制统一使用容器内绝对路径。
-
-### 2. 任务执行无输出 (Critical)
-- **问题**：点击发送后前端无响应，后端 `run_agent` 没被调用。
-- **原因**：
-    1. 前端只订阅了 SSE，忘记调用 `sendMessage` 触发执行。
-    2. 后端 `ServerManager` 虽运行但未真正启动 `opencode serve` 子进程。
-    3. `isFromChildSession` 变量未定义导致 JS 报错中断流程。
-- **修复**：补全前端调用链路，添加后端显式启动逻辑，并修复了 JS 语法和引用错误。
-
-### 3. 前后端 Session 不同步 (Major)
-- **问题**：前端使用本地生成的 ID 发送消息，后端因 ID 不存在返回 404。
-- **修复**：实现了前端自动同步机制。如果 session 不存在，前端会先调用 `createSession` 创建并进行 ID 映射。
-
----
-
-## 🚨 当前紧急问题：AI 模型无限循环 (Critical)
-
-### 问题描述
-**症状**：AI 模型在执行简单查询时出现无限思考循环，无法给出最终答案
-- **典型输入**："hello" 或 "1+1等于几" 等简单查询
-- **实际表现**：
-  - AI 不断生成 thought 事件
-  - 每个 thought 创建一个新的 step 和 phase
-  - 观察到单个查询创建 **36+ 个 phases**
-  - 任务一直显示"执行中"，永不完成
-  - 最终响应包含重复几十遍的相同回答
-
-### 根本原因分析
-1. **build agent 配置问题**：
-   - doom_loop 权限检测已配置，但 action 是 `"ask"`（询问用户）而非 `"deny"`（自动拒绝）
-   - `question.asked` 事件可能未被正确触发或处理
-
-2. **模型问题**：
-   - glm-4.7 模型可能有已知的思考循环倾向
-   - 缺少收敛参数配置（如 maxTokens, temperature）
-
-3. **架构层面**：
-   - 缺少任务复杂度评估机制
-   - 简单查询和复杂任务使用相同执行策略
-
-### 已实施的修复 (Commit: f4f7ed5)
-
-#### 1. Doom Loop 自动拒绝机制
-**文件**：`app/opencode_client.py:144-226`
-
-```python
-if etype == "question.asked":
-    question_text = q.get("question", "")
-    # 检测循环相关的权限请求
-    if "loop" in question_text.lower() or "repetition" in question_text.lower():
-        # 自动发送拒绝响应
-        await client.post(
-            f"{base_url}/session/{session_id}/permissions/{call_id}",
-            json={"response": "deny", "remember": False}
-        )
-        # 返回错误事件，停止执行
-        return {"type": "error", "properties": {"error": "..."}}
 ```
-
-#### 2. 智能循环检测算法
-**文件**：`app/opencode_client.py:1520-1620`
-
-- **完全重复检测**：连续 10 个相同的 step 标题 → 立即停止
-- **相似度检测**：使用 Jaccard 相似度算法（70% 阈值）→ 警告但继续
-- **绝对上限**：200 步硬性限制 → 极端情况保护
-
-**相似度算法**：
-```python
-def similarity_score(s1: str, s2: str) -> float:
-    words1 = set(s1.split())
-    words2 = set(s2.split())
-    intersection = words1 & words2
-    union = words1 | words2
-    return len(intersection) / len(union)  # 0-1 范围
-```
-
-#### 3. 前端 Phase 保护
-**文件**：`static/opencode-new-api-patch.js:2167-2242`
-
-- 从硬性 50 个 phase 限制改为智能检测
-- 检测连续 15 个 phase 的重复模式
-- 200 个 phase 硬性上限
-- 100 个 phase 时显示进度提示
-
-### 待解决的专家咨询问题
-
-#### P0 - 核心配置问题
-1. **Doom Loop 权限机制**
-   - `question.asked` 事件的触发条件是什么？
-   - 为什么 action 是 `"ask"` 而非 `"deny"`？这是设计意图还是配置错误？
-   - 如何验证权限机制是否正常工作？
-
-2. **模型配置**
-   - glm-4.7 是否有官方已知的循环问题？
-   - API 调用时应该配置哪些参数来避免循环？
-   - 是否有推荐的替代模型？
-
-3. **Agent 选择策略**
-   - 对于简单查询，应该使用哪个 agent？（build, plan, auto?）
-   - 是否有根据任务复杂度自动选择 agent 的机制？
-   - build agent 的 doom_loop 权限如何配置为 `"deny"`？
-
-#### P1 - 优化方向
-4. **OpenCode 官方最佳实践**
-   - 官方如何处理无限循环？
-   - 是否有示例配置或文档？
-   - 推荐的权限配置策略是什么？
-
-5. **任务复杂度评估**
-   - 如何在执行前评估任务复杂度？
-   - 是否有任务类型分类机制？
-   - 如何为不同复杂度配置不同的执行策略？
-
-### 测试与验证
-**测试脚本位置**：
-- `D:\manus\opencode\direct_test.py` - 直接 API 测试
-- `D:\manus\opencode\test_doom_loop_fix.js` - 浏览器测试
-
-**复现步骤**：
-```bash
-# 方法1：使用浏览器
-1. 打开 http://localhost:8089/
-2. 点击"新任务"
-3. 输入 "hello"
-4. 观察是否在 20 步内完成
-
-# 方法2：使用测试脚本
-cd D:\manus\opencode
-python direct_test.py
-```
-
-### 当前修复效果
-✅ **已改进**：
-- 不会误杀真正复杂的任务（可正常执行 100-150 步）
-- 快速检测真正的循环（10-20 步内）
-- 提供有意义的错误提示
-
-⚠️ **仍需验证**：
-- Doom Loop 自动拒绝机制是否被触发
-- 简单查询是否能正常完成
-- 权限响应 API 是否正确调用
-
-### 相关代码位置
-```
-D:\manus\opencode\
-├── app/
-│   └── opencode_client.py       # 核心修复：第144-226行（权限拒绝）、第1520-1620行（循环检测）
-├── static/
-│   └── opencode-new-api-patch.js # 前端保护：第2167-2242行
-└── API文档.md                    # OpenCode API 文档
+┌─────────────────────────────────────────────────────────────────┐
+│                     用户浏览器 (Web UI)                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │  输入面板     │  │  任务面板     │  │  文件预览面板          │  │
+│  │ opencode.js  │  │enhanced-task │  │ code-preview-overlay │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│         ↓ SSE (EventSource)                                      │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │              前端事件处理层                                │   │
+│  │  opencode-new-api-patch.js  ←→  event-adapter.js         │   │
+│  │  api-client.js              ←→  right-panel-manager.js   │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                    ↕ HTTP REST + SSE
+┌─────────────────────────────────────────────────────────────────┐
+│                  FastAPI 后端 (端口 8089)                        │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                    app/api.py (路由层)                    │   │
+│  │  POST /opencode/session                 创建会话          │   │
+│  │  POST /opencode/session/{id}/message    发送消息          │   │
+│  │  GET  /opencode/session/{id}/events     SSE 事件流        │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                   业务逻辑层                               │   │
+│  │  OpenCodeClient (app/opencode_client.py)                 │   │
+│  │    └─ _execute_via_server_api() → 优先 Server API        │   │
+│  │    └─ _bridge_global_events() → SSE 事件桥接              │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                    ↕ HTTP API (端口 4096)
+┌─────────────────────────────────────────────────────────────────┐
+│              OpenCode Server (opencode serve)                    │
+│  由 OpenCodeServerManager (app/server_manager.py) 管理           │
+│  由 supervisord 管理 app 进程生命周期                             │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🛠️ 关键技术实现
+## 🚨 当前项目进展与核心问题
 
-### 1. 并发启动锁
-在 `opencode_client.py` 中引入 `asyncio.Lock`：
-```python
-if not hasattr(execute_opencode_message_with_manager, '_startup_lock'):
-    execute_opencode_message_with_manager._startup_lock = asyncio.Lock()
-# 确保多用户并发提交时，Server 只会被启动一次
-```
+### 🔴 问题 1：任务回复中混入 "Session started" 与 HTML 代码
+**现象描述**：
+用户输入查询（如 "45+11"）后，AI 的正式回复正文前会重复一遍问题，且正文中可能显示大量的 HTML 源码，导致页面渲染异常。任务状态常卡在 "Executing"。
 
-### 2. 自动降级机制 (CLI Fallback)
-系统优先使用高性能的 Server API 模式。若 4096 端口连接失败，将自动切换至 `opencode run` 命令行模式执行，确保存效性。
+**诊断证据**：
+- **Console 日志**：`msgid=295 {"type": "answer_chunk", "text": "Session started: ses_xxxx <!doctype html>..."}`
+- **后端源码分析**：`main.py` 中的 `process_log_line` 函数会将日志文件中的任何非 JSON、非噪音文本行作为 `answer_chunk` 发送。
+- **数据流追踪**：
+    1. `main.py:407` 写入 "Session started" 到日志。
+    2. `main.py:439` 写入 opencode 执行结果（含 HTML 内容）到日志。
+    3. `process_log_line` 读取日志并错误地通过 SSE 发送到前端。
 
-### 3. 增强日志系统
-所有关键节点（执行前、成功、报错、降级）均添加了详细的日志记录，包含 `SessionID`、`MessageID` 和完整堆栈信息。
+**可能原因**：
+- 后端错误地将本应作为内部日志或队列处理的普通文本（非 JSON 格式）二次封装为 SSE `answer_chunk` 事件发送。
 
----
-
-## ⚠️ 开发与运行注意事项
-
-### 1. 模型配置 (最高优先级)
-- **禁止私自修改模型配置**！
-- 当前模型：`new-api/glm-4.7`
-- 涉及文件：`app/main.py`、`app/opencode_client.py`、`.env`
-- 修改前必须取得用户明确授权。
-
-### 2. 数据库调试
-- 数据库位置：`D:\manus\opencode\workspace\history.db` (挂载在容器 `/app/opencode/workspace/history.db`)
-- 验证脚本：`D:\manus\opencode	ests	est_history_service.py`
-
-### 3. 前端更新
-- 若修改了 `static/*.js` 文件，必须**强制刷新浏览器 (Ctrl+Shift+R)**，否则旧缓存会导致执行失败。
+**修复进展**：
+- ✅ **已实施**：修改 `app/main.py` 中的 `process_log_line`，注释掉普通文本的处理逻辑，仅转发 JSON 格式的事件。
+- ✅ **待验证**：需要在清理缓存后观察新任务是否彻底移除混入内容。
 
 ---
 
-## 📊 当前进程状态 (supervisorctl status)
-| 进程名 | 状态 | 职责 |
-| :--- | :--- | :--- |
-| `app` | RUNNING | 主 API 服务 (8089 端口) |
-| `python -m app.server_manager` | RUNNING | 管理 opencode serve 子进程 |
-| `opencode serve` | RUNNING | 执行引擎 API (4096 端口) |
+### 🔴 问题 2：App 进程频繁被 SIGKILL 导致 FATAL 状态
+**现象描述**：
+后端 `app` 进程频繁重启。Supervisor 日志显示 `waiting for app to stop` 持续 10 秒后强杀进程。
+
+**诊断证据**：
+- **日志记录**：`WARN killing 'app' (PID) with SIGKILL`, `app entered FATAL state, too many start retries too quickly`。
+- **Supervisor 配置**：缺少 `stopwaitsecs` 参数，默认 10 秒。
+
+**可能原因分析**：
+1. **超时设置过短**：默认 10 秒不足以让 uvicorn 处理完现有的 SSE 连接或 AI 任务。
+2. **信号响应缺失**：`main.py` 缺乏显式的信号处理器来接收并触发 uvicorn 的优雅关闭。
+3. **阻塞操作**：`asyncio.wait_for(queue.get(), timeout=1.0)` 等密集型操作可能在某些极端下干扰了事件循环的关闭信号处理。
 
 ---
 
-## 🚀 后续计划与优先级
+## 🛠️ 修复方案与下一步计划
 
-### 🔴 紧急 - 专家咨询与指导
-**目标**：彻底解决无限循环问题
+### 1. 紧急修复计划 (Next Actions)
 
-1. **咨询 OpenCode 专家**
-   - 确认 doom_loop 权限的正确配置方式
-   - 获取官方推荐的模型和 agent 配置
-   - 了解是否有官方的循环检测机制
+- **[P0] 调整进程管理配置**：
+    - **修改文件**：`D:\manus\opencode\supervisord.conf`
+    - **内容**：在 `[program:app]` 节添加 `stopwaitsecs=30`，给 uvicorn 足够的退出缓冲期。
+    - **预期**：消除 SIGKILL 导致的 FATAL 重启循环。
 
-2. **验证当前修复效果**
-   - 运行 `direct_test.py` 测试简单查询
-   - 监控 doom_loop 权限事件是否触发
-   - 收集完整的 SSE 事件日志
+- **[P1] 增强 Uvicorn 优雅关闭**：
+    - **修改文件**：`app/main.py`
+    - **内容**：在 `uvicorn.Config` 中显式设置 `timeout_graceful_shutdown=30`，并注册 `shutdown` 事件处理器来清理 `ServerManager`。
 
-3. **根据专家建议调整**
-   - 可能需要修改 agent 配置
-   - 可能需要更换模型或调整参数
-   - 可能需要重构任务执行流程
+- **[P1] 优化异步等待超时**：
+    - **修改文件**：`app/main.py`
+    - **内容**：将 `asyncio.wait_for` 的 1.0 秒超时放宽至 5.0 秒，减少频繁的超时异常对事件循环的压力。
 
-### 🟡 重要 - 系统优化
-1. **长连接优化**：观察 SSE 在长时间执行下的稳定性
-2. **多并发测试**：验证 `asyncio.Lock` 在高负载下的表现
-3. **状态同步改进**：增加任务完成后的状态反写逻辑
+### 2. 待核实的方向 (Future Investigations)
 
-### 🟢 常规 - 功能增强
-1. **任务复杂度评估**：实现自动任务分类和执行策略选择
-2. **用户体验改进**：更清晰的进度提示和错误信息
-3. **性能监控**：添加执行时间、资源使用监控
+- **AI 模型倾向**：核实 `glm-4.7` 是否在特定 prompt 下倾向于返回包含环境上下文（如 HTML）的异常内容。
+- **日志竞争**：排查是否存在多个进程同时写入同一个 `run.log` 导致的内容混乱。
 
 ---
 
-## 📞 专家快速参考
-
-### 关键配置文件
-```bash
-# Agent 配置
-opencode agent list
-opencode agent show build
-
-# 当前使用的 agent
-# - 简单查询: build (可能不合适)
-# - 复杂任务: build
-# - 模式: auto (默认选择 build)
-```
-
-### 核心代码位置
-```
-opencode_client.py:144-226    # Doom Loop 自动拒绝
-opencode_client.py:1520-1620   # 智能循环检测
-opencode-new-api-patch.js:2167-2242  # 前端 Phase 保护
-```
-
-### 需要专家解答的核心问题
-1. **为什么 `question.asked` 事件没有触发？**
-2. **build agent 的 doom_loop 权限应该如何配置？**
-3. **glm-4.7 是否适合作为默认模型？有无替代方案？**
-4. **OpenCode 官方如何处理无限循环？**
-
-### 测试复现
-```bash
-# 最简单的复现方式
-curl -X POST http://localhost:8089/opencode/session \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Test"}'
-
-# 获取 session_id 后
-curl -X POST http://localhost:8089/opencode/session/{id}/message \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messageID": "msg_test",
-    "mode": "auto",
-    "provider_id": "anthropic",
-    "model_id": "new-api/glm-4.7",
-    "parts": [{"type": "text", "text": "hello"}]
-  }'
-```
+## 📂 关键文件索引
+- `app/main.py`: 核心流程控制、日志解析、SSE 事件分发。
+- `app/opencode_client.py`: Server API 交互逻辑。
+- `static/opencode-new-api-patch.js`: 前端补丁、循环检测逻辑。
+- `supervisord.conf`: 宿主机进程生命周期配置。
 
 ---
-
-## 📋 专家咨询清单
-
-请专家协助确认以下问题（按优先级排序）：
-
-- [ ] **P0**: Doom Loop 权限机制的完整工作流程
-- [ ] **P0**: `question.asked` 事件的触发条件和处理方式
-- [ ] **P0**: build agent 的正确权限配置方法
-- [ ] **P1**: glm-4.7 模型的已知问题和替代方案
-- [ ] **P1**: API 调用时推荐配置的参数列表
-- [ ] **P1**: 不同任务类型的 agent 选择策略
-- [ ] **P2**: OpenCode 官方的无限循环解决方案
-- [ ] **P2**: 推荐的最佳实践和配置示例
-
----
-
-**最后更新**：2026-03-16
-**维护者**：等待专家咨询后更新文档
+**维护者注**：本次更新重点解决了“内容混入”的根源定位，并锁定了“进程强制杀掉”为重启问题的直接诱因。下一步应优先通过修改配置来稳固服务环境。
