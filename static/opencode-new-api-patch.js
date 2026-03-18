@@ -1407,10 +1407,51 @@ window.Logger = {
                 s._diag.lastEventType = newEvent?.type || null;
                 if (newEvent?.type === 'session.idle') {
                     s._sessionIdleSeen = true;
+                    console.log('[session.idle] Received, state:', {
+                        _activeAssistantMessageId: s._activeAssistantMessageId,
+                        _pendingAssistantCompletion: s._pendingAssistantCompletion,
+                        status: s.status
+                    });
                     if (s._pendingAssistantCompletion && s._lastAssistantCompletionAdapted) {
                         const pending = s._lastAssistantCompletionAdapted;
                         s._pendingAssistantCompletion = false;
-                        processEvent(s, pending);
+                        console.log('[session.idle] Triggering pending completion');
+                        // 给 pending 事件加上 _forceComplete，跳过 quietOk 检查
+                        processEvent(s, { ...pending, _forceComplete: true });
+                    } else if (s.status !== 'completed' && s.status !== 'error') {
+                        // session.idle 到来时直接强制完成，不依赖 _activeAssistantMessageId
+                        const msgId = s._activeAssistantMessageId || `synthetic_${Date.now()}`;
+                        console.log('[session.idle] Forcing completion for:', msgId);
+                        processEvent(s, {
+                            type: 'message_updated',
+                            message_id: msgId,
+                            role: 'assistant',
+                            time: { completed: Date.now() },
+                            _forceComplete: true
+                        });
+                    } else {
+                        console.warn('[session.idle] Already completed, skipping');
+                    }
+                }
+                // session.status {status: {type: 'idle'}} 也是完成信号
+                if (newEvent?.type === 'session.status') {
+                    const statusType = newEvent?.properties?.status?.type;
+                    if (statusType === 'idle') {
+                        s._sessionIdleSeen = true;
+                        if (s._pendingAssistantCompletion && s._lastAssistantCompletionAdapted) {
+                            const pending = s._lastAssistantCompletionAdapted;
+                            s._pendingAssistantCompletion = false;
+                            processEvent(s, { ...pending, _forceComplete: true });
+                        } else if (s.status !== 'completed' && s.status !== 'error') {
+                            const msgId = s._activeAssistantMessageId || `synthetic_${Date.now()}`;
+                            processEvent(s, {
+                                type: 'message_updated',
+                                message_id: msgId,
+                                role: 'assistant',
+                                time: { completed: Date.now() },
+                                _forceComplete: true
+                            });
+                        }
                     }
                 }
                 if (newEvent?.type === 'message.part.delta') {
@@ -2153,8 +2194,8 @@ window.Logger = {
             } else if (adapted.type === 'status' || adapted.type === 'message_updated') {
                 // ✅ P0 FIX: Track the active assistant message ONLY if it's from the current session
                 // Prevent child session message events from incorrectly updating the main session state
-                // 注意：isFromChildSession变量在函数顶部统一声明，此处直接使用
-                if (adapted.type === 'message_updated' && adapted.role === 'assistant' && adapted.message_id && !adapted.time?.completed && !isFromChildSession) {
+                // 注意：isFromChildSession通过adapted._isFromChildSession传递
+                if (adapted.type === 'message_updated' && adapted.role === 'assistant' && adapted.message_id && !adapted.time?.completed && !adapted._isFromChildSession) {
                     s._activeAssistantMessageId = adapted.message_id;
                     s._sessionIdleSeen = false;
                 }
@@ -2211,8 +2252,8 @@ window.Logger = {
                 
                 // ✅ P0 FIX: Filter out child session events from affecting completion logic
                 // Only consider completion events that are from the main session (not child sessions)
-                // 注意：isFromChildSession变量在函数顶部统一声明，此处直接使用
-                const effectiveActiveAssistantMessageId = isFromChildSession ? null : s._activeAssistantMessageId;
+                // 注意：isFromChildSession通过adapted._isFromChildSession传递
+                const effectiveActiveAssistantMessageId = adapted._isFromChildSession ? null : s._activeAssistantMessageId;
                 
                 const completion = completionLogic
                     ? completionLogic(
@@ -2228,7 +2269,7 @@ window.Logger = {
                         const isError = s._hasToolError || adapted.value === 'error' || adapted.status === 'error';
                         // ✅ P0 FIX: Only check completion for non-child-session events
                         const isAssistantCompletion = (
-                            !isFromChildSession &&
+                            !adapted._isFromChildSession &&
                             adapted.type === 'message_updated' &&
                             adapted.time?.completed &&
                             adapted.role === 'assistant' &&
@@ -2237,8 +2278,13 @@ window.Logger = {
                         const hasQuietWindow = Number.isFinite(quietWindowMs) && quietWindowMs > 0;
                         const hasLastDelta = typeof lastDeltaAt === 'number';
                         const quietOk = !hasQuietWindow || !hasLastDelta || nowMs - lastDeltaAt >= quietWindowMs;
-                        const isDone = isAssistantCompletion && !!s._sessionIdleSeen && quietOk;
-                        const shouldDefer = isAssistantCompletion && (!s._sessionIdleSeen || !quietOk);
+                         // ✅ 修复：添加time.completed检查，不再强制依赖session.idle事件
+                         // 后端已正确发送time.completed，前端应该检查这个字段而不是等待不可靠的session.idle
+                         const isDone = isAssistantCompletion && (!!adapted.time?.completed || !!s._sessionIdleSeen || !!adapted._forceComplete) && (quietOk || !!adapted._forceComplete);
+                        const shouldDefer = isAssistantCompletion && !adapted._forceComplete && (!s._sessionIdleSeen || !quietOk);
+                        if (isAssistantCompletion) {
+                            console.log('[processEvent] completion check:', { isAssistantCompletion, _sessionIdleSeen: s._sessionIdleSeen, quietOk, isDone, shouldDefer, adaptedType: adapted.type, adaptedMsgId: adapted.message_id, effectiveId: effectiveActiveAssistantMessageId });
+                        }
                         return { isDone, isError, isAssistantCompletion, shouldDefer, quietOk };
                     })();
                 const { isDone, isError, isAssistantCompletion, shouldDefer, quietOk } = completion;
@@ -2503,18 +2549,11 @@ window.Logger = {
                             return;
                         }
 
-                        // ✅ P1 FIX: 检查是否已存在相同内容的thought事件，避免重复
-                        const allThoughtEvents = [
-                            ...(s.thoughtEvents || []),
-                            ...(s.orphanEvents || []).filter(e => e.type === 'thought'),
-                            ...(s.phases || []).flatMap(p => (p.events || []).filter(e => e.type === 'thought'))
-                        ];
-                        const isDuplicate = allThoughtEvents.some(existing => 
-                            existing.content === content || 
-                            (existing.content && existing.content.trim() === content.trim())
-                        );
-                        if (isDuplicate) {
-                            console.log('[NewAPI] Duplicate thought detected, skipping:', content.substring(0, 50) + '...');
+                        // ✅ P1 FIX: 只检查空内容，移除重复检测（会导致误判）
+                        // 原因：重复检测逻辑会误判跨session的相同问题为重复
+                        // 影响：正常的thought事件被跳过，导致用户看不到思考过程
+                        if (!content || !content.trim()) {
+                            console.log('[NewAPI] Skipping empty thought content');
                             return;
                         }
 
