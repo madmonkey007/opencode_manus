@@ -2025,27 +2025,60 @@ class OpenCodeClient:
                         params=request_params,
                     )
                     message_response.raise_for_status()
-                    message_data = message_response.json()
-
-                    parts = message_data.get("parts")
-                    if not parts and isinstance(message_data, dict):
-                        parts = message_data.get("message", {}).get("parts")
-                    # If POST response has no tool parts, fetch full message list
-                    if parts is not None:
-                        has_tool = any(p.get("type") == "tool" for p in parts if isinstance(p, dict))
-                    else:
-                        has_tool = False
-                    if not parts or not has_tool:
-                        try:
-                            messages_resp = await client.get(
-                                f"{base_url}/session/{server_session_id}/message",
-                                params={**request_params, "limit": 20},
-                            )
-                            if messages_resp.status_code == 200:
-                                parts = _flatten_assistant_parts(messages_resp.json())
-                        except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
-                            logger.debug(f"Fetch additional parts failed: {e}")
-                            pass
+                     message_data = message_response.json()
+ 
+                     # ✅ 诊断日志：分析POST response的实际结构
+                     logger.debug(
+                         f"[SERVER_API] POST /message response keys: {list(message_data.keys())}"
+                     )
+                     logger.debug(
+                         f"[SERVER_API] Full response structure (first 1000 chars): "
+                         f"{json.dumps(message_data, indent=2, ensure_ascii=False)[:1000]}"
+                     )
+ 
+                     parts = message_data.get("parts")
+                     logger.debug(f"[SERVER_API] Initial parts extraction (message_data.get('parts')): {parts}")
+ 
+                     if not parts and isinstance(message_data, dict):
+                         parts = message_data.get("message", {}).get("parts")
+                         logger.debug(
+                             f"[SERVER_API] Fallback parts extraction (message_data.get('message').get('parts')): {parts}"
+                         )
+ 
+                     logger.info(
+                         f"[SERVER_API] Final extracted parts: {len(parts) if parts else 0} parts"
+                     )
+ 
+                     # If POST response has no tool parts, fetch full message list
+                     if parts is not None:
+                         has_tool = any(p.get("type") == "tool" for p in parts if isinstance(p, dict))
+                         logger.info(f"[SERVER_API] Has tool parts: {has_tool}")
+                     else:
+                         has_tool = False
+                         logger.warning(
+                             f"[SERVER_API] parts is None, setting has_tool=False"
+                         )
+ 
+                      if not parts or not has_tool:
+                         try:
+                             # ✅ 修复：只获取最新消息(limit=1)而不是所有历史消息(limit=20)
+                             # 这可以避免重复广播用户query和历史assistant回复
+                             logger.info(
+                                 f"[SERVER_API] POST response has no tool parts, "
+                                 f"fetching latest message only (limit=1) instead of all history (limit=20)"
+                             )
+                             messages_resp = await client.get(
+                                 f"{base_url}/session/{server_session_id}/message",
+                                 params={**request_params, "limit": 1},  # ← 只取最新消息
+                             )
+                             if messages_resp.status_code == 200:
+                                 parts = _flatten_assistant_parts(messages_resp.json())
+                                 logger.info(
+                                     f"[SERVER_API] Fetched {len(parts) if parts else 0} parts from latest message"
+                                 )
+                         except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
+                             logger.debug(f"Fetch additional parts failed: {e}")
+                             pass
                 except httpx.HTTPStatusError as e:
                     if e.response is not None and e.response.status_code == 404:
                         logger.warning(
