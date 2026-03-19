@@ -23,7 +23,7 @@ try:
         generate_step_id,
     )
     from .api import event_stream_manager
-    from .history_service import get_history_service
+    from .history_service import get_history_service, HistoryService
 except ImportError:
     from models import (
         Part,
@@ -34,7 +34,7 @@ except ImportError:
         generate_part_id,
         generate_step_id,
     )
-    from history_service import get_history_service
+    from history_service import get_history_service, HistoryService
 
 logger = logging.getLogger("opencode.client")
 
@@ -95,11 +95,22 @@ class OpenCodeClient:
         self.workspace_base = workspace_base
         os.makedirs(workspace_base, exist_ok=True)
         self.server_api_base_url = os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
+
+        # 初始化history_service（使用正确的数据库路径）
+        history_db_path = os.path.join(workspace_base, 'history.db')
         try:
-            from app.history_service import HistoryService; self.history_service = HistoryService('workspace/history.db')
-        except Exception as e:
-            logger.warning(f"Failed to initialize history service: {e}")
+            self.history_service: Optional[HistoryService] = HistoryService(history_db_path)
+            logger.info(f"History service initialized: {history_db_path}")
+        except FileNotFoundError:
+            logger.error(f"History database directory not found: {os.path.dirname(history_db_path)}")
             self.history_service = None
+        except PermissionError:
+            logger.error(f"Permission denied accessing history database: {history_db_path}")
+            self.history_service = None
+        except Exception as e:
+            logger.error(f"Failed to initialize history service: {type(e).__name__}: {e}")
+            self.history_service = None
+
         self._skip_preview_sessions = set()
         # Track active preview tasks so errors surface and cleanup is possible
         self._active_preview_tasks: set = set()
