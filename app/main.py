@@ -309,7 +309,7 @@ class SessionManager:
     """会话管理器，负责管理OpenCode会话的生命周期和持久化"""
 
     # 常量定义
-    DB_PATH = "/app/opencode/workspace/history.db"  # ✅ 与Go CLI保持一致
+    DB_PATH = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "../workspace")), "history.db")
     SESSION_ID_PREFIX = "ses_"
     SESSION_ID_LENGTH = 9
 
@@ -355,7 +355,7 @@ class SessionManager:
                         created_at, updated_at
                     )
                     VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0.0, ?, ?)
-                """, (sid, prompt, "running", f"/app/opencode/workspace/{sid}",
+                """, (sid, prompt, "running", os.path.join(self.db_path.replace("history.db", ""), sid),
                        title, now, now))
 
                 conn.commit()
@@ -664,18 +664,18 @@ async def process_log_line(text: str, sid: str = None):
                             if success:
                                 # ✅ P1-2修复：数据库保存是重要业务操作，使用info级别
                                 logger.info(f"Saved tool part to DB: {tool_name} for session {sid}")
-                         except Exception as save_err:
-                             logger.warning(f"Failed to save tool part for {sid}: {save_err}")
+                        except Exception as save_err:
+                            logger.warning(f"Failed to save tool part for {sid}: {save_err}")
 
-             # ✅ 修复：删除text事件处理，避免与opencode_client.py重复广播
-             # 问题：opencode_client.py已经正确发送了text事件的增量
-             # 影响：main.py再次发送完整文本，导致"52"+"52"="5252"
-             # 修复：注释掉以下代码，只让opencode_client.py负责text事件
-             # elif event_type == "text":
-             #     chunk = event.get("part", {}).get("text", "")
-             #     if chunk: yield format_sse({"type": "answer_chunk", "text": chunk})
+            # ✅ 修复：删除text事件处理，避免与opencode_client.py重复广播
+            # 问题：opencode_client.py已经正确发送了text事件的增量
+            # 影响：main.py再次发送完整文本，导致"52"+"52"="5252"
+            # 修复：注释掉以下代码，只让opencode_client.py负责text事件
+            # elif event_type == "text":
+            #     chunk = event.get("part", {}).get("text", "")
+            #     if chunk: yield format_sse({"type": "answer_chunk", "text": chunk})
 
-             elif event_type == "error":
+            elif event_type == "error":
                 yield format_sse({"type": "tool_event", "data": {"type": "error", "content": event.get("message", "Unknown error")}})
 
             return

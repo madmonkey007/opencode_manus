@@ -336,7 +336,17 @@ class OpenCodeClient:
         
         try:
             async with httpx.AsyncClient(timeout=120) as client:
-                payload = {"model": {"providerID": "openai", "modelID": "gpt-4o"}, "parts": [{"type": "text", "text": user_prompt}]}
+                # Parse model_id from environment variable or default to "new-api/glm-4.7"
+                model_id = os.getenv("OPENCODE_MODEL_ID", os.getenv("OPENAI_MODEL", "new-api/glm-4.7"))
+
+                # Extract provider and model from model_id (format: "provider/model" or just "model")
+                if "/" in model_id:
+                    provider_id, model_name = model_id.split("/", 1)
+                else:
+                    provider_id = os.getenv("OPENCODE_PROVIDER_ID", "openai")
+                    model_name = model_id
+
+                payload = {"model": {"providerID": provider_id, "modelID": model_name}, "parts": [{"type": "text", "text": user_prompt}]}
                 resp = await client.post(f"{base_url}/session/{server_session_id}/message", json=payload, params=request_params)
                 resp.raise_for_status()
         except Exception as e:
@@ -412,7 +422,7 @@ class OpenCodeClient:
         logger.info(f"Executing {assistant_message_id} for {session_id}")
         await self._broadcast_event(session_id, {"type": "message.updated", "properties": {"info": {"id": assistant_message_id, "session_id": session_id, "role": "assistant", "time": {"created": int(time.time())}}}})
         
-        server_ok = await self._execute_via_server_api(session_id, assistant_message_id, user_prompt, mode, "gpt-4o")
+        server_ok = await self._execute_via_server_api(session_id, assistant_message_id, user_prompt, mode, os.getenv("OPENAI_MODEL", "deepseek-chat"))
         
         if server_ok:
             # Wait for any in-flight preview tasks before signalling completion
