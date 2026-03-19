@@ -379,7 +379,7 @@ class OpenCodeClient:
             try:
                 # Limit 1 ensures we only get the latest message (assistant response)
                 async with httpx.AsyncClient() as client:
-                    r = await client.get(f"{base_url}/session/{server_session_id}/message", params={**request_params, "limit": 1})
+                    r = await client.get(f"{base_url}/session/{server_session_id}/messages", params={**request_params, "limit": 1})
                     if r.status_code == 200:
                         msgs = r.json()
                         for m in msgs:
