@@ -96,7 +96,7 @@ class OpenCodeClient:
         os.makedirs(workspace_base, exist_ok=True)
         self.server_api_base_url = os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
         try:
-            self.history_service = get_history_service()
+            from app.history_service import HistoryService; self.history_service = HistoryService('workspace/history.db')
         except Exception as e:
             logger.warning(f"Failed to initialize history service: {e}")
             self.history_service = None
