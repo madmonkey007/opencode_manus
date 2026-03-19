@@ -274,9 +274,18 @@ class OpenCodeClient:
 
                             # ✅ 过滤 user message 的 part，防止用户问题被当作 AI 回复广播到前端
                             user_msg_id = state.get("user_message_id")
-                            if user_msg_id and part.get("messageID") == user_msg_id:
-                                logger.debug(f"[BRIDGE] Skipping user message part: {part.get('id')}")
+                            # opencode server 字段可能是 messageID（驼峰）或 message_id（下划线）
+                            part_msg_id = part.get("messageID") or part.get("message_id")
+                            if user_msg_id and part_msg_id == user_msg_id:
+                                logger.debug(f"[BRIDGE] Skipping user message part (by id): {part.get('id')}")
                                 continue
+                            # Fallback：如果 part 文本与用户原始 prompt 完全一致，也跳过
+                            if etype in ["message.part.updated", "message.part.delta"]:
+                                part_text = part.get("text") or (part.get("content") or {}).get("text", "")
+                                user_prompt_text = state.get("user_prompt", "")
+                                if part_text and user_prompt_text and part_text.strip() == user_prompt_text.strip():
+                                    logger.debug(f"[BRIDGE] Skipping user message part (by content match): {part.get('id')}")
+                                    continue
                             
                             if etype in ["message.part.updated", "message.part.delta"]:
                                 ptype = part.get("type")
@@ -350,16 +359,14 @@ class OpenCodeClient:
         
         request_params = {"sessionID": server_session_id}
         stop_event = asyncio.Event()
-        sse_state = {"events": 0, "completed": False, "saw_tool": False}
-        
-        bridge_task = asyncio.create_task(self._bridge_global_events(base_url, request_params, server_session_id, session_id, assistant_message_id, stop_event, sse_state))
-        
+
+        # ✅ 修复时序问题：先 POST message 拿到 user_message_id，再启动 bridge
+        # 这样 bridge 启动时 user_message_id 已知，不会漏过早到的 user part 事件
+        user_msg_id = None
         try:
             async with httpx.AsyncClient(timeout=120) as client:
-                # Parse model_id from environment variable or default to "new-api/glm-4.7"
+                # Parse model_id from environment variable
                 model_id = os.getenv("OPENCODE_MODEL_ID", os.getenv("OPENAI_MODEL", "new-api/glm-4.7"))
-
-                # Extract provider and model from model_id (format: "provider/model" or just "model")
                 if "/" in model_id:
                     provider_id, model_name = model_id.split("/", 1)
                 else:
@@ -369,17 +376,19 @@ class OpenCodeClient:
                 payload = {"model": {"providerID": provider_id, "modelID": model_name}, "parts": [{"type": "text", "text": user_prompt}]}
                 resp = await client.post(f"{base_url}/session/{server_session_id}/message", json=payload, params=request_params)
                 resp.raise_for_status()
-                # 记录 user message ID，bridge 里过滤掉 user message 的 part，防止用户问题被当作 AI 回复广播
                 try:
                     user_msg_id = resp.json().get("id")
                     if user_msg_id:
-                        sse_state["user_message_id"] = user_msg_id
                         logger.info(f"[EXEC] User message ID: {user_msg_id}")
                 except Exception:
                     pass
         except Exception as e:
             logger.error(f"Post message failed: {e}")
             return False
+
+        # 启动 bridge，此时 user_message_id 已知
+        sse_state = {"events": 0, "completed": False, "saw_tool": False, "user_message_id": user_msg_id, "user_prompt": user_prompt}
+        bridge_task = asyncio.create_task(self._bridge_global_events(base_url, request_params, server_session_id, session_id, assistant_message_id, stop_event, sse_state))
 
         try: 
             # Wait for SSE to finish or timeout
