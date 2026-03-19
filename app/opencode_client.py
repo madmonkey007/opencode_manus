@@ -415,12 +415,13 @@ class OpenCodeClient:
                 else:
                     logger.debug(f"[POLL] Content already fully sent for {global_key}")
 
-                # ✅ 持久化：在 poll 阶段用完整 text 覆盖写入数据库（INSERT OR REPLACE 幂等）
+                # ✅ 持久化：在 poll 阶段用完整 text 写入数据库（INSERT OR REPLACE 幂等）
                 # 选择 poll 而非 SSE delta 阶段，是因为 poll 拿到的是最终完整文本，一条记录即可。
-                # 只在有新内容（delta 存在）时才写入，避免无变化时的冗余 IO。
-                if delta and self.history_service:
-                    # part_id：优先用 server 返回的原始 id，fallback 加 mapped_type 后缀保证唯一
-                    part_id = (part.get("id") or f"final_{global_key}") + f"_{mapped_type}"
+                # 注意：持久化条件独立于 delta，即使 SSE 已发完全部内容，数据库里也必须有记录。
+                if self.history_service:
+                    raw_id = part.get("id")
+                    # 有原始 id 直接用；fallback 时加 mapped_type 后缀保证 text/thought 不互相覆盖
+                    part_id = raw_id if raw_id else f"final_{global_key}_{mapped_type}"
                     try:
                         await self.history_service.save_part(session_id, assistant_message_id, {
                             "id": part_id,
@@ -430,7 +431,7 @@ class OpenCodeClient:
                         logger.info(f"[POLL] Persisted {mapped_type} part to DB: {part_id} ({len(text)} chars)")
                     except Exception as e:
                         logger.error(f"[POLL] Failed to persist part {part_id}: {e}")
-                        # 不抛出，持久化失败不影响 SSE 广播主流程
+                        # 不抛出，持久化失败不影响主流程
         
         return True
 
