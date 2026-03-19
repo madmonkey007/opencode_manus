@@ -1084,6 +1084,14 @@ window.Logger = {
         if (pCount > rCount) {
             s.response += rSep;
         }
+        // ✅ v=39: 幂等检查 (P0 修复) - 防止文本重复叠加
+        // 原因：后端可能通过 SSE delta、SSE updated、以及最后的 Poll 三种途径发送相同内容的增量
+        // 如果文本已经存在于 s.response 的末尾，则不再重复追加
+        if (s.response && s.response.endsWith(text)) {
+            console.log('[NewAPI] 🛡️ Skipping idempotent append (text already at tail):', text.length > 50 ? text.substring(0, 50) + '...' : text);
+            return false;
+        }
+
         s.response += text;
         return true;
     }

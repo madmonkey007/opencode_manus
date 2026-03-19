@@ -343,13 +343,9 @@ async def recover_session_from_disk(session_id: str) -> bool:
 
 
 @router.get("/session/{session_id}/messages")
-async def get_messages(session_id: str, limit: int = 100):
+async def get_messages(session_id: str):
     """
-    获取会话的所有消息历史（复数接口，RESTful规范）
-
-    Args:
-        session_id: 会话ID
-        limit: 返回的消息数量限制，默认100
+    获取会话的所有消息历史
     """
     # ✅ S1: 路径验证 - 防止路径遍历攻击
     import re
@@ -508,22 +504,6 @@ async def get_messages(session_id: str, limit: int = 100):
         "messages": [msg.dict() for msg in messages],
         "count": len(messages),
     }
-
-
-@router.get("/session/{session_id}/message")
-async def get_latest_message(session_id: str):
-    """
-    获取会话的最新消息（单数接口，向后兼容）
-
-    这是/messages接口的别名，用于保持向后兼容性。
-    前端可能使用/message（单数）或/messages（复数）。
-    两者都指向同一个实现，符合RESTful最佳实践。
-
-    Args:
-        session_id: 会话ID
-    """
-    # 调用messages接口，limit=1只返回最新一条
-    return await get_messages(session_id, limit=1)
 
 
 

@@ -315,8 +315,8 @@
             }
         }
     },
-    "model": "zai-coding-plan/glm-4.7",
-    "small_model": "zai-coding-plan/glm-4.5-air",
+    "model": "new-api/glm-4.7",
+    "small_model": "new-api/glm-4.7",
     "provider": {
         "google-ai-key1": {
             "npm": "@ai-sdk/google",

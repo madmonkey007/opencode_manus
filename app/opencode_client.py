@@ -24,7 +24,6 @@ try:
     )
     from .api import event_stream_manager
     from .history_service import get_history_service, HistoryService
-    from .api_endpoints import APIEndpoints
 except ImportError:
     from models import (
         Part,
@@ -35,9 +34,7 @@ except ImportError:
         generate_part_id,
         generate_step_id,
     )
-    from api import event_stream_manager
     from history_service import get_history_service, HistoryService
-    from api_endpoints import APIEndpoints
 
 logger = logging.getLogger("opencode.client")
 
@@ -385,15 +382,13 @@ class OpenCodeClient:
             try:
                 # Limit 1 ensures we only get the latest message (assistant response)
                 async with httpx.AsyncClient() as client:
-                    # ✅ v38.4.23: 使用API端点常量，避免硬编码URL
-                    messages_url = f"{base_url}{APIEndpoints.format_session_messages(server_session_id)}"
-                    r = await client.get(messages_url, params={**request_params, "limit": 1})
+                    r = await client.get(f"{base_url}/session/{server_session_id}/message", params={**request_params, "limit": 1})
                     if r.status_code == 200:
                         msgs = r.json()
                         for m in msgs:
                             if (m.get("info") or {}).get("role") == "assistant":
                                 return m.get("parts") or []
-            except Exception as e:
+            except Exception as e: 
                 logger.error(f"Failed to poll final parts: {e}")
             return []
 

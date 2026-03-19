@@ -1,4 +1,281 @@
-Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
-[91m[1mError: [0mUnexpected error, check log file at C:\Users\EDY\.local\share\opencode\log\2026-03-09T054856.log for more details
+2026-03-19 14:13:53,273 - opencode - INFO - History service initialized
+2026-03-19 14:13:53,294 - opencode.managers - INFO - MessageStore initialized
+2026-03-19 14:13:53,295 - opencode.managers - INFO - SessionManager initialized
+2026-03-19 14:13:53,303 - opencode - INFO - New API router imported successfully
+2026-03-19 14:13:53,303 - opencode - INFO - Including api_router with 18 routes
+2026-03-19 14:13:53,308 - opencode - INFO - After include_router, total routes: 22
+2026-03-19 14:13:53,309 - opencode - INFO - New API router registered at /opencode
+INFO:     Started server process [18868]
+INFO:     Waiting for application startup.
+2026-03-19 14:13:53,313 - opencode - INFO - [Startup] Initializing database...
+2026-03-19 14:13:53,313 - opencode - INFO - [DB] Database initialized at D:\manus\opencode\workspace\history.db
+2026-03-19 14:13:53,313 - opencode - INFO - [Startup] Database initialization complete
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8089 (Press CTRL+C to quit)
+INFO:     127.0.0.1:64938 - "HEAD / HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:57976 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /static/event-adapter.js?v=38.4.2 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:62141 - "GET /static/opencode-new-api-patch.js?v=38.4.23 HTTP/1.1" 200 OK
+2026-03-19 14:14:09,916 - opencode.managers - INFO - Session ses_6d1ea6d9 not in memory, restoring from database...
+2026-03-19 14:14:09,917 - opencode.managers - WARNING - Session ses_6d1ea6d9 not found in database
+2026-03-19 14:14:09,917 - opencode.managers - WARNING - Failed to restore session ses_6d1ea6d9 from database
+2026-03-19 14:14:09,920 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+2026-03-19 14:14:09,920 - opencode.api - INFO - [Session Recovery] Attempting to recover session ses_6d1ea6d9 from disk
+2026-03-19 14:14:09,921 - opencode.managers - INFO - Initialized storage for session: ses_6d1ea6d9
+2026-03-19 14:14:09,922 - opencode.api - INFO - [Session Recovery] Successfully recovered session ses_6d1ea6d9
+2026-03-19 14:14:09,922 - opencode.managers - INFO - Retrieved 0 messages for session: ses_6d1ea6d9
+INFO:     127.0.0.1:62141 - "GET /opencode/session/ses_6d1ea6d9/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:14:09,924 - opencode.managers - INFO - Session ses_f1ab5cb8 not in memory, restoring from database...
+2026-03-19 14:14:09,925 - opencode.managers - WARNING - Session ses_f1ab5cb8 not found in database
+2026-03-19 14:14:09,926 - opencode.managers - WARNING - Failed to restore session ses_f1ab5cb8 from database
+2026-03-19 14:14:09,926 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+2026-03-19 14:14:09,927 - opencode.api - INFO - [Session Recovery] Attempting to recover session ses_f1ab5cb8 from disk
+2026-03-19 14:14:09,927 - opencode.managers - INFO - Initialized storage for session: ses_f1ab5cb8
+2026-03-19 14:14:09,927 - opencode.api - INFO - [Session Recovery] Successfully recovered session ses_f1ab5cb8
+2026-03-19 14:14:09,927 - opencode.managers - INFO - Retrieved 0 messages for session: ses_f1ab5cb8
+INFO:     127.0.0.1:57976 - "GET /opencode/session/ses_f1ab5cb8/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:14:09,928 - opencode.managers - INFO - Session ses_57c8b1b0 not in memory, restoring from database...
+2026-03-19 14:14:09,930 - opencode.managers - WARNING - Session ses_57c8b1b0 not found in database
+2026-03-19 14:14:09,931 - opencode.managers - WARNING - Failed to restore session ses_57c8b1b0 from database
+2026-03-19 14:14:09,932 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+2026-03-19 14:14:09,932 - opencode.api - INFO - [Session Recovery] Attempting to recover session ses_57c8b1b0 from disk
+2026-03-19 14:14:09,932 - opencode.managers - INFO - Initialized storage for session: ses_57c8b1b0
+2026-03-19 14:14:09,933 - opencode.api - INFO - [Session Recovery] Successfully recovered session ses_57c8b1b0
+2026-03-19 14:14:09,933 - opencode.managers - INFO - Retrieved 0 messages for session: ses_57c8b1b0
+INFO:     127.0.0.1:60348 - "GET /opencode/session/ses_57c8b1b0/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:14:09,935 - opencode.managers - INFO - Session ses_1a0aa4dd not in memory, restoring from database...
+2026-03-19 14:14:09,937 - opencode.managers - WARNING - Session ses_1a0aa4dd not found in database
+2026-03-19 14:14:09,937 - opencode.managers - WARNING - Failed to restore session ses_1a0aa4dd from database
+2026-03-19 14:14:09,938 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+2026-03-19 14:14:09,938 - opencode.api - INFO - [Session Recovery] Attempting to recover session ses_1a0aa4dd from disk
+2026-03-19 14:14:09,938 - opencode.managers - INFO - Initialized storage for session: ses_1a0aa4dd
+2026-03-19 14:14:09,938 - opencode.api - INFO - [Session Recovery] Successfully recovered session ses_1a0aa4dd
+2026-03-19 14:14:09,938 - opencode.managers - INFO - Retrieved 0 messages for session: ses_1a0aa4dd
+INFO:     127.0.0.1:62141 - "GET /opencode/session/ses_1a0aa4dd/messages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57976 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /opencode/list_session_files?sid=ses_dduve8m HTTP/1.1" 200 OK
+2026-03-19 14:14:10,295 - opencode.managers - INFO - Retrieved 0 messages for session: ses_6d1ea6d9
+2026-03-19 14:14:10,297 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:57976 - "GET /opencode/session/ses_6d1ea6d9/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:14:10,300 - opencode.managers - INFO - Retrieved 0 messages for session: ses_f1ab5cb8
+2026-03-19 14:14:10,301 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:62141 - "GET /opencode/session/ses_f1ab5cb8/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:14:10,304 - opencode.managers - INFO - Retrieved 0 messages for session: ses_57c8b1b0
+2026-03-19 14:14:10,306 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:60348 - "GET /opencode/session/ses_57c8b1b0/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:14:10,307 - opencode.managers - INFO - Retrieved 0 messages for session: ses_1a0aa4dd
+2026-03-19 14:14:10,308 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:57977 - "GET /opencode/session/ses_1a0aa4dd/messages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60747 - "GET /opencode/projects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60747 - "GET /opencode/session/ses_6d1ea6d9/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57977 - "GET /opencode/session/ses_f1ab5cb8/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60747 - "GET /opencode/session/ses_57c8b1b0/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60348 - "GET /opencode/session/ses_1a0aa4dd/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60348 - "GET /opencode/list_session_files?sid=ses_dduve8m HTTP/1.1" 200 OK
+2026-03-19 14:14:10,541 - opencode - ERROR - [DB] Failed to write session ses_dduve8m to database: unable to open database file
+2026-03-19 14:14:10,544 - opencode - INFO - [_run_process] Session ses_dduve8m initialized (task handled by opencode_client)
+INFO:     127.0.0.1:60348 - "GET /opencode/run_sse?prompt=5%2B7%E7%AD%89%E4%BA%8E%E5%A4%9A%E5%B0%91&sid=ses_dduve8m HTTP/1.1" 200 OK
+2026-03-19 14:14:10,547 - opencode - INFO - Agent session attached: ses_dduve8m
+2026-03-19 14:14:56,652 - opencode.managers - INFO - Retrieved 0 messages for session: ses_6d1ea6d9
+2026-03-19 14:14:56,654 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:63311 - "GET /opencode/session/ses_6d1ea6d9/messages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63311 - "GET /opencode/list_session_files?sid=ses_6d1ea6d9 HTTP/1.1" 200 OK
+2026-03-19 14:15:21,295 - opencode.managers - ERROR - [DB] Failed to write session ses_2e71c19e to database: unable to open database file
+2026-03-19 14:15:21,296 - opencode.managers - ERROR - Traceback (most recent call last):
+  File "D:\manus\opencode\app\managers.py", line 623, in _write_session_to_db
+    conn = sqlite3.connect(self.db_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: unable to open database file
 
-Failed to start server on port 4096
+2026-03-19 14:15:21,296 - opencode.managers - INFO - Initialized storage for session: ses_2e71c19e
+2026-03-19 14:15:21,296 - opencode.managers - INFO - Created session: ses_2e71c19e with title: New Session
+2026-03-19 14:15:21,304 - opencode.api - INFO - Created session: ses_2e71c19e with mode: auto, project_id: proj_default
+2026-03-19 14:15:21,304 - opencode.api - INFO - Workspace directory created: D:\manus\opencode\workspace\ses_2e71c19e
+INFO:     127.0.0.1:64099 - "POST /opencode/session HTTP/1.1" 200 OK
+2026-03-19 14:15:21,318 - opencode.api - INFO - [DB] Updated session ses_2e71c19e with title: 测试修复：9+13等于多少...
+2026-03-19 14:15:21,318 - opencode.managers - INFO - Added message: msg_bkjm0ax356j to session: ses_2e71c19e
+2026-03-19 14:15:21,318 - opencode.api - INFO - Adding user message part: part_fe7651e1
+2026-03-19 14:15:21,318 - opencode.managers - INFO - Added part: part_fe7651e1 to message: msg_bkjm0ax356j
+2026-03-19 14:15:21,319 - opencode.api - INFO - Added user message: msg_bkjm0ax356j to session: ses_2e71c19e
+2026-03-19 14:15:21,319 - opencode.managers - INFO - Added message: msg_f45da12e to session: ses_2e71c19e
+2026-03-19 14:15:21,319 - opencode.api - INFO - Created assistant message: msg_f45da12e for session: ses_2e71c19e
+2026-03-19 14:15:21,334 - opencode.enhancer - INFO - Prompt enhanced: detected tasks=['code_edit']
+2026-03-19 14:15:21,334 - opencode.api - INFO - Sending message to ses_2e71c19e in mode: build
+INFO:     127.0.0.1:64099 - "POST /opencode/session/ses_2e71c19e/message HTTP/1.1" 200 OK
+2026-03-19 14:15:21,336 - opencode.client - INFO - Executing msg_f45da12e for ses_2e71c19e
+2026-03-19 14:15:21,336 - opencode.client - INFO - [BROADCAST] session=ses_2e71c19e type=message.updated
+INFO:     127.0.0.1:50870 - "GET /opencode/events?session_id=ses_2e71c19e HTTP/1.1" 200 OK
+2026-03-19 14:15:22,161 - opencode.api - INFO - New listener for session: ses_2e71c19e (total: 1)
+2026-03-19 14:15:22,161 - opencode.api - INFO - SSE connection established for session: ses_2e71c19e (listeners: 1)
+2026-03-19 14:15:22,161 - opencode.managers - INFO - Retrieved 2 messages for session: ses_2e71c19e
+INFO:     127.0.0.1:64099 - "GET /opencode/list_session_files?sid=ses_2e71c19e HTTP/1.1" 200 OK
+2026-03-19 14:15:24,197 - opencode.client - INFO - [BROADCAST] session=ses_2e71c19e type=error
+INFO:     127.0.0.1:54305 - "HEAD / HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:63118 - "GET /health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56408 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56408 - "GET /static/tool-icons.js?v=7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58388 - "GET /static/preview-config.js?v=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53148 - "GET /static/code-preview-enhanced.js?v=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /static/timeline-progress.js?v=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51845 - "GET /static/right-panel-manager.js?v=14 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52629 - "GET /static/enhanced-task-panel.js?v=37 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56408 - "GET /static/api-client.js?v=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58388 - "GET /static/event-adapter.js?v=38.4.2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53148 - "GET /static/opencode-new-api-patch.js?v=38.4.23 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /static/opencode.js?v=38.4.2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52629 - "GET /static/history-fix.js?v=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /opencode/sessions HTTP/1.1" 200 OK
+2026-03-19 14:33:25,832 - opencode.managers - INFO - Retrieved 2 messages for session: ses_2e71c19e
+INFO:     127.0.0.1:57976 - "GET /opencode/session/ses_2e71c19e/messages HTTP/1.1" 200 OK
+2026-03-19 14:33:25,839 - opencode.managers - INFO - Retrieved 0 messages for session: ses_6d1ea6d9
+2026-03-19 14:33:25,840 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:53148 - "GET /opencode/session/ses_6d1ea6d9/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:33:25,843 - opencode.managers - INFO - Retrieved 0 messages for session: ses_f1ab5cb8
+2026-03-19 14:33:25,844 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:52629 - "GET /opencode/session/ses_f1ab5cb8/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:33:25,848 - opencode.managers - INFO - Retrieved 0 messages for session: ses_57c8b1b0
+2026-03-19 14:33:25,853 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:58388 - "GET /opencode/session/ses_57c8b1b0/messages HTTP/1.1" 404 Not Found
+2026-03-19 14:33:25,855 - opencode.managers - INFO - Retrieved 0 messages for session: ses_1a0aa4dd
+2026-03-19 14:33:25,858 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:56408 - "GET /opencode/session/ses_1a0aa4dd/messages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51845 - "GET /opencode/projects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51845 - "GET /opencode/session/ses_6d1ea6d9/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56408 - "GET /opencode/session/ses_f1ab5cb8/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58388 - "GET /opencode/session/ses_57c8b1b0/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56408 - "GET /opencode/session/ses_1a0aa4dd/timeline HTTP/1.1" 200 OK
+2026-03-19 14:33:39,206 - opencode.managers - INFO - Retrieved 2 messages for session: ses_2e71c19e
+INFO:     127.0.0.1:57976 - "GET /opencode/session/ses_2e71c19e/messages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /opencode/list_session_files?sid=ses_2e71c19e HTTP/1.1" 200 OK
+2026-03-19 14:34:22,682 - opencode.api - INFO - Listener left session: ses_2e71c19e (remaining: 0)
+2026-03-19 14:34:31,766 - opencode.managers - ERROR - [DB] Failed to write session ses_a0bb5174 to database: unable to open database file
+2026-03-19 14:34:31,767 - opencode.managers - ERROR - Traceback (most recent call last):
+  File "D:\manus\opencode\app\managers.py", line 623, in _write_session_to_db
+    conn = sqlite3.connect(self.db_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: unable to open database file
+
+2026-03-19 14:34:31,767 - opencode.managers - INFO - Initialized storage for session: ses_a0bb5174
+2026-03-19 14:34:31,767 - opencode.managers - INFO - Created session: ses_a0bb5174 with title: New Session
+2026-03-19 14:34:31,774 - opencode.api - INFO - Created session: ses_a0bb5174 with mode: auto, project_id: proj_default
+2026-03-19 14:34:31,774 - opencode.api - INFO - Workspace directory created: D:\manus\opencode\workspace\ses_a0bb5174
+INFO:     127.0.0.1:63672 - "POST /opencode/session HTTP/1.1" 200 OK
+2026-03-19 14:34:31,792 - opencode.api - INFO - [DB] Updated session ses_a0bb5174 with title: 8+7等于多少...
+2026-03-19 14:34:31,792 - opencode.managers - INFO - Added message: msg_39fgfcdib9s to session: ses_a0bb5174
+2026-03-19 14:34:31,792 - opencode.api - INFO - Adding user message part: part_30311128
+2026-03-19 14:34:31,792 - opencode.managers - INFO - Added part: part_30311128 to message: msg_39fgfcdib9s
+2026-03-19 14:34:31,792 - opencode.api - INFO - Added user message: msg_39fgfcdib9s to session: ses_a0bb5174
+2026-03-19 14:34:31,792 - opencode.managers - INFO - Added message: msg_5b185988 to session: ses_a0bb5174
+2026-03-19 14:34:31,792 - opencode.api - INFO - Created assistant message: msg_5b185988 for session: ses_a0bb5174
+2026-03-19 14:34:31,792 - opencode.api - INFO - Sending message to ses_a0bb5174 in mode: build
+INFO:     127.0.0.1:63672 - "POST /opencode/session/ses_a0bb5174/message HTTP/1.1" 200 OK
+2026-03-19 14:34:31,792 - opencode.client - INFO - Executing msg_5b185988 for ses_a0bb5174
+2026-03-19 14:34:31,792 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=message.updated
+INFO:     127.0.0.1:62432 - "GET /opencode/events?session_id=ses_a0bb5174 HTTP/1.1" 200 OK
+2026-03-19 14:34:32,184 - opencode.api - INFO - New listener for session: ses_a0bb5174 (total: 1)
+2026-03-19 14:34:32,184 - opencode.api - INFO - SSE connection established for session: ses_a0bb5174 (listeners: 1)
+2026-03-19 14:34:32,184 - opencode.managers - INFO - Retrieved 2 messages for session: ses_a0bb5174
+INFO:     127.0.0.1:63672 - "GET /opencode/list_session_files?sid=ses_a0bb5174 HTTP/1.1" 200 OK
+2026-03-19 14:34:33,603 - httpx - INFO - HTTP Request: POST http://127.0.0.1:4096/session "HTTP/1.1 200 OK"
+2026-03-19 14:34:34,983 - httpx - INFO - HTTP Request: GET http://127.0.0.1:4096/event?sessionID=ses_2fb327107ffe7KN09x9kmHSq5q "HTTP/1.1 200 OK"
+2026-03-19 14:34:36,004 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=message.updated
+2026-03-19 14:34:36,005 - opencode.client - INFO - [BRIDGE] Delta Applied to message.part.updated: ses_a0bb5174_msg_5b185988_text +7
+2026-03-19 14:34:36,005 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=message.part.updated
+2026-03-19 14:34:36,005 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=session.status
+2026-03-19 14:34:36,005 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=message.updated
+2026-03-19 14:34:41,550 - httpx - INFO - HTTP Request: POST http://127.0.0.1:4096/session/ses_2fb327107ffe7KN09x9kmHSq5q/message?sessionID=ses_2fb327107ffe7KN09x9kmHSq5q "HTTP/1.1 200 OK"
+2026-03-19 14:34:41,551 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=message.updated
+2026-03-19 14:34:41,551 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=session.diff
+2026-03-19 14:34:41,551 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=session.status
+2026-03-19 14:34:41,552 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=session.error
+2026-03-19 14:34:41,552 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=session.status
+2026-03-19 14:34:41,553 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=session.idle
+2026-03-19 14:34:42,205 - httpx - INFO - HTTP Request: GET http://127.0.0.1:4096/session/ses_2fb327107ffe7KN09x9kmHSq5q/message?sessionID=ses_2fb327107ffe7KN09x9kmHSq5q&limit=1 "HTTP/1.1 200 OK"
+2026-03-19 14:34:42,207 - opencode.client - INFO - [BROADCAST] session=ses_a0bb5174 type=message.updated
+INFO:     127.0.0.1:52562 - "GET /api/sessions HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50634 - "GET /sessions HTTP/1.1" 404 Not Found
+2026-03-19 14:36:01,595 - opencode.managers - INFO - Retrieved 2 messages for session: ses_a0bb5174
+INFO:     127.0.0.1:50654 - "GET /opencode/session/ses_a0bb5174/messages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50676 - "GET /opencode/session/ses_a0bb5174/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50719 - "GET /opencode/sessions HTTP/1.1" 200 OK
+2026-03-19 14:36:23,187 - opencode.managers - INFO - Retrieved 2 messages for session: ses_2e71c19e
+INFO:     127.0.0.1:50729 - "GET /opencode/session/ses_2e71c19e/messages HTTP/1.1" 200 OK
+2026-03-19 15:15:22,155 - opencode.client - INFO - [Cleanup] Cursor and preview dedup state cleared
+2026-03-19 15:32:00,499 - opencode.api - INFO - Listener left session: ses_a0bb5174 (remaining: 0)
+INFO:     127.0.0.1:50087 - "GET /static/opencode-new-api-patch.js?v=38.4.23 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:50087 - "GET /opencode/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50087 - "GET /opencode/list_session_files?sid=ses_a0bb5174 HTTP/1.1" 200 OK
+2026-03-19 15:32:01,552 - opencode.managers - INFO - Retrieved 2 messages for session: ses_a0bb5174
+INFO:     127.0.0.1:50087 - "GET /opencode/session/ses_a0bb5174/messages HTTP/1.1" 200 OK
+2026-03-19 15:32:01,556 - opencode.managers - INFO - Retrieved 2 messages for session: ses_2e71c19e
+INFO:     127.0.0.1:59314 - "GET /opencode/session/ses_2e71c19e/messages HTTP/1.1" 200 OK
+2026-03-19 15:32:01,561 - opencode.managers - INFO - Retrieved 0 messages for session: ses_6d1ea6d9
+2026-03-19 15:32:01,562 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:55646 - "GET /opencode/session/ses_6d1ea6d9/messages HTTP/1.1" 404 Not Found
+2026-03-19 15:32:01,563 - opencode.managers - INFO - Retrieved 0 messages for session: ses_f1ab5cb8
+2026-03-19 15:32:01,565 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:50721 - "GET /opencode/session/ses_f1ab5cb8/messages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59314 - "GET /opencode/projects HTTP/1.1" 200 OK
+2026-03-19 15:32:01,571 - opencode.managers - INFO - Retrieved 0 messages for session: ses_57c8b1b0
+2026-03-19 15:32:01,574 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:57976 - "GET /opencode/session/ses_57c8b1b0/messages HTTP/1.1" 404 Not Found
+2026-03-19 15:32:01,578 - opencode.managers - INFO - Retrieved 0 messages for session: ses_1a0aa4dd
+2026-03-19 15:32:01,580 - opencode.history - ERROR - Error getting session messages: no such column: completed_at
+INFO:     127.0.0.1:59808 - "GET /opencode/session/ses_1a0aa4dd/messages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59808 - "GET /opencode/session/ses_6d1ea6d9/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /opencode/session/ses_f1ab5cb8/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59808 - "GET /opencode/session/ses_57c8b1b0/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /opencode/session/ses_1a0aa4dd/timeline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57976 - "GET /opencode/list_session_files?sid=ses_a0bb5174 HTTP/1.1" 200 OK
+2026-03-19 15:32:01,952 - opencode - ERROR - [DB] Failed to write session ses_a0bb5174 to database: unable to open database file
+2026-03-19 15:32:01,957 - opencode - INFO - [_run_process] Session ses_a0bb5174 initialized (task handled by opencode_client)
+INFO:     127.0.0.1:57976 - "GET /opencode/run_sse?prompt=8%2B7%E7%AD%89%E4%BA%8E%E5%A4%9A%E5%B0%91&sid=ses_a0bb5174 HTTP/1.1" 200 OK
+2026-03-19 15:32:01,958 - opencode - INFO - Agent session attached: ses_a0bb5174
+2026-03-19 15:32:14,644 - opencode.managers - ERROR - [DB] Failed to write session ses_1da6a678 to database: unable to open database file
+2026-03-19 15:32:14,645 - opencode.managers - ERROR - Traceback (most recent call last):
+  File "D:\manus\opencode\app\managers.py", line 623, in _write_session_to_db
+    conn = sqlite3.connect(self.db_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: unable to open database file
+
+2026-03-19 15:32:14,645 - opencode.managers - INFO - Initialized storage for session: ses_1da6a678
+2026-03-19 15:32:14,645 - opencode.managers - INFO - Created session: ses_1da6a678 with title: New Session
+2026-03-19 15:32:14,647 - opencode.api - INFO - Created session: ses_1da6a678 with mode: auto, project_id: proj_default
+2026-03-19 15:32:14,647 - opencode.api - INFO - Workspace directory created: D:\manus\opencode\workspace\ses_1da6a678
+INFO:     127.0.0.1:63855 - "POST /opencode/session HTTP/1.1" 200 OK
+2026-03-19 15:32:14,657 - opencode.api - INFO - [DB] Updated session ses_1da6a678 with title: 5+3等于多少...
+2026-03-19 15:32:14,657 - opencode.managers - INFO - Added message: msg_0eizgpllxkyq to session: ses_1da6a678
+2026-03-19 15:32:14,657 - opencode.api - INFO - Adding user message part: part_cfe4a8fa
+2026-03-19 15:32:14,658 - opencode.managers - INFO - Added part: part_cfe4a8fa to message: msg_0eizgpllxkyq
+2026-03-19 15:32:14,658 - opencode.api - INFO - Added user message: msg_0eizgpllxkyq to session: ses_1da6a678
+2026-03-19 15:32:14,658 - opencode.managers - INFO - Added message: msg_8e12119e to session: ses_1da6a678
+2026-03-19 15:32:14,658 - opencode.api - INFO - Created assistant message: msg_8e12119e for session: ses_1da6a678
+2026-03-19 15:32:14,658 - opencode.api - INFO - Sending message to ses_1da6a678 in mode: build
+INFO:     127.0.0.1:63855 - "POST /opencode/session/ses_1da6a678/message HTTP/1.1" 200 OK
+2026-03-19 15:32:14,659 - opencode.client - INFO - Executing msg_8e12119e for ses_1da6a678
+2026-03-19 15:32:14,660 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=message.updated
+INFO:     127.0.0.1:60427 - "GET /opencode/events?session_id=ses_1da6a678 HTTP/1.1" 200 OK
+2026-03-19 15:32:15,174 - opencode.api - INFO - New listener for session: ses_1da6a678 (total: 1)
+2026-03-19 15:32:15,175 - opencode.api - INFO - SSE connection established for session: ses_1da6a678 (listeners: 1)
+2026-03-19 15:32:15,187 - opencode.managers - INFO - Retrieved 2 messages for session: ses_1da6a678
+INFO:     127.0.0.1:63855 - "GET /opencode/list_session_files?sid=ses_1da6a678 HTTP/1.1" 200 OK
+2026-03-19 15:32:15,321 - httpx - INFO - HTTP Request: POST http://127.0.0.1:4096/session "HTTP/1.1 200 OK"
+2026-03-19 15:32:16,133 - httpx - INFO - HTTP Request: GET http://127.0.0.1:4096/event?sessionID=ses_2fafd9eb1ffeyts03aJ2xh3n5r "HTTP/1.1 200 OK"
+2026-03-19 15:32:16,934 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=message.updated
+2026-03-19 15:32:16,934 - opencode.client - INFO - [BRIDGE] Delta Applied to message.part.updated: ses_1da6a678_msg_8e12119e_text +7
+2026-03-19 15:32:16,934 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=message.part.updated
+2026-03-19 15:32:16,935 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=session.status
+2026-03-19 15:32:16,935 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=message.updated
+2026-03-19 15:32:23,572 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=message.updated
+2026-03-19 15:32:23,614 - httpx - INFO - HTTP Request: POST http://127.0.0.1:4096/session/ses_2fafd9eb1ffeyts03aJ2xh3n5r/message?sessionID=ses_2fafd9eb1ffeyts03aJ2xh3n5r "HTTP/1.1 200 OK"
+2026-03-19 15:32:23,615 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=session.diff
+2026-03-19 15:32:23,616 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=session.status
+2026-03-19 15:32:23,616 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=session.error
+2026-03-19 15:32:23,616 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=session.status
+2026-03-19 15:32:23,616 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=session.idle
+2026-03-19 15:32:24,006 - httpx - INFO - HTTP Request: GET http://127.0.0.1:4096/session/ses_2fafd9eb1ffeyts03aJ2xh3n5r/message?sessionID=ses_2fafd9eb1ffeyts03aJ2xh3n5r&limit=1 "HTTP/1.1 200 OK"
+2026-03-19 15:32:24,007 - opencode.client - INFO - [BROADCAST] session=ses_1da6a678 type=message.updated
+INFO:     127.0.0.1:60535 - "GET /opencode/sessions HTTP/1.1" 200 OK
+2026-03-19 15:32:45,821 - opencode.managers - INFO - Retrieved 2 messages for session: ses_1da6a678
+INFO:     127.0.0.1:54277 - "GET /opencode/session/ses_1da6a678/messages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54310 - "GET /opencode/session/ses_1da6a678/timeline HTTP/1.1" 200 OK
