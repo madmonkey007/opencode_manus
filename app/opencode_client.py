@@ -337,10 +337,13 @@ class OpenCodeClient:
         server_session_id = _SERVER_SESSION_ID_MAP.get(session_id)
         if not server_session_id:
             try:
-                resp = await httpx.AsyncClient().post(f"{base_url}/session")
+                # ✅ 修复：添加/opencode前缀，匹配后端路由
+                resp = await httpx.AsyncClient().post(f"{base_url}/opencode/session")
                 server_session_id = resp.json().get("id")
                 _SERVER_SESSION_ID_MAP[session_id] = server_session_id
-            except: return False
+            except Exception as e:
+                logger.error(f"Failed to create server session: {e}")
+                return False
         
         request_params = {"sessionID": server_session_id}
         stop_event = asyncio.Event()
