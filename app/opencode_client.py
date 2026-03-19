@@ -271,6 +271,12 @@ class OpenCodeClient:
                             etype = normalized.get("type")
                             props = normalized.get("properties") or {}
                             part = props.get("part") or {}
+
+                            # ✅ 过滤 user message 的 part，防止用户问题被当作 AI 回复广播到前端
+                            user_msg_id = state.get("user_message_id")
+                            if user_msg_id and part.get("messageID") == user_msg_id:
+                                logger.debug(f"[BRIDGE] Skipping user message part: {part.get('id')}")
+                                continue
                             
                             if etype in ["message.part.updated", "message.part.delta"]:
                                 ptype = part.get("type")
@@ -363,6 +369,14 @@ class OpenCodeClient:
                 payload = {"model": {"providerID": provider_id, "modelID": model_name}, "parts": [{"type": "text", "text": user_prompt}]}
                 resp = await client.post(f"{base_url}/session/{server_session_id}/message", json=payload, params=request_params)
                 resp.raise_for_status()
+                # 记录 user message ID，bridge 里过滤掉 user message 的 part，防止用户问题被当作 AI 回复广播
+                try:
+                    user_msg_id = resp.json().get("id")
+                    if user_msg_id:
+                        sse_state["user_message_id"] = user_msg_id
+                        logger.info(f"[EXEC] User message ID: {user_msg_id}")
+                except Exception:
+                    pass
         except Exception as e:
             logger.error(f"Post message failed: {e}")
             return False
