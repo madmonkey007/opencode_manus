@@ -414,6 +414,17 @@ class OpenCodeClient:
                     })
                 else:
                     logger.debug(f"[POLL] Content already fully sent for {global_key}")
+
+                # ✅ 持久化：无论是否有 delta，都用完整 text 覆盖写入数据库
+                # 用 INSERT OR REPLACE 保证幂等，刷新后数据不丢失
+                if self.history_service:
+                    part_id = part.get("id") or f"final_{global_key}"
+                    await self.history_service.save_part(session_id, assistant_message_id, {
+                        "id": part_id,
+                        "type": mapped_type,
+                        "content": {"text": text},
+                    })
+                    logger.info(f"[POLL] Persisted {mapped_type} part to DB: {part_id} ({len(text)} chars)")
         
         return True
 
