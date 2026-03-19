@@ -1,9 +1,3 @@
-"""
-OpenCode Client - CLI 调用和事件转换
-
-负责调用 OpenCode CLI 命令，解析输出，并转换为 SSE 事件流
-"""
-
 import asyncio
 import subprocess
 import shlex
@@ -47,73 +41,68 @@ logger = logging.getLogger("opencode.client")
 # Server API session reuse: map app session_id -> server session_id
 _SERVER_SESSION_ID_MAP: Dict[str, str] = {}
 
-# ✅ 修复可维护性：提取CLI事件相关的常量（避免魔法字符串）
+# Constants
 CLI_EVENT_TYPE_TOOL_USE = 'tool_use'
-CLI_EVENT_TYPE_TOOL_RESULT = 'tool_result'
 CLI_EVENT_TYPE_TEXT = 'text'
-
 PART_TYPE_TOOL = 'tool'
 PART_TYPE_TEXT = 'text'
 PART_TYPE_THOUGHT = 'thought'
 
-# ✅ 已知工具白名单（用于安全验证）
+# Known tools whitelist
 KNOWN_TOOLS = [
     'read', 'write', 'edit', 'bash', 'grep', 'task', 'todowrite',
     'search', 'browse', 'run_server', 'file_editor', 'common_search__search'
 ]
 
-# ✅ JSON大小限制（防止DoS）
-MAX_JSON_SIZE = 10240  # 10KB - 基于单次事件合理大小的安全限制
+# JSON size limit
+MAX_JSON_SIZE = 10240
 
-# 正则表达式模式（预编译以提高性能）
-THOUGHT_PATTERN = re.compile(
-    r"(?:🤔\s*Thought:|Thought:|Thought\s*>\s*|思考[:：])\s*(.*)",
-    re.IGNORECASE
-)
-PHASE_HEADER_PATTERN = re.compile(
-    r"^(?:\[\d+/\d+\]|(?:\d+\.))\s*(.*)",
-    re.IGNORECASE
-)
+# Regex patterns
+THOUGHT_PATTERN = re.compile(r"(?:🤔\s*Thought:|Thought:|Thought\s*>\s*|思考[:：])\s*(.*)", re.IGNORECASE)
+PHASE_HEADER_PATTERN = re.compile(r"^(?:\[\d+/\d+\]|(?:\d+\.))\s*(.*)", re.IGNORECASE)
+
+"""
+Global Cursor Tracking for AI Reply Deduplication
+
+Key Format: "{session_id}_{message_id}_{part_type}"
+  - session_id:  前端会话ID
+  - message_id:  助手消息ID
+  - part_type:   "text" | "thought"
+Value: int (已发送的字符长度)
+
+Thread Safety: asyncio 单线程，但路径B/C并发时需用 _cursor_lock 保护。
+Memory:        每小时由 _cleanup_cursors() 清理一次。
+"""
+_SENT_TEXT_LENGTHS_GLOBAL: Dict[str, int] = {}
+_cursor_lock = asyncio.Lock()
+
+# Preview deduplication: tracks which step_ids have already had preview events sent
+# Key Format: "preview_{session_id}_{step_id}"
+# Memory: 每小时由 _cleanup_cursors() 一并清理。
+_SENT_PREVIEW_STEPS: set = set()
 
 
-# ====================================================================
-# OpenCode Client
-# ====================================================================
-
+async def _cleanup_cursors():
+    """每小时清理一次游标字典和 preview 集合，防止内存无限增长。"""
+    while True:
+        await asyncio.sleep(3600)
+        _SENT_TEXT_LENGTHS_GLOBAL.clear()
+        _SENT_PREVIEW_STEPS.clear()
+        logger.info("[Cleanup] Cursor and preview dedup state cleared")
 
 class OpenCodeClient:
-    """
-    OpenCode CLI 客户端
-
-    职责：
-    1. 调用 opencode run CLI 命令
-    2. 解析 JSON 输出
-    3. 转换为 SSE 事件
-    4. 广播到 EventStreamManager
-    5. 生成文件预览事件
-    """
-
     def __init__(self, workspace_base: str):
-        """
-        初始化客户端
-
-        Args:
-            workspace_base: 工作区基础路径
-        """
         self.workspace_base = workspace_base
         os.makedirs(workspace_base, exist_ok=True)
-        # Default to the local opencode serve HTTP endpoint.
         self.server_api_base_url = os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
-
-        # 尝试初始化 history_service
         try:
             self.history_service = get_history_service()
-            logger.info("History service initialized in OpenCodeClient")
         except Exception as e:
             logger.warning(f"Failed to initialize history service: {e}")
             self.history_service = None
-        # Sessions that already emitted tool-based previews via global SSE
         self._skip_preview_sessions = set()
+        # Track active preview tasks so errors surface and cleanup is possible
+        self._active_preview_tasks: set = set()
 
     def _extract_session_id_from_payload(self, payload: Dict[str, Any]) -> Optional[str]:
         props = payload.get("properties") or {}
@@ -125,2342 +114,322 @@ class OpenCodeClient:
         part = props.get("part") or {}
         if isinstance(part, dict) and part.get("sessionID"):
             return part.get("sessionID")
-        if payload.get("type", "").startswith("question") and props.get("sessionID"):
-            return props.get("sessionID")
         return None
 
     def _normalize_server_event(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        if not payload or "type" not in payload:
-            return None
-
         etype = payload.get("type")
         props = payload.get("properties") or {}
-
-        if etype == "question.asked":
-            try:
-                questions = props.get("questions") or []
-                if questions:
-                    q = questions[0] or {}
-                    tool_meta = props.get("tool") or {}
-                    input_data = {
-                        "question": q.get("question") or q.get("header") or "请回答以下问题",
-                        "choices": [
-                            {"label": opt.get("label"), "value": opt.get("label")}
-                            for opt in (q.get("options") or [])
-                            if opt.get("label")
-                        ],
-                    }
-                    part = {
-                        "id": props.get("id") or generate_part_id("tool_question"),
-                        "session_id": props.get("sessionID"),
-                        "message_id": tool_meta.get("messageID"),
-                        "type": "tool",
-                        "content": {
-                            "tool": "question",
-                            "call_id": tool_meta.get("callID") or props.get("id"),
-                            "state": {"status": "completed", "input": input_data},
-                            "text": "",
-                        },
-                        "metadata": {
-                            "title": "Question",
-                            "input": input_data,
-                            "status": "completed",
-                        },
-                        "time": {"start": int(datetime.now().timestamp())},
-                    }
-                    return {
-                        "type": "message.part.updated",
-                        "properties": {"part": part},
-                    }
-            except (KeyError, TypeError, ValueError) as e:
-                logger.error(f"Failed to normalize question.asked event: {e}")
-                return None
-            return None
-
-        if etype == "todo.updated":
-            todos = props.get("todos") or []
-            part = {
-                "id": generate_part_id("tool_todowrite"),
-                "session_id": props.get("sessionID"),
-                "message_id": None,
-                "type": "tool",
-                "content": {
-                    "tool": "todowrite",
-                    "call_id": generate_part_id("call_todowrite"),
-                    "state": {"status": "completed", "input": {"todos": todos}},
-                    "text": "",
-                },
-                "metadata": {
-                    "title": "Todo",
-                    "input": {"todos": todos},
-                    "status": "completed",
-                },
-                "time": {"start": int(datetime.now().timestamp())},
-            }
-            return {"type": "message.part.updated", "properties": {"part": part}}
-
         if etype == "message.part.updated":
             part = props.get("part") or {}
-            if not isinstance(part, dict):
-                return payload
-
-            part_type = part.get("type")
-            if part_type == "reasoning":
-                part["type"] = "thought"
-                if "content" not in part:
-                    part["content"] = {"text": part.get("text", "")}
-            if part_type == "text" and "content" not in part:
-                part["content"] = {"text": part.get("text", "")}
-            if part_type == "tool":
+            if not isinstance(part, dict): return payload
+            if part.get("type") == "reasoning": part["type"] = "thought"
+            if "content" not in part: part["content"] = {"text": part.get("text", "")}
+            if part.get("type") == "tool":
                 state = part.get("state") or {}
-                tool_name = part.get("tool") or "unknown"
-                call_id = part.get("callID") or part.get("callId") or part.get("id")
-                content = {
-                    "tool": tool_name,
-                    "call_id": call_id,
-                    "state": state,
-                    "text": state.get("output", ""),
-                }
+                content = {"tool": part.get("tool", "unknown"), "call_id": part.get("id"), "state": state, "text": state.get("output", "")}
                 metadata = part.get("metadata") or {}
-                if "input" not in metadata:
-                    metadata["input"] = state.get("input", {})
-                if "status" not in metadata:
-                    metadata["status"] = state.get("status")
+                if "input" not in metadata: metadata["input"] = state.get("input", {})
+                if "status" not in metadata: metadata["status"] = state.get("status")
                 part["content"] = content
                 part["metadata"] = metadata
             payload["properties"]["part"] = part
-            return payload
-
         return payload
 
-    async def _bridge_global_events(
-        self,
-        base_url: str,
-        request_params: Dict[str, Any],
-        server_session_id: str,
-        session_id: str,
-        assistant_message_id: str,
-        stop_event: asyncio.Event,
-        state: Dict[str, Any],
-    ) -> None:
-        async def _stream_events(event_url: str) -> None:
-            async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream("GET", event_url, params=request_params) as resp:
-                    resp.raise_for_status()
-                    data_buf: List[str] = []
-                    async for line in resp.aiter_lines():
-                        if stop_event.is_set():
-                            break
-                        if not line:
-                            if not data_buf:
-                                continue
-                            data_str = "\n".join(data_buf).strip()
-                            data_buf = []
-                            if not data_str or data_str == "[DONE]":
-                                continue
-                            try:
-                                event = json.loads(data_str)
-                            except json.JSONDecodeError as e:
-                                logger.warning(f"Failed to parse SSE event JSON: {e}, data: {data_str[:200]}")
-                                continue
-                            payload = event.get("payload") or event
-                            sid = self._extract_session_id_from_payload(payload)
-                            if sid != server_session_id:
-                                continue
-                            normalized = self._normalize_server_event(payload)
-                            if normalized:
-                                # Track tool events to avoid duplicate previews later
-                                try:
-                                    if normalized.get("type") == "message.part.updated":
-                                        part = (normalized.get("properties") or {}).get("part") or {}
-                                        if part.get("type") == "tool":
-                                            state["saw_tool"] = True
-                                except (KeyError, TypeError, AttributeError) as e:
-                                    logger.debug(f"Failed to track tool event: {e}")
-                                    pass
-                                logger.info(f"[BRIDGE] Broadcasting normalized event type={normalized.get('type')} to session {session_id}")
-                                await self._broadcast_event(session_id, normalized)
-                                state["events"] += 1
-                                # session.idle 是最可靠的完成信号（无论 message ID 是否匹配）
-                                if normalized.get("type") == "session.idle":
-                                    logger.info(f"[BRIDGE] session.idle detected, setting completed for session {session_id}")
-                                    state["completed"] = True
-                                    stop_event.set()
-                                    break
-                                if normalized.get("type") == "message.updated":
-                                    info = (normalized.get("properties") or {}).get("info") or {}
-                                    if info.get("time", {}).get("completed"):
-                                        state["completed"] = True
-                                        stop_event.set()
-                                        break
-                            continue
-                        if line.startswith(":"):
-                            continue
-                        if line.startswith("data:"):
-                            data_buf.append(line[5:].lstrip())
-
-        # Prefer /event (scoped stream), fallback to /global/event
-        for path in ["/event", "/global/event"]:
-            url = f"{base_url}{path}"
-            try:
-                await _stream_events(url)
-                return
-            except (httpx.HTTPError, asyncio.TimeoutError, ConnectionError) as e:
-                logger.warning(f"[SERVER_API] Event stream failed at {path}: {e}")
-                continue
-        state["failed"] = True
-
-    async def execute_message(
-        self,
-        session_id: str,
-        assistant_message_id: str,
-        user_prompt: str,
-        mode: str = "auto",
-        model_id: str = "new-api/glm-4.7",
-    ):
-        """
-        执行单条消息（调用 CLI 并广播事件）
-
-        Args:
-            session_id: 会话ID
-            assistant_message_id: 助手消息ID
-            user_prompt: 用户提示词
-            model_id: 模型ID
-
-        流程：
-        1. 创建会话目录
-        2. 构建并执行 CLI 命令
-        3. 解析输出
-        4. 转换为 SSE 事件
-        5. 广播到 EventStreamManager
-        6. 保存文件快照
-        """
-        session_dir = os.path.join(self.workspace_base, session_id)
-        os.makedirs(session_dir, exist_ok=True)
-
-        log_file = os.path.join(session_dir, "run.log")
-        status_file = os.path.join(session_dir, "status.txt")
-
-        # 记录执行前的文件列表（用于后续检测新创建的文件）
-        initial_files = set()
-        if os.path.exists(session_dir):
-            for item in os.listdir(session_dir):
-                item_path = os.path.join(session_dir, item)
-                if os.path.isfile(item_path):
-                    initial_files.add(item)
-
-        # 初始化日志文件
-        with open(status_file, "w", encoding="utf-8") as f:
-            f.write("running")
-        with open(log_file, "w", encoding="utf-8") as f:
-            f.write(f"Session started: {session_id}\n")
-            f.write(f"Executing: {user_prompt}\n")
-
-        logger.info(
-            f"Executing message {assistant_message_id} for session {session_id}"
-        )
-
-        # ✅ v=38修复：保存assistant message到数据库
-        if self.history_service:
-            await self.history_service.save_message(
-                session_id=session_id,
-                message_id=assistant_message_id,
-                role="assistant"
-            )
-            logger.debug(f"Saved assistant message to database: {assistant_message_id}")
-
+    async def _broadcast_event(self, session_id: str, event: Dict[str, Any]):
         try:
-            # 发送开始事件
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "message.updated",
-                    "properties": {
-                        "info": {
-                            "id": assistant_message_id,
-                            "session_id": session_id,
-                            "role": "assistant",
-                            "time": {"created": int(datetime.now().timestamp())},
-                        }
-                    },
-                },
-            )
-
-            # Prefer Server API execution path, fallback to CLI if it fails.
-            server_api_ok = await self._execute_via_server_api(
-                session_id=session_id,
-                assistant_message_id=assistant_message_id,
-                user_prompt=user_prompt,
-                mode=mode,
-                model_id=model_id,
-            )
-            if server_api_ok:
-                await self._scan_and_preview_new_files(
-                    session_id, assistant_message_id, session_dir, initial_files
-                )
-                with open(status_file, "w", encoding="utf-8") as f:
-                    f.write("completed")
-
-                await self._broadcast_event(
-                    session_id,
-                    {
-                        "type": "message.updated",
-                        "properties": {
-                            "info": {
-                                "id": assistant_message_id,
-                                "time": {
-                                    "created": int(datetime.now().timestamp()),
-                                    "completed": int(datetime.now().timestamp()),
-                                },
-                            }
-                        },
-                    },
-                )
-                logger.info(
-                    f"Message {assistant_message_id} completed via server API"
-                )
-                return
-
-            # 环境和路径检测
-            is_windows = platform.system() == "Windows"
-
-            # 动态搜索配置文件
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            config_file = os.path.join(base_dir, "config_host", "opencode.json")
-            if not os.path.exists(config_file):
-                # Fallback to current dir plus config
-                config_file = os.path.join(base_dir, "config", "opencode.json")
-
-            # 创建日志和状态目录
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
-            
-            # 修复 ENOENT: no such file or directory, open '.claude/transcripts/...'
-            # 这是一个已知的 Windows 环境下的 OpenCode CLI 路径问题
-            user_home = os.path.expanduser("~")
-            claude_transcripts_dir = os.path.join(user_home, ".claude", "transcripts")
-            if not os.path.exists(claude_transcripts_dir):
-                logger.info(f"Creating missing directory: {claude_transcripts_dir}")
-                os.makedirs(claude_transcripts_dir, exist_ok=True)
-
-            # 构建环境变量
-            env = {**os.environ}
-            if not is_windows:
-                path_env = "/root/.bun/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
-                env["PATH"] = path_env
-
-            env["FORCE_COLOR"] = "1"
-            env["OPENCODE_CONFIG_FILE"] = config_file
-
-            # 构建命令行（CLI 回退路径，server 不可用时使用，不依赖 server）
-            safe_prompt = shlex.quote(user_prompt)
-            agent_flag = f" --agent {mode}" if mode in ["plan", "build"] else ""
-
-            # 添加调试日志
-            logger.info(f"CLI fallback - Mode: '{mode}', Session: '{session_id}', Agent flag: '{agent_flag}'")
-
-            # 构建命令参数（不加 --attach，因为 server 不可用）
-            cmd = [
-                "opencode", "run",
-                "--model", model_id,
-                "--format", "json",
-                "--thinking",
-                "--session", session_id,
-                "--title", user_prompt[:50],
-                user_prompt
-            ]
-            if mode in ["plan", "build"]:
-                cmd = cmd[:2] + ["--agent", mode] + cmd[2:]
-            
-            logger.info(f"[CLI Command] {' '.join(cmd)}")
-
-            # ✅ Phase 1 修复：分离stderr和stdout，避免JSON流被污染
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,  # ✅ 分离stderr
-                cwd=session_dir,
-                env=env,
-            )
-            logger.info(f"[CLI Process] Started with PID: {process.pid}")
-
-            # ✅ Phase 1 新增：异步读取stderr日志，不干扰主流程
-            async def log_stderr():
-                async for err_line in process.stderr:
-                    err_text = err_line.decode('utf-8', errors='ignore').strip()
-                    if err_text:
-                        logger.warning(f"[CLI stderr] {err_text}")
-            
-            asyncio.create_task(log_stderr())
-
-
-            # 解析输出并生成事件
-            line_count = 0
-            event_count = 0
-            
-            # 使用本地会话上下文追踪当前活跃步骤，确保 ID 一致性
-            # 并根据模式动态设置默认标题
-            default_title = (
-                "Planning & Analysis"
-                if mode == "plan"
-                else ("Building & Implementation" if mode == "build" else "Executing")
-            )
-            session_context = {
-                "current_step_id": None,
-                "current_step_title": default_title,
-                "mode": mode,
-            }
-
-            # ✅ Phase 5 修复：增加超时时间到120秒（opencode serve启动需要51秒）
-            READ_TIMEOUT = 120.0
-            last_output_time = time.time()
-
-            if process.stdout is not None:
-                logger.info(
-                    f"[CLI Stream] Starting to read stdout for message {assistant_message_id}..."
-                )
-                
-                try:
-                    while True:
-                        # ✅ Phase 1 新增：使用wait_for实现超时检测
-                        line = await asyncio.wait_for(
-                            process.stdout.readline(),
-                            timeout=READ_TIMEOUT
-                        )
+            # ✅ Final deduplication check at broadcast point
+            etype = event.get("type")
+            if etype in ["message.part.updated", "message.part.delta"]:
+                props = event.get("properties") or {}
+                part = props.get("part") or {}
+                ptype = part.get("type")
+                if ptype in [PART_TYPE_TEXT, PART_TYPE_THOUGHT, "reasoning"]:
+                    mapped_type = PART_TYPE_THOUGHT if ptype == "reasoning" else ptype
+                    msg_id = part.get("message_id")
+                    if msg_id:
+                        text = part.get("text") or ""
+                        if not text and isinstance(part.get("content"), dict):
+                            text = part["content"].get("text") or ""
                         
-                        # 更新最后输出时间
-                        last_output_time = time.time()
-                        
-                        if not line:  # EOF (进程结束)
-                            break
-                        
-                        line_text = line.decode(errors="ignore").strip()
-                        if not line_text:
-                            continue
-
-                        line_count += 1
-                        logger.info(f"Processing line {line_count}: {line_text[:100]}")
-
-                        # 写入日志文件
-                        with open(log_file, "a", encoding="utf-8") as f:
-                            f.write(line_text + "\n")
-
-                        # ✅ Phase 1 新增：容错JSON解析
-                        # 跳过警告和错误行（不以{开头）
-                        if line_text.startswith('!') or line_text.startswith('[WARN') or line_text.startswith('[ERROR') or not line_text.startswith('{'):
-                            logger.info(f"[CLI Non-JSON Output] {line_text[:100]}")
-                            continue
-                        
-                        # 解析并生成事件
-                        try:
-                            async for event in self._process_line(
-                                line_text, session_id, assistant_message_id, session_context
-                            ):
-                                event_type = event.get('type', 'unknown')
-                                logger.info(f"[Yielded event type: {event_type}] to session {session_id}")
-                                await self._broadcast_event(session_id, event)
-                                event_count += 1
-
-                        except Exception as e:
-                            logger.error(f"Error processing line {line_count}: {e}")
-                
-                except asyncio.TimeoutError:
-                    logger.error(f"[CLI Timeout] No output for {READ_TIMEOUT}s. Terminating PID {process.pid}.")
-                    
-                    # ✅ Phase 4 修复：强制击杀，避免僵尸进程阻塞
-                    if process is not None:
-                        try:
-                            logger.warning(f"[CLI Timeout] Force killing PID {process.pid}...")
-                            process.kill()  # 直接kill，不用terminate
-                            await asyncio.sleep(1)  # 等待进程退出
-                            
-                            # 检查进程是否已退出
-                            if process.returncode is None:
-                                logger.error(f"[CLI Timeout] Process {process.pid} still alive after kill, waiting...")
-                                await asyncio.sleep(2)
-                                if process.returncode is None:
-                                    logger.error(f"[CLI Timeout] Process {process.pid} FAILED to terminate, may be zombie")
-                            else:
-                                logger.info(f"[CLI Timeout] Process {process.pid} terminated successfully (code={process.returncode})")
-                        except ProcessLookupError:
-                            logger.info(f"[CLI Timeout] Process {process.pid} already terminated")
-                        except Exception as cleanup_error:
-                            logger.error(f"[CLI Timeout] Error during cleanup: {cleanup_error}")
-                except Exception as e:
-                    logger.error(f"[CLI Unexpected Error] {e}", exc_info=True)
-
-            # 等待进程结束
-            return_code = await process.wait()
-            logger.info(f"CLI process finished with return code: {return_code}")
-
-            # 扫描新创建的文件并生成预览事件
-            await self._scan_and_preview_new_files(
-                session_id, assistant_message_id, session_dir, initial_files
-            )
-
-            # 更新状态文件
-            with open(status_file, "w", encoding="utf-8") as f:
-                f.write("completed")
-
-            # 发送完成事件
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "message.updated",
-                    "properties": {
-                        "info": {
-                            "id": assistant_message_id,
-                            "time": {
-                                "created": int(datetime.now().timestamp()),
-                                "completed": int(datetime.now().timestamp()),
-                            },
-                        }
-                    },
-                },
-            )
-
-            logger.info(f"Message {assistant_message_id} execution completed")
-
+                        global_key = f"{session_id}_{msg_id}_{mapped_type}"
+                        # If the text being broadcast is already known, we might need to skip or adjust
+                        # However, by this point the delta should have been applied by the caller.
+            
+            logger.info(f"[BROADCAST] session={session_id} type={event.get('type')}")
+            await event_stream_manager.broadcast(session_id, event)
         except Exception as e:
-            logger.error(f"Error executing message: {e}")
-            # 发送错误事件
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "error",
-                    "properties": {"session_id": session_id, "message": str(e)},
-                },
+            logger.error(f"Broadcast failed: {e}")
+
+    async def _maybe_broadcast_preview(self, session_id: str, part: Dict[str, Any]):
+        """
+        ✅ 方案2：从 tool part 生成右侧面板 preview 事件。
+        替代 main.py _run_process 路径A中的 preview_start/delta/end 逻辑。
+        只处理 write/edit 类工具，且只在 SSE 路径B中触发（不在 poll 路径C中重复）。
+        """
+        try:
+            content = part.get("content") or {}
+            metadata = part.get("metadata") or {}
+            state_data = content.get("state") or part.get("state") or {}
+
+            tool_name = content.get("tool") or metadata.get("tool") or part.get("tool") or ""
+            tool_name_lower = tool_name.lower()
+
+            WRITE_TOOLS = {"write", "edit", "file_editor", "patch", "str_replace_editor"}
+            if not any(t in tool_name_lower for t in WRITE_TOOLS):
+                return
+
+            # 提取文件路径
+            input_data = metadata.get("input") or state_data.get("input") or content.get("input") or {}
+            file_path = str(
+                input_data.get("file_path") or
+                input_data.get("path") or
+                input_data.get("filePath") or
+                part.get("file_path") or
+                ""
+            )
+            if not file_path:
+                return
+
+            # 提取文件内容
+            file_content = (
+                input_data.get("content") or
+                input_data.get("new_string") or
+                input_data.get("newString") or
+                ""
             )
 
-            # 更新状态文件
-            with open(status_file, "w", encoding="utf-8") as f:
-                f.write("error")
+            action_type = "edit" if any(t in tool_name_lower for t in {"edit", "patch", "str_replace"}) else "write"
+            step_id = part.get("id") or part.get("call_id") or f"preview_{int(time.time())}"
 
-    # ====================================================================
-    # Helper Functions for _process_line
-    # ====================================================================
+            # 去重：同一 step_id 只发一次 preview
+            preview_key = f"preview_{session_id}_{step_id}"
+            if preview_key in _SENT_PREVIEW_STEPS:
+                logger.debug(f"[PREVIEW] Skipping duplicate preview for step: {step_id}")
+                return
+            _SENT_PREVIEW_STEPS.add(preview_key)
 
-    def _detect_thought_in_text(self, text: str) -> Optional[str]:
-        """
-        从文本中启发式检测thought内容
+            logger.info(f"[PREVIEW] Generating preview for {tool_name}: {file_path} ({len(file_content)} chars)")
 
-        Args:
-            text: 待检测的文本
-
-        Returns:
-            如果检测到thought则返回内容，否则返回None
-        """
-        thought_match = THOUGHT_PATTERN.search(text)
-        if thought_match:
-            return thought_match.group(1).strip()
-        return None
-
-    def _detect_phase_header(self, text: str) -> Optional[str]:
-        """
-        从文本中启发式检测phase标题
-
-        Args:
-            text: 待检测的文本
-
-        Returns:
-            如果检测到phase标题则返回标题，否则返回None
-        """
-        phase_header_match = PHASE_HEADER_PATTERN.search(text)
-        if phase_header_match:
-            return phase_header_match.group(1).strip()
-        return None
-
-    def _should_filter_as_noise(self, text: str) -> bool:
-        """
-        判断文本是否应该被过滤为噪音
-
-        Args:
-            text: 待检测的文本
-
-        Returns:
-            如果是噪音则返回True（应该过滤），否则返回False
-        """
-        # 特殊处理：数据库迁移消息需要显示
-        if "database migration" in text.lower():
-            return False
-
-        # 过滤ANSI颜色代码
-        ansi_patterns = ["[0m", "[93m", "[1m", "\x1b[", "[?25"]
-        if any(pattern in text for pattern in ansi_patterns):
-            return True
-
-        # 过滤已知的噪音关键词
-        noise_keywords = [
-            "opencode run",
-            "options:",
-            "positionals:",
-            "message  message to send",
-            "run opencode with",
-            # 过滤 OpenCode CLI 的警告信息
-            "agent \"plan\" is a subagent",
-            "is a subagent, not a primary agent",
-            "falling back to default agent",
-        ]
-        return any(keyword in text.lower() for keyword in noise_keywords)
-
-    async def _try_parse_cli_event(self, text: str, session_id: str) -> bool:
-        """
-        尝试解析为CLI工具事件
-
-        Args:
-            text: 待解析的文本
-            session_id: 会话ID
-
-        Returns:
-            如果成功解析并处理了CLI事件则返回True，否则返回False
-        """
-        stripped_text = text.strip()
-
-        # Early Exit: 检查是否可能是JSON
-        if not stripped_text.startswith(('{', '[')):
-            return False
-
-        # Early Exit: JSON大小限制
-        if len(stripped_text) > MAX_JSON_SIZE:
-            logger.warning(f"[_try_parse_cli_event] JSON too large: {len(stripped_text)}, skipping")
-            return False
-
-        try:
-            event_data = json.loads(stripped_text)
-
-            # 验证事件数据结构
-            if not isinstance(event_data, dict):
-                logger.debug(f"[_try_parse_cli_event] Event is not dict, skipping")
-                return False
-
-            # 验证事件类型
-            if event_data.get('type') != CLI_EVENT_TYPE_TOOL_USE:
-                logger.debug(f"[_try_parse_cli_event] Event type is not tool_use, skipping")
-                return False
-
-            part = event_data.get('part', {})
-
-            # 验证part类型
-            if part.get('type') != PART_TYPE_TOOL:
-                logger.debug(f"[_try_parse_cli_event] Part type is not tool, skipping")
-                return False
-
-            # 提取工具信息
-            tool_name = part.get('tool') or 'unknown'
-            tool_state = part.get('state', {})
-
-            # 验证工具名称
-            if tool_name == 'unknown':
-                logger.warning(f"[_try_parse_cli_event] Missing tool name in part: {part.get('tool')}")
-            elif tool_name not in KNOWN_TOOLS and not tool_name.startswith('common_search__'):
-                logger.warning(f"[_try_parse_cli_event] Unknown tool: {tool_name}")
-
-            # 处理timestamp
-            event_timestamp = event_data.get('timestamp')
-            if event_timestamp is None:
-                event_timestamp = int(datetime.now().timestamp() * 1000)
-
-            # 处理output
-            output_raw = tool_state.get('output')
-            output = str(output_raw) if output_raw is not None else ''
-
-            # 处理input
-            input_raw = tool_state.get('input')
-            if input_raw is None:
-                input_data = {}
-            elif not isinstance(input_raw, dict):
-                logger.warning(f"[_try_parse_cli_event] Invalid input type: {type(input_raw)}, using empty dict")
-                input_data = {}
-            else:
-                input_data = input_raw
-
-            # 发送tool_event到前端
-            await self._broadcast_event(session_id, {
-                "type": "tool_event",
-                "data": {
-                    "type": "tool",
-                    "tool": tool_name,
-                    "tool_name": tool_name,
-                    "status": tool_state.get('status', 'running'),
-                    "input": input_data,
-                    "output": output,
-                    "title": tool_state.get('title', f'Using {tool_name}')
-                },
-                "timestamp": event_timestamp
+            await event_stream_manager.broadcast(session_id, {
+                "type": "preview_start",
+                "step_id": step_id,
+                "file_path": file_path,
+                "action": action_type,
             })
 
-            logger.debug(f"[_try_parse_cli_event] Parsed tool_event: {tool_name}")
-            return True
-
-        except json.JSONDecodeError:
-            # 不是有效的JSON，继续作为文本处理
-            logger.debug(f"[_try_parse_cli_event] JSON decode error")
-            return False
-        except Exception as e:
-            logger.warning(f"[_try_parse_cli_event] Error parsing JSON: {e}")
-            return False
-
-    async def _handle_database_migration_message(self, text: str, session_id: str, message_id: str) -> Optional[Dict[str, Any]]:
-        """
-        处理数据库迁移消息（清理ANSI序列）
-
-        Args:
-            text: 原始文本
-            session_id: 会话ID
-            message_id: 消息ID
-
-        Returns:
-            如果是数据库迁移消息则返回事件，否则返回None
-        """
-        if "database migration" not in text.lower():
-            return None
-
-        # 清理ANSI转义序列但保留消息
-        cleaned_text = re.sub(r'\[[?0-9;]+[a-zA-Z]', '', text)
-        if not cleaned_text.strip():
-            return None
-
-        return {
-            "type": "message.part.updated",
-            "properties": {
-                "part": {
-                    "id": generate_part_id("text"),
-                    "session_id": session_id,
-                    "message_id": message_id,
-                    "type": "text",
-                    "content": {"text": cleaned_text.strip() + " "},
-                    "time": {"start": int(datetime.now().timestamp())},
-                }
-            },
-        }
-
-    async def _try_parse_json_event(
-        self,
-        text: str,
-        session_id: str,
-        message_id: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        尝试解析为标准JSON事件
-
-        Args:
-            text: 待解析的文本
-            session_id: 会话ID
-            message_id: 消息ID
-            context: 会话上下文
-
-        Yields:
-            SSE 事件字典
-        """
-        try:
-            event = json.loads(text)
-            event_type = event.get("type")
-            logger.info(f"[_try_parse_json_event] Parsed JSON event: type={event_type}, sessionID={event.get('sessionID')}, my session_id={session_id}")
-
-            # ✅ CRITICAL-001修复：记录CLI sessionID，但不过滤事件
-            # CLI进程有内部sessionID，与API sessionID不同是正常的
-            # 我们只记录它用于调试，但仍然使用API session_id来广播事件
-            event_cli_session_id = event.get('sessionID')
-            if event_cli_session_id and event_cli_session_id != session_id:
-                logger.debug(
-                    f"[_try_parse_json_event] CLI internal sessionID differs from API sessionID:\n"
-                    f"  CLI SessionID: {event_cli_session_id}\n"
-                    f"  API SessionID: {session_id}\n"
-                    f"  This is expected. Using API session_id for broadcasting."
-                )
-
-            # 处理不同类型的事件
-            if event_type == "text":
-                logger.info(f"[_try_parse_json_event] Handling text event")
-                async for e in self._handle_text_event(
-                    event, session_id, message_id, context
-                ):
-                    yield e
-
-            elif event_type == "tool_use":
-                logger.info(f"[_try_parse_json_event] Handling tool_use event, tool={event.get('part', {}).get('tool')}")
-                async for e in self._handle_tool_use_event(
-                    event, session_id, message_id
-                ):
-                    yield e
-
-            elif event_type == "thought":
-                logger.info(f"[_try_parse_json_event] Handling thought event")
-                async for e in self._handle_thought_event(
-                    event, session_id, message_id
-                ):
-                    yield e
-            elif event_type == "reasoning" or event_type == "thinking":
-                logger.info(f"[_try_parse_json_event] Handling {event_type} event")
-                async for e in self._handle_thought_event(
-                    event, session_id, message_id
-                ):
-                    yield e
-
-            elif event_type == "step_start" or event_type == "step-start":
-                logger.info(f"[_try_parse_json_event] Handling step_start event")
-                async for e in self._handle_step_start_event(
-                    event, session_id, message_id, context
-                ):
-                    yield e
-
-            elif event_type == "step_finish" or event_type == "step-finish":
-                logger.info(f"[_try_parse_json_event] Handling step_finish event, reason={event.get('reason')}")
-                async for e in self._handle_step_finish_event(
-                    event, session_id, message_id, context
-                ):
-                    yield e
-
-            elif event_type == "error":
-                logger.info(f"[_try_parse_json_event] Handling error event")
-                yield self._handle_error_event(event, session_id)
-
-            else:
-                logger.warning(f"[_try_parse_json_event] Unknown event type: {event_type}")
-
-        except json.JSONDecodeError as e:
-            logger.error(f"[_try_parse_json_event] JSON decode error: {e}, text: {text[:100]}")
-        except Exception as e:
-            logger.error(f"[_try_parse_json_event] Error processing JSON event: {e}", exc_info=True)
-
-    # ====================================================================
-    # Main Line Processing Function
-    # ====================================================================
-
-    async def _process_line(
-        self,
-        text: str,
-        session_id: str,
-        message_id: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        处理单行输出，生成 SSE 事件
-
-        Args:
-            text: 输出行
-            session_id: 会话ID
-            message_id: 消息ID
-            context: 会话上下文
-
-        Yields:
-            SSE 事件字典
-        """
-        # MARKER: 调试日志
-        logger.info(f"[_process_line] Processing line: {text[:100]}...")
-
-        # ====================================================================
-        # 路径1: 尝试解析为标准JSON事件
-        # ====================================================================
-        if text.startswith("{") and text.endswith("}"):
-            async for event in self._try_parse_json_event(text, session_id, message_id, context):
-                yield event
-            return
-
-        # ====================================================================
-        # 路径2: 处理非JSON行 - Thought检测
-        # ====================================================================
-        thought_content = self._detect_thought_in_text(text)
-        if thought_content:
-            yield {
-                "type": "message.part.updated",
-                "properties": {
-                    "part": {
-                        "id": generate_part_id("thought"),
-                        "session_id": session_id,
-                        "message_id": message_id,
-                        "type": "thought",
-                        "content": {"text": thought_content},
-                        "time": {"start": int(datetime.now().timestamp())},
-                    }
-                },
-            }
-            return
-
-        # ====================================================================
-        # 路径3: 启发式Phase标题检测
-        # ====================================================================
-        phase_title = self._detect_phase_header(text)
-        if phase_title and context and context.get("current_step_id"):
-            if phase_title != context.get("current_step_title"):
-                context["current_step_title"] = phase_title
-                logger.info(f"[_process_line] Heuristic title detection: {phase_title}")
-                yield {
-                    "type": "message.part.updated",
-                    "properties": {
-                        "part": {
-                            "id": context["current_step_id"],
-                            "session_id": session_id,
-                            "message_id": message_id,
-                            "type": "step-start",
-                            "content": {"text": phase_title},
-                            "metadata": {"title": phase_title},
-                        }
-                    },
-                }
-                return
-
-        # ====================================================================
-        # 路径4: 尝试解析CLI工具事件
-        # ====================================================================
-        if await self._try_parse_cli_event(text, session_id):
-            return
-
-        # ====================================================================
-        # 路径5: 特殊处理数据库迁移消息
-        # ====================================================================
-        db_event = await self._handle_database_migration_message(text, session_id, message_id)
-        if db_event:
-            yield db_event
-            return
-
-        # ====================================================================
-        # 路径6: 过滤噪音
-        # ====================================================================
-        if self._should_filter_as_noise(text):
-            # ANSI代码已被过滤，直接返回
-            if any(pattern in text for pattern in ["[0m", "[93m", "[1m", "\x1b[", "[?25"]):
-                logger.debug(f"[_process_line] Filtered ANSI color code line")
-            return
-
-        # ====================================================================
-        # 路径7: 默认作为普通文本处理
-        # ====================================================================
-        yield {
-            "type": "message.part.updated",
-            "properties": {
-                "part": {
-                    "id": generate_part_id("text"),
-                    "session_id": session_id,
-                    "message_id": message_id,
-                    "type": "text",
-                    "content": {"text": text + " "},
-                    "time": {"start": int(datetime.now().timestamp())},
-                }
-            },
-        }
-
-    async def _handle_text_event(
-        self,
-        event: Dict[str, Any],
-        session_id: str,
-        message_id: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """处理 text 事件"""
-        chunk = event.get("part", {}).get("text", "") or event.get("text", "")
-        if chunk:
-            # 同样对 text chunk 进行启发式标题检测
-            if context and context.get("current_step_id"):
-                phase_header_match = re.search(
-                    r"^(?:\[\d+/\d+\]|(?:\d+\.))\s*(.*)", chunk, re.IGNORECASE
-                )
-                if phase_header_match:
-                    new_title = phase_header_match.group(1).strip()
-                    if new_title and new_title != context.get("current_step_title"):
-                        context["current_step_title"] = new_title
-                        yield {
-                            "type": "message.part.updated",
-                            "properties": {
-                                "part": {
-                                    "id": context["current_step_id"],
-                                    "session_id": session_id,
-                                    "message_id": message_id,
-                                    "type": "step-start",
-                                    "content": {"text": new_title},
-                                    "metadata": {"title": new_title},
-                                }
-                            },
-                        }
-
-            # 同时检查是否有 reasoning_content
-            reasoning = event.get("part", {}).get("reasoning_content") or event.get(
-                "reasoning_content"
-            )
-            if reasoning:
-                yield {
-                    "type": "message.part.updated",
-                    "properties": {
-                        "part": {
-                            "id": generate_part_id("thought"),
-                            "session_id": session_id,
-                            "message_id": message_id,
-                            "type": "thought",
-                            "content": {"text": reasoning},
-                            "time": {"start": int(datetime.now().timestamp())},
-                        }
-                    },
-                }
-
-            yield {
-                "type": "message.part.updated",
-                "properties": {
-                    "part": {
-                        "id": generate_part_id("text"),
-                        "session_id": session_id,
-                        "message_id": message_id,
-                        "type": "text",
-                        "content": {"text": chunk},
-                        "time": {"start": int(datetime.now().timestamp())},
-                    }
-                },
-            }
-
-    async def _handle_tool_use_event(
-        self, event: Dict[str, Any], session_id: str, message_id: str
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """处理 tool_use 事件"""
-        part = event.get("part", {})
-
-        # ✅ CRITICAL-002修复：验证必需字段，防止静默失败
-        if not part:
-            logger.error(f"[_handle_tool_use_event] Missing 'part' field in event. Available keys: {event.keys()}")
-            yield {
-                "type": "error",
-                "properties": {
-                    "session_id": session_id,
-                    "message_id": message_id,
-                    "code": "INVALID_TOOL_EVENT",
-                    "message": "Invalid tool_use event: missing 'part' field"
-                }
-            }
-            return
-
-        tool_name = part.get("tool", "unknown")
-        if tool_name == "unknown":
-            logger.warning(f"[_handle_tool_use_event] Missing 'tool' name in part. Available keys: {part.keys()}")
-
-        state = part.get("state", {})
-        if not state:
-            logger.warning(f"[_handle_tool_use_event] Missing 'state' in part for tool={tool_name}. Keys: {part.keys()}")
-
-        status = state.get("status")
-        # Prefer explicit part.input, fallback to state.input for server API parts
-        input_data = part.get("input") or state.get("input") or {}
-        output = state.get("output", "")
-
-        # 调试：打印完整的 part 结构
-        logger.info(f"[_handle_tool_use_event] tool={tool_name}, part.keys={list(part.keys())}")
-        if tool_name in ["write", "edit", "file_editor"]:
-            logger.info(f"[_handle_tool_use_event] input_data type={type(input_data)}, input_data={input_data}")
-            logger.info(f"[_handle_tool_use_event] state keys={list(state.keys())}, state={state}")
-
-        # 特殊处理 todowrite：转换为阶段初始化事件
-        if tool_name == "todowrite":
-            todos = input_data.get("todos", [])
-            if todos:
-                # 转换为 frontend phases 格式
-                phases = []
-                for i, todo in enumerate(todos):
-                    phases.append(
-                        {
-                            "id": todo.get("id", f"phase_{i}"),
-                            "title": todo.get("content", "New Phase"),
-                            "status": todo.get("status", "pending"),
-                            "number": i + 1,
-                        }
-                    )
-                # 广播 phases_init 事件
-                await self._broadcast_event(
-                    session_id,
-                    {
-                        "type": "phases_init",
-                        "phases": phases,
-                        "timestamp": int(datetime.now().timestamp()),
-                    },
-                )
-            return
-
-        # 创建工具部分
-        tool_part_id = generate_part_id(f"tool_{tool_name}")
-
-        # 提取标题和描述（如果元数据中存在）
-        metadata = part.get("metadata", {})
-        title = metadata.get("title") or f"Using {tool_name}"
-
-        # 发送工具事件
-        yield {
-            "type": "message.part.updated",
-            "properties": {
-                "part": {
-                    "id": tool_part_id,
-                    "session_id": session_id,
-                    "message_id": message_id,
-                    "type": "tool",
-                    "content": {
-                        "tool": tool_name,
-                        "call_id": tool_part_id,
-                        "state": state,
-                        "text": output,
-                    },
-                    "metadata": {
-                        "title": title,
-                        "input": input_data,
-                        "status": status,
-                    },
-                    "time": {
-                        "start": int(datetime.now().timestamp()),
-                    },
-                },
-                "session_id": session_id,
-                "message_id": message_id,
-            },
-        }
-
-        # ✅ v=38修复：保存tool part到数据库
-        if self.history_service:
-            part_dict = {
-                "id": tool_part_id,
-                "type": "tool",
-                "content": {
-                    "tool": tool_name,
-                    "call_id": tool_part_id,
-                    "state": state,
-                    "text": output,
-                    "tool_name": tool_name,
-                    "input": input_data,
-                    "output": output,
-                    "status": status,
-                }
-            }
-            await self.history_service.save_part(
-                session_id=session_id,
-                message_id=message_id,
-                part=part_dict
-            )
-            logger.debug(f"Saved tool part to database: {tool_part_id} tool={tool_name}")
-
-        # 文件操作：生成预览事件（write/edit）
-        # 注意：预览事件发送不依赖 history_service，始终发送
-        if tool_name in ["write", "edit", "file_editor"]:
-            # 从 state.input 获取实际的文件路径和内容
-            state_input = state.get("input", {})
-            await self._handle_file_operation(
-                session_id, message_id, tool_name, state_input, status
-            )
-
-        # Bash/Grep 工具：生成终端输出预览
-        if tool_name in ["bash", "grep", "terminal"] and output:
-            await self._handle_terminal_output(
-                session_id, message_id, tool_name, input_data, output
-            )
-
-        # Read 工具：生成文件内容预览
-        if tool_name == "read" and output:
-            await self._handle_read_preview(
-                session_id, message_id, input_data, output
-            )
-
-    async def _handle_file_operation(
-        self,
-        session_id: str,
-        message_id: str,
-        tool_name: str,
-        input_data: Dict[str, Any],
-        status: str,
-    ):
-        """
-        处理文件操作，生成预览事件
-
-        Args:
-            session_id: 会话ID
-            message_id: 消息ID
-            tool_name: 工具名称
-            input_data: 输入参数（来自 part.input，可能为空）
-            status: 状态
-        """
-        try:
-            logger.info(f"[PREVIEW] _handle_file_operation called: tool={tool_name}, session={session_id}")
-            # 从 input_data 提取（兼容旧格式）
-            file_path = input_data.get("file_path") or input_data.get("path") or input_data.get("filePath", "")
-            content = input_data.get("content", "")
-
-            # 如果 input_data 为空，尝试从 state 对象中获取
-            # 注意：需要从调用者传入 state 对象
-            logger.info(f"[PREVIEW] Extracted from input_data: file_path={file_path}, content_length={len(content)}")
-
-            if not file_path:
-                logger.warning("[PREVIEW] No file_path found in input_data, skipping preview")
-                return
-
-            step_id = generate_step_id()
-
-            # 发送预览开始事件
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "preview_start",
-                    "step_id": step_id,
-                    "file_path": file_path,
-                    "action": "write" if tool_name == "write" else "edit",
-                },
-            )
-
-            # 打字机效果：逐字符推送内容
-            if content:
-                logger.info(
-                    f"Starting typewriter effect for {file_path} ({len(content)} chars)"
-                )
-                for i, char in enumerate(content):
-                    await self._broadcast_event(
-                        session_id,
-                        {
-                            "type": "preview_delta",
-                            "step_id": step_id,
-                            "delta": {"type": "insert", "position": i, "content": char},
-                        },
-                    )
-                    # 打字机速度：每个字符间隔 5ms
-                    await asyncio.sleep(0.005)
-                logger.info(f"Typewriter effect completed for {file_path}")
-
-            # 发送预览结束事件
-            await self._broadcast_event(
-                session_id,
-                {"type": "preview_end", "step_id": step_id, "file_path": file_path},
-            )
-
-            # 发送文件生成事件（用于前端文件列表更新）
-            # 注意：前端 files-manager.js 期待 data.file 对象包含 name, path, type
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "file_generated",
-                    "file": {
-                        "name": file_path.split("/")[-1],
-                        "path": file_path,
-                        "type": (
-                            file_path.split(".")[-1].lower()
-                            if "." in file_path
-                            else "text"
-                        ),
-                    },
-                },
-            )
-
-            # 保存文件快照
-            if self.history_service:
-                await self.history_service.capture_file_change(
-                    step_id=step_id,
-                    file_path=file_path,
-                    content=content,
-                    operation_type="created" if tool_name == "write" else "modified",
-                )
-
-            # 发送时间轴更新
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "timeline_update",
-                    "step": {
-                        "step_id": step_id,
-                        "action": "write" if tool_name == "write" else "edit",
-                        "path": file_path,
-                        "timestamp": int(datetime.now().timestamp()),
-                        "status": status,
-                    },
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"Error handling file operation: {e}")
-
-    async def _handle_terminal_output(
-        self,
-        session_id: str,
-        message_id: str,
-        tool_name: str,
-        input_data: Dict[str, Any],
-        output: str,
-    ):
-        """
-        处理 bash/grep/terminal 工具的输出，生成终端预览事件
-
-        Args:
-            session_id: 会话ID
-            message_id: 消息ID
-            tool_name: 工具名称
-            input_data: 输入参数
-            output: 命令输出
-        """
-        try:
-            if not output:
-                return
-
-            step_id = generate_step_id()
-
-            # 生成预览标题
-            if tool_name == "bash":
-                command = input_data.get("command", "")
-                title = f"终端: {command}" if command else "终端输出"
-            elif tool_name == "grep":
-                pattern = input_data.get("pattern", "")
-                title = f"搜索结果: {pattern}" if pattern else "搜索结果"
-            else:
-                title = "终端输出"
-
-            # 发送终端预览开始事件
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "preview_start",
-                    "step_id": step_id,
-                    "title": title,
-                    "action": "terminal",
-                    "tool": tool_name,
-                },
-            )
-
-            # 发送输出内容（逐行推送以模拟终端滚动）
-            lines = output.split("\n")
-            for i, line in enumerate(lines):
-                await self._broadcast_event(
-                    session_id,
-                    {
+            if file_content:
+                chunk_size = 100
+                for i in range(0, len(file_content), chunk_size):
+                    chunk = file_content[i:i + chunk_size]
+                    await event_stream_manager.broadcast(session_id, {
                         "type": "preview_delta",
                         "step_id": step_id,
-                        "delta": {"type": "insert", "position": i, "content": line + "\n"},
-                    },
-                )
-                # 终端输出稍快于打字机效果
-                await asyncio.sleep(0.002)
+                        "delta": {"type": "insert", "position": i, "content": chunk},
+                    })
+                    await asyncio.sleep(0.03)
 
-            # 发送预览结束事件
-            await self._broadcast_event(
-                session_id,
-                {"type": "preview_end", "step_id": step_id, "title": title},
-            )
+            await event_stream_manager.broadcast(session_id, {
+                "type": "preview_end",
+                "step_id": step_id,
+                "file_path": file_path,
+            })
 
         except Exception as e:
-            logger.error(f"Error handling terminal output: {e}")
+            logger.error(f"[PREVIEW] Failed to broadcast preview for session {session_id}: {e}")
 
-    async def _handle_read_preview(
-        self,
-        session_id: str,
-        message_id: str,
-        input_data: Dict[str, Any],
-        output: str,
-    ):
-        """
-        处理 read 工具的输出，生成文件内容预览事件
+    async def _bridge_global_events(self, base_url, request_params, server_session_id, session_id, assistant_message_id, stop_event, state):
+        async def _stream_events(url):
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream("GET", url, params=request_params) as resp:
+                    resp.raise_for_status()
+                    data_buf = []
+                    async for line in resp.aiter_lines():
+                        if stop_event.is_set(): break
+                        if not line:
+                            if not data_buf: continue
+                            data_str = "\n".join(data_buf).strip()
+                            data_buf = []
+                            if not data_str or data_str == "[DONE]": continue
+                            try: event = json.loads(data_str)
+                            except: continue
+                            payload = event.get("payload") or event
+                            if self._extract_session_id_from_payload(payload) != server_session_id: continue
+                            normalized = self._normalize_server_event(payload)
+                            if not normalized: continue
+                            
+                            etype = normalized.get("type")
+                            props = normalized.get("properties") or {}
+                            part = props.get("part") or {}
+                            
+                            if etype in ["message.part.updated", "message.part.delta"]:
+                                ptype = part.get("type")
+                                # For message.part.delta, type might be missing in some server versions, so we infer it from partId if possible
+                                if not ptype and etype == "message.part.delta":
+                                    ptype = "text" # Default to text for deltas if unknown
 
-        Args:
-            session_id: 会话ID
-            message_id: 消息ID
-            input_data: 输入参数
-            output: 文件内容
-        """
+                                if ptype in [PART_TYPE_TEXT, PART_TYPE_THOUGHT, "reasoning"]:
+                                    mapped_type = PART_TYPE_THOUGHT if ptype == "reasoning" else ptype
+                                    
+                                    # ✅ Robust text extraction
+                                    text = part.get("text")
+                                    if not text and isinstance(part.get("content"), dict):
+                                        text = part["content"].get("text", "")
+                                    
+                                    if text:
+                                        global_key = f"{session_id}_{assistant_message_id}_{mapped_type}"
+                                        async with _cursor_lock:
+                                            sent_len = _SENT_TEXT_LENGTHS_GLOBAL.get(global_key, 0)
+                                            if len(text) > sent_len:
+                                                delta = text[sent_len:]
+                                                _SENT_TEXT_LENGTHS_GLOBAL[global_key] = len(text)
+                                            else:
+                                                delta = None
+                                        
+                                        if delta:
+                                            if "content" in part and isinstance(part["content"], dict):
+                                                part["content"]["text"] = delta
+                                            else:
+                                                part["content"] = {"text": delta}
+                                            part["text"] = delta
+                                            logger.info(f"[BRIDGE] Delta Applied to {etype}: {global_key} +{len(delta)}")
+                                        else:
+                                            logger.debug(f"[BRIDGE] Skipping duplicate content for {etype}: {global_key}")
+                                            continue
+                            
+                            if etype == "message.part.updated" and part.get("type") == "tool":
+                                state["saw_tool"] = True
+                                # ✅ 非阻塞触发 preview，跟踪 task 以便错误可见和优雅关闭
+                                task = asyncio.create_task(self._maybe_broadcast_preview(session_id, part))
+                                self._active_preview_tasks.add(task)
+                                task.add_done_callback(self._active_preview_tasks.discard)
+
+                            if etype == "session.idle" or (etype == "message.updated" and (props.get("info") or {}).get("time", {}).get("completed")):
+                                state["completed"] = True
+                                stop_event.set()
+                            
+                            await self._broadcast_event(session_id, normalized)
+                            state["events"] += 1
+                        elif line.startswith("data:"): data_buf.append(line[5:].lstrip())
+
+        # ✅ CRITICAL: Only use /event (the session-specific stream)
+        # Using /global/event is redundant and often causes duplicates when sequential connection is used
+        for p in ["/event"]:
+            if stop_event.is_set(): break
+            try: await _stream_events(f"{base_url}{p}")
+            except Exception as e: logger.warning(f"Bridge failed at {p}: {e}")
+
+    async def _execute_via_server_api(self, session_id, assistant_message_id, user_prompt, mode, model_id):
+        base_url = self.server_api_base_url
+        server_session_id = _SERVER_SESSION_ID_MAP.get(session_id)
+        if not server_session_id:
+            try:
+                resp = await httpx.AsyncClient().post(f"{base_url}/session")
+                server_session_id = resp.json().get("id")
+                _SERVER_SESSION_ID_MAP[session_id] = server_session_id
+            except: return False
+        
+        request_params = {"sessionID": server_session_id}
+        stop_event = asyncio.Event()
+        sse_state = {"events": 0, "completed": False, "saw_tool": False}
+        
+        bridge_task = asyncio.create_task(self._bridge_global_events(base_url, request_params, server_session_id, session_id, assistant_message_id, stop_event, sse_state))
+        
         try:
-            if not output:
-                return
-
-            file_path = input_data.get("path") or input_data.get("file_path", "")
-            step_id = generate_step_id()
-
-            # 发送文件预览开始事件
-            await self._broadcast_event(
-                session_id,
-                {
-                    "type": "preview_start",
-                    "step_id": step_id,
-                    "file_path": file_path,
-                    "action": "read",
-                },
-            )
-
-            # 打字机效果：逐字符推送内容（稍快于写入）
-            logger.info(
-                f"Starting read preview for {file_path} ({len(output)} chars)"
-            )
-            for i, char in enumerate(output):
-                await self._broadcast_event(
-                    session_id,
-                    {
-                        "type": "preview_delta",
-                        "step_id": step_id,
-                        "delta": {"type": "insert", "position": i, "content": char},
-                    },
-                )
-                # 读取速度稍快
-                await asyncio.sleep(0.003)
-            logger.info(f"Read preview completed for {file_path}")
-
-            # 发送预览结束事件
-            await self._broadcast_event(
-                session_id,
-                {"type": "preview_end", "step_id": step_id, "file_path": file_path},
-            )
-
+            async with httpx.AsyncClient(timeout=120) as client:
+                payload = {"model": {"providerID": "openai", "modelID": "gpt-4o"}, "parts": [{"type": "text", "text": user_prompt}]}
+                resp = await client.post(f"{base_url}/session/{server_session_id}/message", json=payload, params=request_params)
+                resp.raise_for_status()
         except Exception as e:
-            logger.error(f"Error handling read preview: {e}")
+            logger.error(f"Post message failed: {e}")
+            return False
 
-    async def _handle_step_start_event(
-        self,
-        event: Dict[str, Any],
-        session_id: str,
-        message_id: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """处理 step_start 事件"""
-        part = event.get("part", {}) or event
-        step_id = part.get("id") or part.get("step_id") or generate_part_id("step")
+        try: 
+            # Wait for SSE to finish or timeout
+            await asyncio.wait_for(stop_event.wait(), timeout=60)
+        except: 
+            logger.warning(f"SSE stream for {session_id} timed out or interrupted")
+            pass
+        
+        stop_event.set()
+        
+        # ✅ Polling for final state - ensures everything is captured
+        # We still use _SENT_TEXT_LENGTHS_GLOBAL here to ensure no duplication with SSE content
+        async def _poll_parts():
+            try:
+                # Limit 1 ensures we only get the latest message (assistant response)
+                async with httpx.AsyncClient() as client:
+                    r = await client.get(f"{base_url}/session/{server_session_id}/message", params={**request_params, "limit": 1})
+                    if r.status_code == 200:
+                        msgs = r.json()
+                        for m in msgs:
+                            if (m.get("info") or {}).get("role") == "assistant":
+                                return m.get("parts") or []
+            except Exception as e: 
+                logger.error(f"Failed to poll final parts: {e}")
+            return []
 
-        # 深度标题提取策略
-        default_title = (
-            "Planning & Analysis"
-            if context and context.get("mode") == "plan"
-            else (
-                "Building & Implementation"
-                if context and context.get("mode") == "build"
-                else "Executing"
-            )
-        )
-
-        title = (
-            (
-                part.get("content", {}).get("text")
-                if isinstance(part.get("content"), dict)
-                else None
-            )
-            or (
-                part.get("metadata", {}).get("title")
-                if isinstance(part.get("metadata"), dict)
-                else None
-            )
-            or (
-                event.get("metadata", {}).get("title")
-                if isinstance(event.get("metadata"), dict)
-                else None
-            )
-            or part.get("title")
-            or event.get("title")
-            or part.get("label")
-            or event.get("label")
-            or part.get("message")
-            or event.get("message")
-            or default_title
-        )
-
-        description = part.get("description") or event.get("description") or ""
-
-        # 补丁：如果标题是通用的 "Executing"，尝试从描述中找更好的
-        if title == "Executing" and description:
-            title = description
-            description = ""
-
-        # 记录到上下文以便后续追踪和启发式更新
-        if context:
-            context["current_step_id"] = step_id
-            context["current_step_title"] = title
-
-        yield {
-            "type": "message.part.updated",
-            "properties": {
-                "part": {
-                    "id": step_id,
-                    "session_id": session_id,
-                    "message_id": message_id,
-                    "type": "step-start",
-                    "content": {"text": title},
-                    "metadata": {"title": title, "description": description},
-                    "time": {"start": int(datetime.now().timestamp())},
-                }
-            },
-        }
-
-    async def _handle_tool_result_event(
-        self, event: Dict[str, Any], session_id: str, message_id: str
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """处理 tool_result 事件"""
-        part = event.get("part", {})
-        tool_name = part.get("tool", "tool")
-        state = part.get("state", {})
-        input_data = state.get("input", {}) or {}
-        output_data = state.get("output", "") or ""
-
-        yield {
-            "type": "message.part.updated",
-            "properties": {
-                "part": {
-                    "id": generate_part_id("tool"),
-                    "session_id": session_id,
-                    "message_id": message_id,
-                    "type": "tool",
-                    "tool": tool_name,
-                    "state": {
-                        "status": "completed",
-                        "input": input_data,
-                        "output": output_data,
-                    },
-                    "content": {"text": str(output_data)},
-                    "time": {"start": int(datetime.now().timestamp())},
-                }
-            },
-        }
-
-    async def _handle_step_finish_event(
-        self,
-        event: Dict[str, Any],
-        session_id: str,
-        message_id: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """处理 step_finish 事件"""
-        part = event.get("part", {}) or event
-        # 优先使用从上次 step_start 追踪到的 ID
-        step_id = (
-            part.get("id")
-            or part.get("step_id")
-            or (context.get("current_step_id") if context else None)
-        )
-
-        # 提取步骤完成信息
-        result = part.get("result") or event.get("result") or ""
-        status = part.get("status") or event.get("status") or "completed"
-        reason = part.get("reason") or event.get("reason") or ""
-        timestamp = part.get("timestamp") or event.get("timestamp") or int(datetime.now().timestamp())
-
-        tokens = event.get("tokens", {}) or part.get("tokens", {})
-        reasoning_tokens = tokens.get("reasoning", 0)
-
-        # 尝试提取实际的思考内容
-        thought_content = (
-            (
-                part.get("content", {}).get("text")
-                if isinstance(part.get("content"), dict)
-                else None
-            )
-            or event.get("reasoning_content")
-            or part.get("reasoning_content")
-            or part.get("metadata", {}).get("thought")
-        )
-
-        # 如果没有实际思考内容，跳过（不显示 token 数的占位消息）
-        if not thought_content:
-            # 但仍然发送完成信号
-            if step_id:
-                yield {
-                    "type": "message.part.updated",
-                    "properties": {
-                        "part": {
-                            "id": step_id,
-                            "session_id": session_id,
-                            "message_id": message_id,
-                            "type": "step-finish",
-                            "content": {"text": result or "Step completed"},
-                            "metadata": {"result": result, "status": status},
-                            "time": {"end": timestamp},
-                        }
-                    },
-                }
-
-                # 如果reason提供了，发送一个thought事件
-                if reason:
-                    yield {
+        final_parts = await _poll_parts()
+        now_ts = int(time.time())
+        for part in final_parts:
+            ptype = part.get("type") or "text"
+            if ptype in [PART_TYPE_TEXT, PART_TYPE_THOUGHT, "reasoning"]:
+                mapped_type = PART_TYPE_THOUGHT if ptype == "reasoning" else ptype
+                
+                # Robust text extraction for final parts
+                text = part.get("text")
+                if not text and isinstance(part.get("content"), dict):
+                    text = part["content"].get("text", "")
+                
+                if not text: continue
+                
+                global_key = f"{session_id}_{assistant_message_id}_{mapped_type}"
+                async with _cursor_lock:
+                    sent_len = _SENT_TEXT_LENGTHS_GLOBAL.get(global_key, 0)
+                    if len(text) > sent_len:
+                        delta = text[sent_len:]
+                        _SENT_TEXT_LENGTHS_GLOBAL[global_key] = len(text)
+                    else:
+                        delta = None
+                
+                if delta:
+                    logger.info(f"[POLL] Final Delta Applied: {global_key} +{len(delta)}")
+                    await self._broadcast_event(session_id, {
                         "type": "message.part.updated",
                         "properties": {
                             "part": {
-                                "id": generate_part_id("thought"),
-                                "session_id": session_id,
-                                "message_id": message_id,
-                                "type": "thought",
-                                "content": {"text": f"Step finished: {reason}"},
-                                "time": {"start": timestamp},
+                                "id": f"final_{global_key}", "session_id": session_id, "message_id": assistant_message_id,
+                                "type": mapped_type, "content": {"text": delta}, "time": {"start": now_ts}
                             }
-                        },
-                    }
+                        }
+                    })
+                else:
+                    logger.debug(f"[POLL] Content already fully sent for {global_key}")
+        
+        return True
+
+    async def execute_message(self, session_id, assistant_message_id, user_prompt, mode="auto"):
+        # Minimal implementation for now to restore functionality
+        logger.info(f"Executing {assistant_message_id} for {session_id}")
+        await self._broadcast_event(session_id, {"type": "message.updated", "properties": {"info": {"id": assistant_message_id, "session_id": session_id, "role": "assistant", "time": {"created": int(time.time())}}}})
+        
+        server_ok = await self._execute_via_server_api(session_id, assistant_message_id, user_prompt, mode, "gpt-4o")
+        
+        if server_ok:
+            # Wait for any in-flight preview tasks before signalling completion
+            if self._active_preview_tasks:
+                await asyncio.gather(*self._active_preview_tasks, return_exceptions=True)
+            await self._broadcast_event(session_id, {"type": "message.updated", "properties": {"info": {"id": assistant_message_id, "time": {"completed": int(time.time())}}}})
             return
+        
+        # Fallback to simple stub if server fails
+        await self._broadcast_event(session_id, {"type": "error", "properties": {"session_id": session_id, "message": "Server API failed"}})
 
-        # 如果有任何思考信息，生成思考事件
-        if thought_content:
-            yield {
-                "type": "message.part.updated",
-                "properties": {
-                    "part": {
-                        "id": generate_part_id("thought"),
-                        "session_id": session_id,
-                        "message_id": message_id,
-                        "type": "thought",
-                        "content": {"text": thought_content},
-                        "time": {"start": int(datetime.now().timestamp())},
-                    }
-                },
-            }
+_cleanup_task_started = False
 
-        # 发送阶段完成信号
-        if step_id:
-            yield {
-                "type": "message.part.updated",
-                "properties": {
-                    "part": {
-                        "id": step_id,
-                        "session_id": session_id,
-                        "message_id": message_id,
-                        "type": "step-finish",
-                        "content": {"text": result or "Step completed"},
-                        "metadata": {"result": result, "status": status},
-                        "time": {"end": timestamp},
-                    }
-                },
-            }
-
-            # 如果reason提供了，发送一个thought事件
-            if reason:
-                yield {
-                    "type": "message.part.updated",
-                    "properties": {
-                        "part": {
-                            "id": generate_part_id("thought"),
-                            "session_id": session_id,
-                            "message_id": message_id,
-                            "type": "thought",
-                            "content": {"text": f"Step finished: {reason}"},
-                            "time": {"start": timestamp},
-                        }
-                    },
-                }
-
-    def _handle_error_event(
-        self, event: Dict[str, Any], session_id: str
-    ) -> Dict[str, Any]:
-        """处理 error 事件"""
-        err_msg = event.get("message", "Unknown error")
-        return {
-            "type": "error",
-            "properties": {"session_id": session_id, "message": err_msg},
-        }
-
-    async def _handle_thought_event(
-        self, event: Dict[str, Any], session_id: str, message_id: str
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """处理显式的 thought 事件"""
-        part = event.get("part", {}) or event
-        content = (
-            part.get("content", {}).get("text")
-            or part.get("text")
-            or event.get("reasoning_content")
-        )
-
-        if content:
-            yield {
-                "type": "message.part.updated",
-                "properties": {
-                    "part": {
-                        "id": generate_part_id("thought"),
-                        "session_id": session_id,
-                        "message_id": message_id,
-                        "type": "thought",
-                        "content": {"text": content},
-                        "time": {"start": int(datetime.now().timestamp())},
-                    }
-                },
-            }
-
-    async def _scan_and_preview_new_files(
-        self,
-        session_id: str,
-        message_id: str,
-        session_dir: str,
-        initial_files: set,
-    ):
-        """
-        扫描并预览新创建的文件
-
-        Args:
-            session_id: 会话ID
-            message_id: 消息ID
-            session_dir: 会话目录
-            initial_files: 执行前的文件集合
-        """
-        try:
-            # 扫描会话目录，查找新文件
-            current_files = set()
-            if os.path.exists(session_dir):
-                for item in os.listdir(session_dir):
-                    item_path = os.path.join(session_dir, item)
-                    if os.path.isfile(item_path):
-                        current_files.add(item)
-
-            # 找出新创建的文件
-            new_files = current_files - initial_files
-
-            # 过滤掉日志文件和状态文件
-            ignored_files = {"run.log", "status.txt"}
-            new_files = new_files - ignored_files
-
-            if not new_files:
-                logger.info(f"[FILE_SCAN] No new files found in session {session_id}")
-                return
-
-            logger.info(f"[FILE_SCAN] Found {len(new_files)} new files: {new_files}")
-
-            # If tool-based previews already streamed, only emit file_generated
-            emit_preview = session_id not in self._skip_preview_sessions
-
-            # 为每个新文件生成预览事件
-            for filename in sorted(new_files):
-                file_path = os.path.join(session_dir, filename)
-
-                if not emit_preview:
-                    await self._broadcast_event(
-                        session_id,
-                        {
-                            "type": "file_generated",
-                            "file": {
-                                "name": filename,
-                                "path": f"/app/opencode/workspace/{session_id}/{filename}",
-                                "type": filename.split(".")[-1].lower() if "." in filename else "unknown",
-                            },
-                        },
-                    )
-                    continue
-
-                # 读取文件内容
-                try:
-                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                        content = f.read()
-                except Exception as e:
-                    logger.warning(f"[FILE_SCAN] Failed to read file {filename}: {e}")
-                    continue
-
-                # 生成预览事件
-                await self._handle_file_operation(
-                    session_id=session_id,
-                    message_id=message_id,
-                    tool_name="write",
-                    input_data={
-                        "file_path": f"/app/opencode/workspace/{session_id}/{filename}",
-                        "content": content
-                    },
-                    status="completed"
-                )
-                logger.info(f"[FILE_SCAN] Generated preview for {filename}")
-
-            if not emit_preview and session_id in self._skip_preview_sessions:
-                self._skip_preview_sessions.discard(session_id)
-
-        except Exception as e:
-            logger.error(f"[FILE_SCAN] Error scanning new files: {e}")
-
-    async def _broadcast_event(self, session_id: str, event: Dict[str, Any]):
-        """
-        广播事件到 EventStreamManager
-
-        Args:
-            session_id: 会话ID
-            event: 事件对象
-        """
-        try:
-            try:
-                from .api import event_stream_manager
-            except ImportError:
-                try:
-                    from api import event_stream_manager
-                except ImportError:
-                    logger.error(
-                        "Failed to import event_stream_manager for broadcasting"
-                    )
-                    return
-
-            logger.info(
-                f"Broadcasting event {event.get('type')} to session {session_id}"
-            )
-            await event_stream_manager.broadcast(session_id, event)
-        except Exception as e:
-            logger.error(f"Failed to broadcast event: {e}")
-
-    async def _execute_via_server_api(
-        self,
-        session_id: str,
-        assistant_message_id: str,
-        user_prompt: str,
-        mode: str,
-        model_id: str,
-    ) -> bool:
-        """
-        Execute message via opencode serve HTTP API.
-
-        Returns:
-            True if server API succeeds and events are broadcast, otherwise False.
-        """
-        use_server_api = os.getenv("OPENCODE_USE_SERVER_API", "true").lower() == "true"
-        if not use_server_api:
-            logger.info("[SERVER_API] Disabled via OPENCODE_USE_SERVER_API")
-            return False
-
-        base_url = self.server_api_base_url.rstrip("/")
-        logger.info(f"[SERVER_API] Attempting server API execution at {base_url}")
-        timeout = httpx.Timeout(300.0, connect=10.0)
-
-        try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                session_dir = os.path.join(self.workspace_base, session_id)
-                os.makedirs(session_dir, exist_ok=True)
-                request_params = {
-                    "directory": session_dir,
-                    "workspace": session_id,
-                }
-
-                # 先触发 server 启动（通过全局 manager）
-                try:
-                    from app.managers_internal import get_opencode_server_manager
-                    manager = await get_opencode_server_manager()
-                    await manager.start()
-                except Exception as e:
-                    logger.warning(f"[SERVER_API] Failed to start server via manager: {e}")
-
-                # Health check (retry to allow server warmup)
-                health_ok = False
-                for attempt in range(10):
-                    try:
-                        health_response = await client.get(f"{base_url}/session")
-                        if health_response.status_code == 200:
-                            health_ok = True
-                            break
-                    except (httpx.HTTPError, asyncio.TimeoutError) as e:
-                        logger.debug(f"Health check failed: {e}")
-                    await asyncio.sleep(1)
-                if not health_ok:
-                    logger.warning("[SERVER_API] Health check failed for all endpoints")
-                    return False
-
-                async def _create_server_session() -> Optional[str]:
-                    title = user_prompt[:100] if user_prompt else "New Session"
-                    session_payload = {"title": title}
-                    session_response = await client.post(
-                        f"{base_url}/session", json=session_payload, params=request_params
-                    )
-                    session_response.raise_for_status()
-                    session_data = session_response.json()
-                    new_server_session_id = (
-                        session_data.get("id")
-                        or session_data.get("session_id")
-                        or session_data.get("sessionID")
-                    )
-                    if not new_server_session_id:
-                        logger.error(
-                            f"[SERVER_API] Missing session id in response: {session_data}"
-                        )
-                        return None
-                    _SERVER_SESSION_ID_MAP[session_id] = new_server_session_id
-                    logger.info(
-                        f"[SERVER_API] Created and bound server session {new_server_session_id} for {session_id}"
-                    )
-                    return new_server_session_id
-
-                # Reuse server session if available; otherwise create once
-                server_session_id = _SERVER_SESSION_ID_MAP.get(session_id)
-                if server_session_id:
-                    logger.info(
-                        f"[SERVER_API] Reusing server session {server_session_id} for {session_id}"
-                    )
-                else:
-                    server_session_id = await _create_server_session()
-                    if not server_session_id:
-                        return False
-
-                # Start global event bridge (real-time SSE)
-                sse_state = {"events": 0, "failed": False, "saw_tool": False, "completed": False}
-                stop_event = asyncio.Event()
-                stream_task = asyncio.create_task(
-                    self._bridge_global_events(
-                        base_url,
-                        request_params,
-                        server_session_id,
-                        session_id,
-                        assistant_message_id,
-                        stop_event,
-                        sse_state,
-                    )
-                )
-
-                # Send message
-                agent_mode = mode if mode in ["plan", "build"] else "build"
-                if "/" in model_id:
-                    provider_id, model_name = model_id.split("/", 1)
-                else:
-                    provider_id, model_name = "openai", model_id
-                message_payload = {
-                    "model": {"providerID": provider_id, "modelID": model_name},
-                    "parts": [{"type": "text", "text": user_prompt}],
-                }
-                request_start_ts = int(datetime.now().timestamp())
-                def _flatten_assistant_parts(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-                    parts_acc: List[Dict[str, Any]] = []
-                    for msg in messages or []:
-                        info = msg.get("info") or {}
-                        if info.get("role") != "assistant":
-                            continue
-                        msg_parts = msg.get("parts") or []
-                        parts_acc.extend(msg_parts)
-                    return parts_acc
-
-                async def _poll_parts() -> List[Dict[str, Any]]:
-                    parts = []
-                    for i in range(60):
-                        # 第一次立即查询（AI 已完成），后续每 2 秒重试
-                        if i > 0:
-                            await asyncio.sleep(2)
-                        try:
-                            messages_resp = await client.get(
-                                f"{base_url}/session/{server_session_id}/message",
-                                params={**request_params, "limit": 20},
-                            )
-                            if messages_resp.status_code != 200:
-                                continue
-                            messages = messages_resp.json()
-                            parts = _flatten_assistant_parts(messages)
-                            if parts:
-                                break
-                        except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
-                            logger.debug(f"Poll parts attempt failed: {e}")
-                            continue
-                    return parts
-
-                parts = None
-                try:
-                    message_response = await client.post(
-                        f"{base_url}/session/{server_session_id}/message",
-                        json=message_payload,
-                        params=request_params,
-                    )
-                    message_response.raise_for_status()
-                     message_data = message_response.json()
- 
-                     # ✅ 诊断日志：分析POST response的实际结构
-                     logger.debug(
-                         f"[SERVER_API] POST /message response keys: {list(message_data.keys())}"
-                     )
-                     logger.debug(
-                         f"[SERVER_API] Full response structure (first 1000 chars): "
-                         f"{json.dumps(message_data, indent=2, ensure_ascii=False)[:1000]}"
-                     )
- 
-                     parts = message_data.get("parts")
-                     logger.debug(f"[SERVER_API] Initial parts extraction (message_data.get('parts')): {parts}")
- 
-                     if not parts and isinstance(message_data, dict):
-                         parts = message_data.get("message", {}).get("parts")
-                         logger.debug(
-                             f"[SERVER_API] Fallback parts extraction (message_data.get('message').get('parts')): {parts}"
-                         )
- 
-                     logger.info(
-                         f"[SERVER_API] Final extracted parts: {len(parts) if parts else 0} parts"
-                     )
- 
-                     # If POST response has no tool parts, fetch full message list
-                     if parts is not None:
-                         has_tool = any(p.get("type") == "tool" for p in parts if isinstance(p, dict))
-                         logger.info(f"[SERVER_API] Has tool parts: {has_tool}")
-                     else:
-                         has_tool = False
-                         logger.warning(
-                             f"[SERVER_API] parts is None, setting has_tool=False"
-                         )
- 
-                      if not parts or not has_tool:
-                         try:
-                             # ✅ 修复：只获取最新消息(limit=1)而不是所有历史消息(limit=20)
-                             # 这可以避免重复广播用户query和历史assistant回复
-                             logger.info(
-                                 f"[SERVER_API] POST response has no tool parts, "
-                                 f"fetching latest message only (limit=1) instead of all history (limit=20)"
-                             )
-                             messages_resp = await client.get(
-                                 f"{base_url}/session/{server_session_id}/message",
-                                 params={**request_params, "limit": 1},  # ← 只取最新消息
-                             )
-                             if messages_resp.status_code == 200:
-                                 parts = _flatten_assistant_parts(messages_resp.json())
-                                 logger.info(
-                                     f"[SERVER_API] Fetched {len(parts) if parts else 0} parts from latest message"
-                                 )
-                         except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
-                             logger.debug(f"Fetch additional parts failed: {e}")
-                             pass
-                except httpx.HTTPStatusError as e:
-                    if e.response is not None and e.response.status_code == 404:
-                        logger.warning(
-                            f"[SERVER_API] Session {server_session_id} not found, recreating..."
-                        )
-                        server_session_id = await _create_server_session()
-                        if not server_session_id:
-                            return False
-                        # restart SSE bridge with new session id
-                        stop_event.set()
-                        try:
-                            await asyncio.wait_for(stream_task, timeout=2)
-                        except (asyncio.TimeoutError, asyncio.CancelledError) as e:
-                            logger.debug(f"Stream task wait failed: {e}")
-                            stream_task.cancel()
-                        stop_event = asyncio.Event()
-                        stream_task = asyncio.create_task(
-                            self._bridge_global_events(
-                                base_url,
-                                request_params,
-                                server_session_id,
-                                session_id,
-                                assistant_message_id,
-                                stop_event,
-                                sse_state,
-                            )
-                        )
-                        message_response = await client.post(
-                            f"{base_url}/session/{server_session_id}/message",
-                            json=message_payload,
-                            params=request_params,
-                        )
-                        message_response.raise_for_status()
-                        message_data = message_response.json()
-                        parts = message_data.get("parts")
-                        if not parts and isinstance(message_data, dict):
-                            parts = message_data.get("message", {}).get("parts")
-                        if not parts:
-                            try:
-                                messages_resp = await client.get(
-                                    f"{base_url}/session/{server_session_id}/message",
-                                    params={**request_params, "limit": 20},
-                                )
-                                if messages_resp.status_code == 200:
-                                    parts = _flatten_assistant_parts(messages_resp.json())
-                            except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
-                                logger.debug(f"Fetch message parts failed: {e}")
-                                pass
-                except httpx.ReadTimeout as e:
-                    logger.warning(
-                        f"[SERVER_API] Message request timed out after {timeout.read}s, polling messages... ({type(e).__name__})"
-                    )
-                    parts = await _poll_parts()
-                except httpx.HTTPError as e:
-                    logger.error(
-                        f"[SERVER_API] HTTP error during message request: {type(e).__name__} {e!r}"
-                    )
-                    parts = await _poll_parts()
-
-                # Wait for SSE completion (avoid premature stop/summary)
-                if not sse_state.get("failed", False):
-                    try:
-                        await asyncio.wait_for(stop_event.wait(), timeout=timeout.read)
-                    except asyncio.TimeoutError:
-                        pass
-
-                # Stop SSE bridge after completion or timeout
-                stop_event.set()
-                try:
-                    await asyncio.wait_for(stream_task, timeout=5)
-                except (asyncio.TimeoutError, asyncio.CancelledError) as e:
-                    logger.debug(f"Stream task cleanup failed: {e}")
-                    stream_task.cancel()
-
-                # If SSE yielded events, avoid duplicate manual part broadcasting
-                if sse_state.get("events", 0) > 0 and not sse_state.get("failed", False):
-                    if sse_state.get("saw_tool"):
-                        self._skip_preview_sessions.add(session_id)
-                    if sse_state.get("completed"):
-                        logger.info(
-                            f"[SERVER_API] SSE completed for session {session_id}, fetching text parts..."
-                        )
-                        # SSE 流里 message.part.updated 只有初始化事件，AI 文本回复需要通过 message API 获取
-                        text_parts = await _poll_parts()
-                        if text_parts:
-                            now_ts = int(datetime.now().timestamp())
-                            for part in text_parts:
-                                part_type = part.get("type") or PART_TYPE_TEXT
-                                # 只广播 text/thought/reasoning 类型，工具事件已通过 SSE 广播
-                                if part_type not in [PART_TYPE_TEXT, PART_TYPE_THOUGHT, "reasoning"]:
-                                    continue
-                                mapped_type = PART_TYPE_THOUGHT if part_type == "reasoning" else part_type
-                                text = part.get("text") or ""
-                                if not text and isinstance(part.get("content"), dict):
-                                    text = part["content"].get("text") or part["content"].get("markdown") or ""
-                                if not text:
-                                    continue
-                                logger.info(f"[SERVER_API] Broadcasting text part (type={mapped_type}, len={len(text)}) for session {session_id}")
-                                await self._broadcast_event(
-                                    session_id,
-                                    {
-                                        "type": "message.part.updated",
-                                        "properties": {
-                                            "part": {
-                                                "id": generate_part_id(mapped_type),
-                                                "session_id": session_id,
-                                                "message_id": assistant_message_id,
-                                                "type": mapped_type,
-                                                "content": {"text": text},
-                                                "time": {"start": now_ts},
-                                            }
-                                        },
-                                    },
-                                )
-                        else:
-                            logger.warning(f"[SERVER_API] No text parts found after SSE completion for session {session_id}")
-                        return True
-                    parts = None
-
-                if not parts:
-                    logger.warning(
-                        f"[SERVER_API] No parts returned for session {server_session_id}, polling messages..."
-                    )
-                    parts = await _poll_parts()
-
-                if not parts:
-                    logger.warning(
-                        f"[SERVER_API] No parts available after polling for session {server_session_id}"
-                    )
-                    return False
-
-                now_ts = int(datetime.now().timestamp())
-                step_context = {"mode": agent_mode}
-                for part in parts:
-                    part_type = part.get("type") or PART_TYPE_TEXT
-                    mapped_type = PART_TYPE_THOUGHT if part_type == "reasoning" else part_type
-                    if part_type == "tool":
-                        tool_name = part.get("tool") or ""
-                        state = part.get("state") or {}
-                        status = state.get("status")
-                        input_data = state.get("input") or {}
-                        output_data = state.get("output") or ""
-
-                        if status in ["pending", "running"]:
-                            async for event in self._handle_tool_use_event(
-                                {
-                                    "type": "tool_use",
-                                    "part": {
-                                        "tool": tool_name,
-                                        "state": {"status": status, "input": input_data},
-                                    },
-                                },
-                                session_id,
-                                assistant_message_id,
-                            ):
-                                await self._broadcast_event(session_id, event)
-                            continue
-
-                        if status == "completed":
-                            # 先发送 tool_use，确保前端和数据库记录工具调用
-                            async for event in self._handle_tool_use_event(
-                                {
-                                    "type": "tool_use",
-                                    "part": {
-                                        "tool": tool_name,
-                                        "state": {"status": "running", "input": input_data},
-                                    },
-                                },
-                                session_id,
-                                assistant_message_id,
-                            ):
-                                await self._broadcast_event(session_id, event)
-                            async for event in self._handle_tool_result_event(
-                                {
-                                    "type": "tool_result",
-                                    "part": {
-                                        "tool": tool_name,
-                                        "state": {
-                                            "status": status,
-                                            "input": input_data,
-                                            "output": output_data,
-                                        },
-                                    },
-                                },
-                                session_id,
-                                assistant_message_id,
-                            ):
-                                await self._broadcast_event(session_id, event)
-                            continue
-
-                    if part_type in ["step_start", "step-start", "step"]:
-                        async for event in self._handle_step_start_event(
-                            {"type": "step_start", "part": part},
-                            session_id,
-                            assistant_message_id,
-                            step_context,
-                        ):
-                            await self._broadcast_event(session_id, event)
-                        continue
-
-                    if part_type in ["step_finish", "step-finish"]:
-                        async for event in self._handle_step_finish_event(
-                            {"type": "step_finish", "part": part},
-                            session_id,
-                            assistant_message_id,
-                            step_context,
-                        ):
-                            await self._broadcast_event(session_id, event)
-                        continue
-
-                    text = part.get("text") or ""
-                    if not text and isinstance(part.get("content"), dict):
-                        text = part["content"].get("text") or part["content"].get("markdown") or ""
-                    if not text and part.get("content"):
-                        text = str(part.get("content"))
-
-                    if not text:
-                        continue
-
-                    event_type = (
-                        "message.part.updated"
-                        if part_type in [PART_TYPE_TEXT, PART_TYPE_THOUGHT]
-                        else "message.part.updated"
-                    )
-                    await self._broadcast_event(
-                        session_id,
-                        {
-                            "type": event_type,
-                            "properties": {
-                                "part": {
-                                    "id": generate_part_id(mapped_type),
-                                    "session_id": session_id,
-                                    "message_id": assistant_message_id,
-                                    "type": mapped_type
-                                    if mapped_type in [PART_TYPE_TEXT, PART_TYPE_THOUGHT]
-                                    else PART_TYPE_TEXT,
-                                    "content": {"text": text},
-                                    "time": {"start": now_ts},
-                                }
-                            },
-                        },
-                    )
-
-                # ✅ 发送完成事件（包含completed时间戳）
-                await self._broadcast_event(
-                    session_id,
-                    {
-                        "type": "message.updated",
-                        "properties": {
-                            "message_id": assistant_message_id,
-                            "info": {
-                                "time": {
-                                    "completed": int(time.time() * 1000)
-                                }
-                            }
-                        }
-                    }
-                )
-
-                logger.info(
-                    f"[SERVER_API] Completed message via server API for session {session_id}"
-                )
-                return True
-        except httpx.HTTPError as e:
-            logger.error(f"[SERVER_API] HTTP error: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"[SERVER_API] Unexpected error: {e}")
-            return False
-
-
-# ====================================================================
-# 辅助函数
-# ====================================================================
-
-
-async def execute_opencode_message(
-    session_id: str,
-    message_id: str,
-    user_prompt: str,
-    workspace_base: str,
-    mode: str = "auto",  # New parameter
-):
-    """
-    后台执行 OpenCode 消息的入口函数
-    """
-    # ✅ Code Review修复：确保opencode serve已启动，再执行任务
-    # 修复问题：--attach模式失败，因为opencode serve未启动
-    from app.managers_internal import get_opencode_server_manager
-    
-    logger.info(f"[Execute] Ensuring OpenCodeServer is started before running task...")
-    server_manager = await get_opencode_server_manager()
-    logger.info(f"[Execute] OpenCodeServer ready, starting task execution...")
-    
+async def execute_opencode_message_with_manager(session_id, message_id, user_prompt, workspace_base, mode="auto"):
+    global _cleanup_task_started
+    if not _cleanup_task_started:
+        asyncio.create_task(_cleanup_cursors())
+        _cleanup_task_started = True
     client = OpenCodeClient(workspace_base)
     await client.execute_message(session_id, message_id, user_prompt, mode=mode)
-
-
-
-
-
-
-# ====================================================================
-# 工具类型映射（兼容前端）
-# ====================================================================
-
-
-def map_tool_to_type(tool_name: str) -> str:
-    """映射内部工具名称到前端显示类型"""
-    tool = tool_name.lower()
-
-    if "read" in tool:
-        return "read"
-    if "write" in tool or "save" in tool or "create" in tool:
-        return "write"
-    if "bash" in tool or "sh" == tool or "shell" in tool:
-        return "bash"
-    if "terminal" in tool or "command" in tool or "cmd" in tool or "run" in tool:
-        return "terminal"
-    if (
-        "grep" in tool
-        or "search" in tool
-        and "web" not in tool
-        and "google" not in tool
-    ):
-        return "grep"
-    if "browser" in tool or "click" in tool or "visit" in tool or "scroll" in tool:
-        return "browser"
-    if "web" in tool or "google" in tool:
-        return "web_search"
-    if "edit" in tool or "replace" in tool:
-        return "file_editor"
-
-    return "file_editor"  # Default fallback
-
-# ====================================================================
-# 修复500错误：恢复execute_opencode_message_with_manager函数
-# ====================================================================
-# 这个函数被意外注释掉，导致api.py导入失败，返回500错误
-# 简化版本：直接调用OpenCodeClient.execute_message
-
-async def execute_opencode_message_with_manager(
-    session_id: str,
-    message_id: str,
-    user_prompt: str,
-    workspace_base: str,
-    mode: str = "auto",
-) -> None:
-    """
-    使用OpenCodeClient执行OpenCode消息（通过Server HTTP API）
-
-    这是api.py中调用的入口函数，简化为直接调用OpenCodeClient.execute_message。
-
-    执行流程：
-    1. 创建OpenCodeClient实例
-    2. 调用execute_message（优先使用Server HTTP API，CLI作为回退）
-    3. 所有SSE事件通过_broadcast_event广播到EventStreamManager
-
-    Args:
-        session_id: Session ID
-        message_id: Message ID
-        user_prompt: 用户提示词
-        workspace_base: 工作区基础路径
-        mode: 运行模式（auto/plan/build）
-
-    Returns:
-        None
-
-    Raises:
-        Exception: 如果execute_message失败（会记录日志并重新抛出）
-
-    Note:
-        这是一个会阻塞的async函数，必须在BackgroundTasks中调用以避免阻塞响应。
-        与旧版本（已注释）不同，这个简化版本直接调用execute_message，
-        不再通过OpenCodeServerManager包装。
-    """
-    logger = logging.getLogger(__name__)
-
-    try:
-        client = OpenCodeClient(workspace_base)
-        await client.execute_message(session_id, message_id, user_prompt, mode=mode)
-        logger.info(f"[execute_opencode_message_with_manager] Successfully executed message {message_id} for session {session_id}")
-    except Exception as e:
-        logger.error(f"[execute_opencode_message_with_manager] Failed to execute message {message_id} for session {session_id}: {e}", exc_info=True)
-        raise

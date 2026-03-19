@@ -395,81 +395,20 @@ class SessionManager:
         return self.sessions[sid]
 
     async def _run_process(self, sid: str, prompt: str, mode: str = "auto"):
+        # 路径A已废弃：任务执行由 api.py send_message() → opencode_client.py 负责。
+        # _run_process 只初始化状态文件，不执行任务、不轮询、不广播事件。
         session_dir = os.path.join(WORKSPACE_BASE, sid)
         os.makedirs(session_dir, exist_ok=True)
-        log_file = os.path.join(session_dir, "run.log")
-        status_file = os.path.join(session_dir, "status.txt")
-
-        # Init logs
-        with open(status_file, "w", encoding="utf-8") as f:
-            f.write("running")
-        with open(log_file, "w", encoding="utf-8") as f:
-            f.write(f"Session started: {sid}\n")
-
         try:
-            logger.info(f"Enhancing prompt with mode: {mode}")
-            enhanced_prompt = enhance_prompt(prompt, mode)
-
-            # ✅ 新方案：使用 OpenCodeServerManager 的 HTTP API（懒加载）
-            logger.info(f"Using OpenCodeServerManager (lazy load) for session {sid}")
-
-            # 获取管理器实例（首次请求时才会启动服务器）
-            manager = await get_opencode_server_manager()
-
-            # 更新会话状态
+            with open(os.path.join(session_dir, "run.log"), "w", encoding="utf-8") as f:
+                f.write(f"Session started: {sid}\n")
+            with open(os.path.join(session_dir, "status.txt"), "w", encoding="utf-8") as f:
+                f.write("running")
             if sid in self.sessions:
                 self.sessions[sid]["status"] = "running"
-
-            # 发送 HTTP 请求执行任务
-            logger.info(f"Executing task via HTTP API: {mode}")
-
-            # ✅ 修复：execute返回AsyncGenerator，需要用async for迭代
-            # manager.execute()返回SSE事件流，需要解析并广播到前端
-            async for chunk in manager.execute(
-                session_id=sid,
-                prompt=enhanced_prompt,
-                mode=mode
-            ):
-                # 解析SSE事件流并广播到前端队列
-                # SSE格式: "data:{json}" 或 "event:xxx\ndata:{json}"
-                if isinstance(chunk, str) and chunk.strip():
-                    logger.debug(f"[SSE-DEBUG] Received SSE chunk: {chunk[:100]}")
-
-                    # 解析SSE行
-                    if chunk.startswith('data:'):
-                        # 提取JSON数据
-                        data_part = chunk[5:].strip()  # 移除"data:"前缀
-                        if data_part and data_part != '[DONE]':
-                            try:
-                                # 解析JSON事件
-                                event = json.loads(data_part)
-                                logger.debug(f"[SSE-DEBUG] Parsed SSE event: {event.get('type', 'unknown')}")
-
-                                # 广播事件到session的所有队列（保持SSE格式）
-                                if sid in self.sessions:
-                                    for q in self.sessions[sid]["queues"]:
-                                        await q.put(json.dumps(event))
-                                    logger.debug(f"[SSE-DEBUG] Broadcasted event to {len(self.sessions[sid]['queues'])} queues")
-                            except json.JSONDecodeError as e:
-                                logger.warning(f"[SSE-DEBUG] Failed to parse SSE JSON: {e}, data: {data_part[:100]}")
-                    else:
-                        # 非SSE格式的文本，记录到日志
-                        logger.debug(f"[SSE-DEBUG] Non-SSE chunk: {chunk[:100]}")
-                        # 可选：将非SSE文本也广播（作为消息事件）
-                        # 但目前先忽略，避免混乱
-
-            with open(status_file, "w", encoding="utf-8") as f:
-                f.write("completed")
-
-            if sid in self.sessions:
-                self.sessions[sid]["status"] = "completed"
-
+            logger.info(f"[_run_process] Session {sid} initialized (task handled by opencode_client)")
         except Exception as e:
-            logger.error(f"Process error for {sid}: {e}")
-            with open(status_file, "w", encoding="utf-8") as f:
-                f.write("error")
-            if sid in self.sessions:
-                self.sessions[sid]["status"] = "error"
+            logger.error(f"[_run_process] Failed to initialize session {sid}: {e}")
 
     async def attach(self, sid: str):
         if sid not in self.sessions:
@@ -533,9 +472,25 @@ async def run_agent(prompt: str, sid: str, mode: str = "auto"):
                 with open(log_file, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
-                        if line:
-                            async for event in process_log_line(line, sid):
-                                yield event
+                        if not line:
+                            continue
+                        
+                        # ✅ 健壮过滤：只处理合法的JSON事件数据
+                        # 问题：run.log混合了系统纯文本日志和JSON事件
+                        # 影响：非JSON日志被前端强行解析，导致显示污染
+                        # 修复：尝试解析JSON，只发送合法的事件
+                        try:
+                            parsed = json.loads(line)  # ✅ 使用顶部导入的json
+                            # 只有包含必要事件字段的才发送
+                            if any(field in parsed for field in ("type", "event", "message_type")):
+                                async for event in process_log_line(line, sid):
+                                    yield event
+                            else:
+                                logger.debug(f"[Catch-up] Filtered non-event JSON: {line}")
+                        except json.JSONDecodeError:
+                            # 忽略所有非JSON格式的纯文本日志
+                            logger.debug(f"[Catch-up] Filtered non-JSON log: {line}")
+                            continue
             except Exception as e:
                 logger.error(f"Error reading history: {e}")
 
@@ -663,22 +618,13 @@ async def process_log_line(text: str, sid: str = None):
                         capture_result = await history_service.capture_tool_use(sid, tool_name, input_data, step_id, current_mode)
 
                     if tool_name in ["write", "edit", "file_editor", "patch"]:
-                        # 改进：识别多种路径和内容键名
-                        file_path = str(input_data.get("file_path") or input_data.get("path") or input_data.get("filePath") or "")
-                        content = input_data.get("content") or input_data.get("newString") or ""
-                        action_type = "write" if tool_name == "write" else "edit"
-                        
-                        yield format_sse({"type": "preview_start", "step_id": step_id, "file_path": file_path, "action": action_type})
-                        
-                        if content:
-                            # 批量推送以防止 SSE 拥塞
-                            chunk_size = 100
-                            for i in range(0, len(content), chunk_size):
-                                chunk = content[i:i+chunk_size]
-                                yield format_sse({"type": "preview_delta", "step_id": step_id, "delta": {"type": "insert", "position": i, "content": chunk}})
-                                await asyncio.sleep(0.03)  # ✅ 修复：从5ms增加到30ms，让用户能看到逐步显示效果
-                        
-                        yield format_sse({"type": "preview_end", "step_id": step_id, "file_path": file_path})
+                        # ⚠️ 路径A已废弃：preview 事件现在由 opencode_client.py _maybe_broadcast_preview() 负责。
+                        # 此处代码仅保留注释，不再执行，防止重复 preview。
+                        # file_path = str(input_data.get("file_path") or input_data.get("path") or ...)
+                        # yield format_sse({"type": "preview_start", ...})
+                        # yield format_sse({"type": "preview_delta", ...})
+                        # yield format_sse({"type": "preview_end", ...})
+                        pass
 
                     if capture_result:
                         yield format_sse({"type": "timeline_update", "step": {"step_id": step_id, "action": capture_result.get("action_type"), "path": capture_result.get("file_path"), "timestamp": capture_result.get("timestamp")}})
@@ -718,14 +664,18 @@ async def process_log_line(text: str, sid: str = None):
                             if success:
                                 # ✅ P1-2修复：数据库保存是重要业务操作，使用info级别
                                 logger.info(f"Saved tool part to DB: {tool_name} for session {sid}")
-                        except Exception as save_err:
-                            logger.warning(f"Failed to save tool part for {sid}: {save_err}")
+                         except Exception as save_err:
+                             logger.warning(f"Failed to save tool part for {sid}: {save_err}")
 
-            elif event_type == "text":
-                chunk = event.get("part", {}).get("text", "")
-                if chunk: yield format_sse({"type": "answer_chunk", "text": chunk})
+             # ✅ 修复：删除text事件处理，避免与opencode_client.py重复广播
+             # 问题：opencode_client.py已经正确发送了text事件的增量
+             # 影响：main.py再次发送完整文本，导致"52"+"52"="5252"
+             # 修复：注释掉以下代码，只让opencode_client.py负责text事件
+             # elif event_type == "text":
+             #     chunk = event.get("part", {}).get("text", "")
+             #     if chunk: yield format_sse({"type": "answer_chunk", "text": chunk})
 
-            elif event_type == "error":
+             elif event_type == "error":
                 yield format_sse({"type": "tool_event", "data": {"type": "error", "content": event.get("message", "Unknown error")}})
 
             return
