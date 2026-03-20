@@ -337,13 +337,23 @@ class OpenCodeClient:
                                 stop_event.set()
                             
                             # ✅ 持久化 phases_init 事件
-                            if etype == "phases_init" and self.history_service:
-                                phases = props.get("phases") or payload.get("phases") or []
+                            # opencode server 可能用不同的事件类型名，扩大匹配范围
+                            if etype in ("phases_init", "session.phases", "phases") and self.history_service:
+                                # 尝试多个字段路径
+                                phases = (
+                                    props.get("phases") or
+                                    payload.get("phases") or
+                                    props.get("data", {}).get("phases") or
+                                    []
+                                )
+                                logger.info(f"[PHASES] etype={etype} phases_count={len(phases)} payload_keys={list(payload.keys())} props_keys={list(props.keys())}")
                                 if phases:
                                     turn_index = state.get("turn_index", 0)
                                     asyncio.create_task(
                                         self.history_service.save_phases(session_id, phases, turn_index)
                                     )
+                                else:
+                                    logger.warning(f"[PHASES] phases_init received but phases is empty. Full payload: {payload}")
 
                             await self._broadcast_event(session_id, normalized)
                             state["events"] += 1

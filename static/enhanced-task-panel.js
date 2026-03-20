@@ -216,34 +216,47 @@ function renderEnhancedTaskPanel(session) {
             turnContainer.appendChild(userCard);
         }
 
-        // 2. 任务阶段卡片 - 仅显示属于该对话轮次 (turn_index === i + 1) 的 phases
-        // 注意：turnIndex 是从 1 开始计数的（在 patch.js 中初始化为 1）
-        // ✅ 修复：使用 parseInt 确保类型一致，避免字符串与数字比较失败
-        // ✅ v=31: 精确匹配当前轮次，不使用容错逻辑，避免显示其他轮次的phases
+        // 2. 任务阶段卡片
         const turnPhases = session.phases ? session.phases.filter(p => {
             const phaseTurn = parseInt(p.turn_index, 10);
-            // ✅ 精确匹配：只显示当前轮次的phases
             return phaseTurn === i + 1;
         }) : [];
 
-        // 兜底：如果是最后一轮且没找到匹配的 turn_index，显示所有未关联的 phases
-        // ✅ 修复：使用 parseInt 确保类型一致
-        // ✅ v=31: 只在真正没有匹配时才使用兜底逻辑
+        // 兜底：最后一轮且没有匹配 turn_index 时，显示所有 phases（含历史恢复的无 turn_index phases）
         if (i === turnsCount - 1 && turnPhases.length === 0 && session.phases && session.phases.length > 0) {
-            // ✅ P1修复v3：只显示完全没有turn_index的phases
-            // 由于新修复已经确保所有phases都有正确的turn_index，这个兜底应该很少触发
             const unassociatedPhases = session.phases.filter(p => {
                 const phaseTurn = parseInt(p.turn_index, 10);
-                // ✅ 只显示完全没有turn_index的phases
                 return !p.turn_index || isNaN(phaseTurn);
             });
-            if (unassociatedPhases.length > 0) {
-                const phasesCard = createPhasesCard(unassociatedPhases, session.currentPhase);
+            // ✅ 历史恢复兜底：如果所有 phases 都没有 turn_index，全部显示
+            const phasesToShow = unassociatedPhases.length > 0 ? unassociatedPhases : session.phases;
+            if (phasesToShow.length > 0) {
+                const phasesCard = createPhasesCard(phasesToShow, session.currentPhase);
                 turnContainer.appendChild(phasesCard);
             }
         } else if (turnPhases.length > 0) {
             const phasesCard = createPhasesCard(turnPhases, session.currentPhase);
             turnContainer.appendChild(phasesCard);
+        }
+
+        // 2b. thoughtEvents（历史恢复时 thought 不在 phase.events 里）
+        // 只在最后一轮插入，避免多轮对话重复显示
+        // 包进伪 phase 卡片，样式与真实 phase 一致（兜底：phases 为空时也能显示）
+        if (i === turnsCount - 1 && session.thoughtEvents && session.thoughtEvents.length > 0) {
+            const thoughtEvents = session.thoughtEvents.map(ev => ({
+                type: 'thought',
+                content: ev.content || ev.data?.text || '',
+                id: ev.id
+            })).filter(ev => ev.content);
+            if (thoughtEvents.length > 0) {
+                const thoughtPhaseCard = createPhasesCard([{
+                    id: '_thought_pseudo_phase',
+                    title: '思考过程',
+                    status: 'done',
+                    events: thoughtEvents
+                }], null);
+                turnContainer.appendChild(thoughtPhaseCard);
+            }
         }
 
         // 3. 该轮的回答和交付物

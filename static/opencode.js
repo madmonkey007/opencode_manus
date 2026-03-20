@@ -446,7 +446,10 @@ async function loadState() {
                                         s.actions = [];
                                         s.orphanEvents = [];
                                         s.thoughtEvents = [];
-                                        s.phases = data.phases && data.phases.length > 0 ? data.phases : [];
+                                        // ✅ 修复：data.phases 为空时保留 localStorage 里的 phases
+                                        if (data.phases && data.phases.length > 0) {
+                                            s.phases = data.phases;
+                                        }
 
                                         data.messages.forEach(msg => {
                                             if ((msg.info?.role || msg.role) === 'user') {
@@ -944,7 +947,11 @@ function renderSidebar() {
                                     if (data && data.messages) {
                                         // 转换后端消息格式到前端 state 格式
                                         s.response = '';
-                                        s.phases = data.phases && data.phases.length > 0 ? data.phases : [];
+                                        // ✅ 修复：data.phases 为空时保留 localStorage 里的 phases，不覆盖
+                                        if (data.phases && data.phases.length > 0) {
+                                            s.phases = data.phases;
+                                        }
+                                        // data.phases 为空时 s.phases 保持不变（可能来自 localStorage）
                                         s.orphanEvents = [];
                                         s.actions = [];
                                         s.thoughtEvents = [];
