@@ -18,6 +18,9 @@ logs/
 *.log
 nohup.out
 
+# Config (runtime generated)
+config/opencode.json
+
 # Project Specific
 workspace/
 backups/
