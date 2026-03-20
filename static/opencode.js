@@ -445,6 +445,8 @@ async function loadState() {
                                         s.response = '';
                                         s.actions = [];
                                         s.orphanEvents = [];
+                                        s.thoughtEvents = [];
+                                        s.phases = data.phases && data.phases.length > 0 ? data.phases : [];
 
                                         data.messages.forEach(msg => {
                                             if ((msg.info?.role || msg.role) === 'user') {
@@ -454,6 +456,12 @@ async function loadState() {
                                                 msg.parts?.forEach(part => {
                                                     if (part.type === 'text') {
                                                         s.response += (part.content?.text || part.text || '');
+                                                    } else if (part.type === 'thought') {
+                                                        const thoughtText = part.content?.text || part.text || '';
+                                                        if (thoughtText) {
+                                                            s.thoughtEvents = s.thoughtEvents || [];
+                                                            s.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
+                                                        }
                                                     } else if (part.type === 'tool' || part.type === 'action') {
                                                         const toolContent = part.content || part;
                                                         const toolEv = {
@@ -716,9 +724,10 @@ async function loadState() {
                             if (data && data.messages) {
                                 // 转换后端消息格式到前端 state 格式
                                 session.response = '';
-                                session.phases = [];
+                                session.phases = data.phases && data.phases.length > 0 ? data.phases : [];
                                 session.orphanEvents = [];
                                 session.actions = [];
+                                session.thoughtEvents = [];
 
                                 data.messages.forEach(msg => {
                                     if ((msg.info?.role || msg.role) === 'user') {
@@ -728,6 +737,12 @@ async function loadState() {
                                         msg.parts?.forEach(part => {
                                             if (part.type === 'text') {
                                                 session.response += (part.content?.text || part.text || '');
+                                            } else if (part.type === 'thought') {
+                                                const thoughtText = part.content?.text || part.text || '';
+                                                if (thoughtText) {
+                                                    session.thoughtEvents = session.thoughtEvents || [];
+                                                    session.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
+                                                }
                                             } else if (part.type === 'tool' || part.type === 'action') {
                                                 const toolContent = part.content || part;
                                                 const toolEv = {
@@ -929,9 +944,10 @@ function renderSidebar() {
                                     if (data && data.messages) {
                                         // 转换后端消息格式到前端 state 格式
                                         s.response = '';
-                                        s.phases = [];
+                                        s.phases = data.phases && data.phases.length > 0 ? data.phases : [];
                                         s.orphanEvents = [];
                                         s.actions = [];
+                                        s.thoughtEvents = [];
 
                                         data.messages.forEach(msg => {
                                             if ((msg.info?.role || msg.role) === 'user') {
@@ -942,6 +958,12 @@ function renderSidebar() {
                                                 msg.parts?.forEach(part => {
                                                     if (part.type === 'text') {
                                                         s.response += (part.content?.text || part.text || '');
+                                                    } else if (part.type === 'thought') {
+                                                        const thoughtText = part.content?.text || part.text || '';
+                                                        if (thoughtText) {
+                                                            s.thoughtEvents = s.thoughtEvents || [];
+                                                            s.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
+                                                        }
                                                     } else if (part.type === 'tool' || part.type === 'action') {
                                                         const toolContent = part.content || part;
                                                         const toolEv = {
@@ -1061,9 +1083,10 @@ function renderSidebar() {
                         if (data && data.messages) {
                             // 转换后端消息格式到前端 state 格式
                             s.response = '';
-                            s.phases = [];
+                            s.phases = data.phases && data.phases.length > 0 ? data.phases : [];
                             s.orphanEvents = [];
                             s.actions = [];
+                            s.thoughtEvents = [];
 
                             data.messages.forEach(msg => {
                                 if ((msg.info?.role || msg.role) === 'user') {
@@ -1074,6 +1097,12 @@ function renderSidebar() {
                                     msg.parts?.forEach(part => {
                                         if (part.type === 'text') {
                                             s.response += (part.content?.text || part.text || '');
+                                        } else if (part.type === 'thought') {
+                                            const thoughtText = part.content?.text || part.text || '';
+                                            if (thoughtText) {
+                                                s.thoughtEvents = s.thoughtEvents || [];
+                                                s.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
+                                            }
                                         } else if (part.type === 'tool' || part.type === 'action') {
                                             const toolContent = part.content || part;
                                             const toolEv = {
@@ -1435,7 +1464,7 @@ function renderResults() {
                 <span class="material-symbols-outlined text-gray-400 expand-icon transition-transform duration-200">expand_more</span>
             </div>
             <div class="card-body hidden border-t border-border-light dark:border-border-dark p-3 text-sm text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-black/20">
-                ${isThought ? (ev.content || '') : `<pre class="font-mono text-xs whitespace-pre-wrap">${JSON.stringify(ev.args || {}, null, 2)}</pre>`}
+                ${isThought ? (ev.content || ev.data?.text || '') : `<pre class="font-mono text-xs whitespace-pre-wrap">${JSON.stringify(ev.args || {}, null, 2)}</pre>`}
             </div>
         `;
 

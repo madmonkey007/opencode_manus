@@ -264,7 +264,10 @@ class OpenCodeClient:
                             try: event = json.loads(data_str)
                             except: continue
                             payload = event.get("payload") or event
-                            if self._extract_session_id_from_payload(payload) != server_session_id: continue
+                            extracted_sid = self._extract_session_id_from_payload(payload)
+                            if extracted_sid != server_session_id:
+                                logger.debug(f"[BRIDGE] Filtered event type={payload.get('type')} extracted_sid={extracted_sid} expected={server_session_id}")
+                                continue
                             normalized = self._normalize_server_event(payload)
                             if not normalized: continue
                             
@@ -333,71 +336,109 @@ class OpenCodeClient:
                                 state["completed"] = True
                                 stop_event.set()
                             
+                            # ✅ 持久化 phases_init 事件
+                            if etype == "phases_init" and self.history_service:
+                                phases = props.get("phases") or payload.get("phases") or []
+                                if phases:
+                                    turn_index = state.get("turn_index", 0)
+                                    asyncio.create_task(
+                                        self.history_service.save_phases(session_id, phases, turn_index)
+                                    )
+
                             await self._broadcast_event(session_id, normalized)
                             state["events"] += 1
                         elif line.startswith("data:"): data_buf.append(line[5:].lstrip())
 
         # ✅ CRITICAL: Only use /event (the session-specific stream)
         # Using /global/event is redundant and often causes duplicates when sequential connection is used
+        logger.info(f"[BRIDGE] Starting event bridge for server_session={server_session_id}")
         for p in ["/event"]:
             if stop_event.is_set(): break
-            try: await _stream_events(f"{base_url}{p}")
-            except Exception as e: logger.warning(f"Bridge failed at {p}: {e}")
+            try:
+                await _stream_events(f"{base_url}{p}")
+            except Exception as e:
+                logger.warning(f"[BRIDGE] Bridge failed at {p}: {e}", exc_info=True)
 
     async def _execute_via_server_api(self, session_id, assistant_message_id, user_prompt, mode, model_id):
         base_url = self.server_api_base_url
         server_session_id = _SERVER_SESSION_ID_MAP.get(session_id)
         if not server_session_id:
             try:
-                # ✅ 修复：添加/opencode前缀，匹配后端路由
-                resp = await httpx.AsyncClient().post(f"{base_url}/opencode/session")
+                resp = await httpx.AsyncClient().post(f"{base_url}/session")
                 server_session_id = resp.json().get("id")
                 _SERVER_SESSION_ID_MAP[session_id] = server_session_id
             except Exception as e:
                 logger.error(f"Failed to create server session: {e}")
                 return False
-        
-        request_params = {"sessionID": server_session_id}
+
+        # Parse model from env
+        model_id = os.getenv("OPENCODE_MODEL_ID", os.getenv("OPENAI_MODEL", "new-api/glm-4.7"))
+        if "/" in model_id:
+            provider_id, model_name = model_id.split("/", 1)
+        else:
+            provider_id = os.getenv("OPENCODE_PROVIDER_ID", "openai")
+            model_name = model_id
+
         stop_event = asyncio.Event()
+        sse_state = {"events": 0, "completed": False, "saw_tool": False, "user_message_id": None, "user_prompt": user_prompt}
 
-        # ✅ 修复时序问题：先 POST message 拿到 user_message_id，再启动 bridge
-        # 这样 bridge 启动时 user_message_id 已知，不会漏过早到的 user part 事件
-        user_msg_id = None
+        # ✅ 关键修复：先启动 bridge 监听事件流，再用 prompt_async 发消息（立即返回 204）
+        # 原来的做法是先 POST /message（同步等待完整回复），再启动 bridge，
+        # 导致 bridge 启动时 AI 已经回复完毕，所有事件都错过了，只能靠 60s 超时后 polling。
+        bridge_task = asyncio.create_task(
+            self._bridge_global_events(base_url, {}, server_session_id, session_id, assistant_message_id, stop_event, sse_state)
+        )
+
+        # 给 bridge 一点时间建立 SSE 连接
+        await asyncio.sleep(0.3)
+
+        # 用 prompt_async 异步发消息（返回 204，不阻塞等待 AI 回复）
+        payload = {
+            "model": {"providerID": provider_id, "modelID": model_name},
+            "parts": [{"type": "text", "text": user_prompt}]
+        }
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
-                # Parse model_id from environment variable
-                model_id = os.getenv("OPENCODE_MODEL_ID", os.getenv("OPENAI_MODEL", "new-api/glm-4.7"))
-                if "/" in model_id:
-                    provider_id, model_name = model_id.split("/", 1)
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    f"{base_url}/session/{server_session_id}/prompt_async",
+                    json=payload
+                )
+                if resp.status_code == 204:
+                    logger.info(f"[EXEC] prompt_async sent for server_session={server_session_id}")
                 else:
-                    provider_id = os.getenv("OPENCODE_PROVIDER_ID", "openai")
-                    model_name = model_id
-
-                payload = {"model": {"providerID": provider_id, "modelID": model_name}, "parts": [{"type": "text", "text": user_prompt}]}
-                resp = await client.post(f"{base_url}/session/{server_session_id}/message", json=payload, params=request_params)
-                resp.raise_for_status()
-                try:
-                    user_msg_id = resp.json().get("id")
-                    if user_msg_id:
-                        logger.info(f"[EXEC] User message ID: {user_msg_id}")
-                except Exception:
-                    pass
+                    logger.warning(f"[EXEC] prompt_async returned {resp.status_code}, falling back to sync /message")
+                    # fallback：同步发消息（会阻塞直到 AI 回复完）
+                    resp2 = await client.post(
+                        f"{base_url}/session/{server_session_id}/message",
+                        json=payload
+                    )
+                    resp2.raise_for_status()
         except Exception as e:
-            logger.error(f"Post message failed: {e}")
+            logger.error(f"[EXEC] Failed to send message: {e}")
+            stop_event.set()
+            bridge_task.cancel()
             return False
 
-        # 启动 bridge，此时 user_message_id 已知
-        sse_state = {"events": 0, "completed": False, "saw_tool": False, "user_message_id": user_msg_id, "user_prompt": user_prompt}
-        bridge_task = asyncio.create_task(self._bridge_global_events(base_url, request_params, server_session_id, session_id, assistant_message_id, stop_event, sse_state))
+        try:
+            # 等待 bridge 收到 session.idle 信号，最多等 120s
+            await asyncio.wait_for(stop_event.wait(), timeout=120)
+        except asyncio.TimeoutError:
+            logger.warning(f"[EXEC] SSE stream for {session_id} timed out after 120s")
 
-        try: 
-            # Wait for SSE to finish or timeout
-            await asyncio.wait_for(stop_event.wait(), timeout=60)
-        except: 
-            logger.warning(f"SSE stream for {session_id} timed out or interrupted")
-            pass
-        
         stop_event.set()
+
+        # ✅ 确保 session 记录存在于数据库，供 get_messages 查询
+        if self.history_service:
+            try:
+                import sqlite3 as _sqlite3
+                with _sqlite3.connect(self.history_service.db_path) as _conn:
+                    _conn.execute(
+                        "INSERT OR IGNORE INTO sessions (id, prompt, status, created_at, updated_at) VALUES (?, ?, 'completed', ?, ?)",
+                        (session_id, sse_state.get("user_prompt", "")[:100], int(time.time()), int(time.time()))
+                    )
+                    _conn.commit()
+            except Exception as _e:
+                logger.debug(f"[EXEC] Session upsert skipped: {_e}")
         
         # ✅ Polling for final state - ensures everything is captured
         # We still use _SENT_TEXT_LENGTHS_GLOBAL here to ensure no duplication with SSE content
@@ -405,7 +446,7 @@ class OpenCodeClient:
             try:
                 # Limit 1 ensures we only get the latest message (assistant response)
                 async with httpx.AsyncClient() as client:
-                    r = await client.get(f"{base_url}/session/{server_session_id}/message", params={**request_params, "limit": 1})
+                    r = await client.get(f"{base_url}/session/{server_session_id}/message", params={"limit": 1})
                     if r.status_code == 200:
                         msgs = r.json()
                         for m in msgs:
@@ -483,7 +524,7 @@ class OpenCodeClient:
             # Wait for any in-flight preview tasks before signalling completion
             if self._active_preview_tasks:
                 await asyncio.gather(*self._active_preview_tasks, return_exceptions=True)
-            await self._broadcast_event(session_id, {"type": "message.updated", "properties": {"info": {"id": assistant_message_id, "time": {"completed": int(time.time())}}}})
+            await self._broadcast_event(session_id, {"type": "message.updated", "properties": {"info": {"id": assistant_message_id, "role": "assistant", "time": {"completed": int(time.time())}}}})
             return
         
         # Fallback to simple stub if server fails

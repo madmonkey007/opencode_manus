@@ -13,10 +13,15 @@ DEFAULT_PROJECT_ID = "proj_default"
 class HistoryService:
     def __init__(self, db_path: str = "history.db"):
         self.db_path = db_path
+        # 持久连接，避免每次请求都重新建连接
+        self._conn: Optional[sqlite3.Connection] = None
         self._init_db()
 
-    def _get_connection(self):
-        return sqlite3.connect(self.db_path)
+    def _get_connection(self) -> sqlite3.Connection:
+        if self._conn is None:
+            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._conn.row_factory = sqlite3.Row
+        return self._conn
 
     def _init_db(self):
         with self._get_connection() as conn:
@@ -69,6 +74,7 @@ class HistoryService:
             """)
 
             # ✅ v=38修复：消息表（解决工具调用Part数据丢失问题）
+            # 注意：不使用外键约束，避免与 main.py sessions 表 schema 冲突
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     message_id TEXT PRIMARY KEY,
@@ -76,20 +82,19 @@ class HistoryService:
                     role TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     completed_at TIMESTAMP,
-                    metadata_json TEXT,
-                    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                    metadata_json TEXT
                 )
             """)
 
             # ✅ v=38修复：消息部分表（工具调用、文本等）
+            # 注意：不使用外键约束，避免与 messages 表外键冲突
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS message_parts (
                     part_id TEXT PRIMARY KEY,
                     message_id TEXT NOT NULL,
                     part_type TEXT NOT NULL,
                     content_json TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (message_id) REFERENCES messages(message_id) ON DELETE CASCADE
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
@@ -98,6 +103,22 @@ class HistoryService:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_parts_message ON message_parts(message_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_parts_type ON message_parts(part_type)")
+
+            # ✅ phase 持久化表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS session_phases (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    phase_id TEXT NOT NULL,
+                    title TEXT,
+                    status TEXT,
+                    number INTEGER,
+                    turn_index INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(session_id, phase_id)
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_phases_session ON session_phases(session_id)")
 
             # 添加缺失的列（如果表已存在）
             try:
@@ -269,7 +290,7 @@ class HistoryService:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT message_id, session_id, role, created_at, completed_at
+                    SELECT message_id, session_id, role, created_at
                     FROM messages
                     WHERE session_id = ?
                     ORDER BY created_at ASC
@@ -277,13 +298,12 @@ class HistoryService:
 
                 messages = []
                 for row in cursor.fetchall():
-                    message_id, sess_id, role, created_at, completed_at = row
+                    message_id, sess_id, role, created_at = row
                     messages.append({
                         "id": message_id,
                         "session_id": sess_id,
                         "role": role,
                         "created_at": created_at,
-                        "completed_at": completed_at
                     })
 
                 logger.debug(f"Retrieved {len(messages)} messages for session: {session_id}")
@@ -343,6 +363,51 @@ class HistoryService:
             logger.error(f"Error saving part: {e}")
             return False
 
+    async def save_phases(self, session_id: str, phases: list, turn_index: int = 0) -> bool:
+        """持久化 phase 列表（UPSERT，幂等）"""
+        if not phases:
+            return True
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                for p in phases:
+                    phase_id = p.get("id") or p.get("phase_id")
+                    if not phase_id:
+                        continue
+                    cursor.execute("""
+                        INSERT INTO session_phases (session_id, phase_id, title, status, number, turn_index)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(session_id, phase_id) DO UPDATE SET
+                            title = excluded.title,
+                            status = excluded.status,
+                            number = excluded.number,
+                            turn_index = excluded.turn_index
+                    """, (session_id, phase_id, p.get("title"), p.get("status"), p.get("number"), turn_index))
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error saving phases for {session_id}: {e}")
+            return False
+
+    async def get_session_phases(self, session_id: str) -> list:
+        """获取会话的 phase 列表"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT phase_id, title, status, number, turn_index
+                    FROM session_phases
+                    WHERE session_id = ?
+                    ORDER BY number ASC, id ASC
+                """, (session_id,))
+                return [
+                    {"id": r[0], "title": r[1], "status": r[2], "number": r[3], "turn_index": r[4], "events": []}
+                    for r in cursor.fetchall()
+                ]
+        except Exception as e:
+            logger.error(f"Error getting phases for {session_id}: {e}")
+            return []
+
     async def get_all_parts_for_session(self, session_id: str) -> Dict[str, List[dict]]:
         """
         ✅ P1-1优化：批量获取会话的所有parts（解决N+1查询问题）
@@ -364,12 +429,11 @@ class HistoryService:
                 cursor = conn.cursor()
                 # 一次性查询session的所有parts
                 cursor.execute("""
-                    SELECT part_id, message_id, part_type, content_json
-                    FROM message_parts
-                    WHERE message_id IN (
-                        SELECT message_id FROM messages WHERE session_id = ?
-                    )
-                    ORDER BY created_at ASC
+                    SELECT mp.part_id, mp.message_id, mp.part_type, mp.content_json
+                    FROM message_parts mp
+                    JOIN messages m ON mp.message_id = m.message_id
+                    WHERE m.session_id = ?
+                    ORDER BY mp.created_at ASC
                 """, (session_id,))
 
                 # 按message_id分组
@@ -515,5 +579,9 @@ _instance = None
 def get_history_service():
     global _instance
     if _instance is None:
-        _instance = HistoryService()
+        # 使用绝对路径，确保无论从哪个目录启动都写同一个 DB
+        db_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "../workspace/history.db")
+        )
+        _instance = HistoryService(db_path=db_path)
     return _instance

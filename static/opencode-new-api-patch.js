@@ -2377,13 +2377,8 @@ window.Logger = {
                             window.addSystemMessage(`✅ 任务完成 - 完成${completedPhases}个阶段，执行${totalActions}次工具调用`, 'success');
                         }
 
-                        // Fallback: only if no answer chunks, use last thought at completion
-                        if (!s._hasAnswerChunk && s._lastThoughtContent) {
-                            console.warn('[NewAPI] Fallback: using last thought as answer on completion');
-                            if (appendAnswerChunk(s, s._lastThoughtContent)) {
-                                s._hasAnswerChunk = true;
-                            }
-                        }
+                        // Fallback disabled: text parts are always present, thought should never be used as answer
+                        // if (!s._hasAnswerChunk && s._lastThoughtContent) { ... }
 
                         // ✅ v=33: 强制刷新UI，绕过节流确保总结立即显示
                         try {

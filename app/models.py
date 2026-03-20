@@ -42,6 +42,7 @@ class PartType(str, Enum):
     """消息部分类型"""
     TEXT = "text"
     TOOL = "tool"
+    THOUGHT = "thought"
     FILE = "file"
     STEP_START = "step-start"
     STEP_FINISH = "step-finish"

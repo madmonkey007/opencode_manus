@@ -76,10 +76,10 @@ def init_database():
                 )
             """)
 
-            # 创建messages表
+            # 创建messages表（与 history_service.py 保持一致，使用 message_id 列名）
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
-                    id TEXT PRIMARY KEY,
+                    message_id TEXT PRIMARY KEY,
                     session_id TEXT,
                     role TEXT,
                     content TEXT,
@@ -519,6 +519,8 @@ async def run_agent(prompt: str, sid: str, mode: str = "auto"):
                                 yield format_sse({"type": "phase_update", "phase_id": f"phase_{idx}", "status": "completed"})
                             yield format_sse({"type": "phase_update", "phase_id": "phase_summary", "status": "completed"})
                             yield format_sse({"type": "file_update", "sid": sid})
+                            # ✅ 发送 session.idle 信号，让前端 patch.js 知道任务完成
+                            yield format_sse({"type": "session.idle", "properties": {"sessionID": sid}})
                         break
 
                     if asyncio.get_running_loop().time() - last_activity > 15:

@@ -358,12 +358,14 @@ async def get_messages(session_id: str):
     # 尝试从内存/数据库获取
     messages = await session_manager.get_messages(session_id)
 
+    # 获取 history_svc 单例（后续复用，避免重复调用）
+    from .history_service import get_history_service
+    history_svc = get_history_service()
+
     # 如果内存中没有，尝试从数据库加载
     if not messages:
         # ✅ v=38.2增强：从数据库加载消息
         try:
-            from .history_service import get_history_service
-            history_svc = get_history_service()
             db_messages = await history_svc.get_session_messages(session_id)
 
             if db_messages:
@@ -372,7 +374,6 @@ async def get_messages(session_id: str):
 
                 # 从数据库恢复消息到内存
                 from .models import Message, MessageTime, MessageRole
-                import time
 
                 for msg_data in db_messages:
                     # ✅ P0-1修复：正确解析SQLite时间戳格式
@@ -435,12 +436,7 @@ async def get_messages(session_id: str):
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
 
     # ✅ v=38.2增强：从数据库加载tool parts（补充内存中可能缺失的parts）
-    # ✅ P0-2修复：创建新对象而不是就地修改
-    # ✅ P1-1优化：批量查询解决N+1问题
     try:
-        from .history_service import get_history_service
-        history_svc = get_history_service()
-
         # ✅ P1-1优化：一次性获取session的所有parts（1次查询代替N次）
         all_parts_by_message = await history_svc.get_all_parts_for_session(session_id)
 
@@ -469,11 +465,18 @@ async def get_messages(session_id: str):
                             from .models import Part, PartTime, PartType, PartContent
 
                             # 创建Part对象
+                            _ptype_str = part_data.get('type', 'text')
+                            if _ptype_str == 'tool':
+                                _ptype = PartType.TOOL
+                            elif _ptype_str == 'thought':
+                                _ptype = PartType.THOUGHT
+                            else:
+                                _ptype = PartType.TEXT
                             part = Part(
                                 id=part_id,
                                 session_id=session_id,
                                 message_id=message_id,
-                                type=PartType.TOOL if part_data.get('type') == 'tool' else PartType.TEXT,
+                                type=_ptype,
                                 content=PartContent(
                                     tool=part_data.get('content', {}).get('tool'),
                                     call_id=part_data.get('content', {}).get('call_id'),
@@ -499,10 +502,18 @@ async def get_messages(session_id: str):
     except Exception as db_err:
         logger.error(f"[v38.2] Failed to load parts from database for {session_id}: {db_err}", exc_info=True)
 
+    # 同时加载 phases
+    phases = []
+    try:
+        phases = await history_svc.get_session_phases(session_id)
+    except Exception as e:
+        logger.warning(f"Failed to load phases for {session_id}: {e}")
+
     return {
         "session_id": session_id,
         "messages": [msg.dict() for msg in messages],
         "count": len(messages),
+        "phases": phases,
     }
 
 
