@@ -20,8 +20,9 @@ RUN curl -fsSL https://bun.sh/install | bash \
     && ln -s /root/.bun/bin/bun /usr/local/bin/bun \
     && ln -s /root/.bun/bin/bunx /usr/local/bin/bunx
 
-# 4. 全局安装 OpenCode-AI 官方内核
-RUN npm install -g opencode-ai
+# 4. 全局安装 OpenCode-AI 官方内核及平台二进制包
+RUN npm install -g opencode-ai opencode-linux-x64 && \
+    cd /usr/lib/node_modules/opencode-ai && node postinstall.mjs
 
 # 5. 配置 noVNC 环境 (确保 vnc.html 存在，兼容不同发行版的 noVNC)
 RUN if [ ! -f /usr/share/novnc/vnc.html ] && [ -f /usr/share/novnc/vnc_lite.html ]; then \

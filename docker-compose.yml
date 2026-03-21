@@ -19,6 +19,7 @@ services:
       - ./config:/app/opencode/config
       - ./logs:/app/opencode/logs
       - .env:/app/opencode/.env
+      - ./supervisord.conf:/app/opencode/supervisord.conf
       # Removed :ro to allow plugins to initialize and write configs
       - C:/Users/EDY/.config/opencode/skills:/app/opencode/config_host/skills
       - C:/Users/EDY/.config/opencode/plugin:/app/opencode/config_host/plugin
