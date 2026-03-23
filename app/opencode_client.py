@@ -400,6 +400,34 @@ class OpenCodeClient:
 
                             if etype == "session.idle" or (etype == "message.updated" and (props.get("info") or {}).get("time", {}).get("completed")):
                                 state["completed"] = True
+
+                                # ✅ 修复：等待所有preview任务完成后再设置stop_event
+                                # 防止preview事件发送时SSE连接已经断开
+                                if self._active_preview_tasks:
+                                    logger.info(
+                                        f"[BRIDGE] Session idle detected, waiting for {len(self._active_preview_tasks)} preview task(s) to complete..."
+                                    )
+                                    try:
+                                        # 添加30秒超时保护，防止任务卡住
+                                        await asyncio.wait_for(
+                                            asyncio.gather(*self._active_preview_tasks, return_exceptions=True),
+                                            timeout=30.0
+                                        )
+                                        logger.info(f"[BRIDGE] All preview tasks completed for session {session_id}")
+                                    except asyncio.TimeoutError:
+                                        logger.warning(
+                                            f"[BRIDGE] ⚠️ Preview tasks timed out after 30s for session {session_id}. "
+                                            f"Continuing with {len(self._active_preview_tasks)} pending task(s)."
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"[BRIDGE] Error waiting for preview tasks: {e}")
+                                    finally:
+                                        # 取消未完成的任务并清理
+                                        for task in list(self._active_preview_tasks):
+                                            if not task.done():
+                                                task.cancel()
+                                        self._active_preview_tasks.clear()
+
                                 stop_event.set()
                             
                             # ✅ 持久化 phases_init 事件
