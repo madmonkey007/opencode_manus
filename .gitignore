@@ -1,38 +1,33 @@
-# Dependencies
-node_modules/
-.bun/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Environment
-.env
-.venv
-env/
-venv/
-ENV/
-
-# Logs
-logs/
-*.log
-nohup.out
-
 # Config (runtime generated)
-config/opencode.json
-
-# Project Specific
-workspace/
-backups/
-kernel/
-screenshots/
-.serena/
-nul
-
+# Dependencies
+# Environment
+# Logs
 # OS/Editor
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-*.swp
+# Project Specific
+*.log
+*.pyc
+*.pyd
+*.pyo
 *.swo
+*.swp
+.bun/
+.DS_Store
+.env
+.idea/
+.serena/
+.venv
+.vscode/
+__pycache__/
+backups/
+config/opencode.json
+env/
+ENV/
+kernel/
+logs/
+node_modules/
+nohup.out
+nul
+screenshots/
+Thumbs.db
+venv/
+workspace/

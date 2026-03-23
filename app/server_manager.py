@@ -120,8 +120,25 @@ class OpenCodeServerManager:
                 "--log-level", "INFO",
             ]
 
+            # ✅ 降级逻辑：检查 opencode 是否可用
+            import shutil
+            if not shutil.which("opencode"):
+                logger.warning("opencode command not found, using mock_kernel fallback")
+                # 使用当前 Python 解释器运行 mock_kernel
+                import sys
+                cmd = [
+                    sys.executable,
+                    "-m", "app.mock_kernel"
+                ]
+                # mock_kernel 默认监听 4096，固不需要额外参数，或者可以根据需要添加
+            
             # 设置环境变量
             env = os.environ.copy()
+            # 确保 PYTHONPATH 包含当前目录
+            original_pythonpath = env.get("PYTHONPATH", "")
+            current_dir = os.getcwd()
+            if current_dir not in original_pythonpath:
+                env["PYTHONPATH"] = f"{current_dir}{os.pathsep}{original_pythonpath}" if original_pythonpath else current_dir
 
             # 查找并使用配置文件
             config_file = self._find_config_file()
@@ -215,15 +232,21 @@ class OpenCodeServerManager:
         if not self.base_url or not self.base_url.startswith(('http://', 'https://')):
             logger.error(f"Invalid base_url format: {self.base_url}")
             return False
-            
+
         try:
             timeout = httpx.Timeout(5.0, connect=3.0)
-            
+
             async with httpx.AsyncClient(timeout=timeout) as client:
                 # opencode serve 的 /session 端点返回 200 表示服务器就绪
+                # 注意：如果启用了认证插件（如 opencode-antigravity-auth），会返回 401
+                # 这种情况下，401 也表示服务器正常运行，只是需要认证
                 response = await client.get(f"{self.base_url}/session")
                 if response.status_code == 200:
                     logger.debug(f"Health check successful: {self.base_url}")
+                    return True
+                elif response.status_code == 401:
+                    # 401 表示服务器运行中但需要认证（antigravity-auth 插件）
+                    logger.info(f"Server running with authentication enabled: {self.base_url}")
                     return True
                 else:
                     logger.warning(f"Health check failed with status {response.status_code}")
