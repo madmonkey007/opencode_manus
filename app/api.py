@@ -734,6 +734,12 @@ class EventStreamManager:
     async def broadcast(self, session_id: str, event: dict):
         """向会话的所有监听者广播事件"""
         if session_id not in self.listeners:
+            # ✅ 改进：记录警告而不是静默失败
+            logger.warning(
+                f"[EventStreamManager] ⚠️ Session {session_id} not in listeners. "
+                f"Event '{event.get('type')}' will be discarded. "
+                f"Current sessions: {list(self.listeners.keys())}"
+            )
             return
 
         # 使用 jsonable_encoder 处理 Enum 和 Pydantic 模型
@@ -741,8 +747,8 @@ class EventStreamManager:
         event_json = json.dumps(encoded_event, ensure_ascii=False)
         sse_data = f"data: {event_json}\n\n"
 
-        logger.debug(
-            f"Broadcasting to {len(self.listeners[session_id])} listeners: {event.get('type')}"
+        logger.info(
+            f"[EventStreamManager] Broadcasting '{event.get('type')}' to {len(self.listeners[session_id])} listeners for session {session_id}"
         )
 
         for queue in list(self.listeners[session_id]):

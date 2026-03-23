@@ -250,6 +250,22 @@ class OpenCodeClient:
             _SENT_PREVIEW_STEPS.add(preview_key)
 
             logger.info(f"[PREVIEW] Generating preview for {tool_name}: {file_path} ({len(file_content)} chars)")
+            logger.info(f"[PREVIEW] Session ID: {session_id}, Step ID: {step_id}")
+
+            # ✅ 检查session是否在event_stream_manager.listeners中
+            from .api import event_stream_manager
+            listener_count = event_stream_manager.get_listener_count(session_id)
+            logger.info(f"[PREVIEW] Current listener count for session {session_id}: {listener_count}")
+
+            if listener_count == 0:
+                logger.error(
+                    f"[PREVIEW] ⚠️ No listeners for session {session_id}! "
+                    f"Preview events will be lost. "
+                    f"SSE connection may have been closed or session ID mismatch."
+                )
+                # 仍然尝试发送，但会失败（为了调试）
+            else:
+                logger.info(f"[PREVIEW] Broadcasting to {listener_count} listener(s)")
 
             await event_stream_manager.broadcast(session_id, {
                 "type": "preview_start",
@@ -257,6 +273,7 @@ class OpenCodeClient:
                 "file_path": file_path,
                 "action": action_type,
             })
+            logger.info(f"[PREVIEW] Sent preview_start event")
 
             if file_content:
                 # ✅ 平衡方案：既保证打字机效果，又不会太慢
@@ -264,8 +281,14 @@ class OpenCodeClient:
                 # 对于5000字符文件：约5秒完成（100块 × 50ms = 5秒）
                 chunk_size = 50  # 平衡：每个块50字符
                 TYPEWRITER_DELAY_MS = 0.05  # 50ms延迟，既有效果又不会太慢
+                total_chunks = (len(file_content) + chunk_size - 1) // chunk_size
+                logger.info(f"[PREVIEW] Starting typewriter effect: {total_chunks} chunks, {len(file_content)} chars")
+
                 for i in range(0, len(file_content), chunk_size):
                     chunk = file_content[i:i + chunk_size]
+                    chunk_num = i // chunk_size + 1
+                    logger.debug(f"[PREVIEW] Sending chunk {chunk_num}/{total_chunks}: {len(chunk)} chars")
+
                     await event_stream_manager.broadcast(session_id, {
                         "type": "preview_delta",
                         "step_id": step_id,
@@ -273,11 +296,14 @@ class OpenCodeClient:
                     })
                     await asyncio.sleep(TYPEWRITER_DELAY_MS)
 
+                logger.info(f"[PREVIEW] Completed typewriter effect: {total_chunks} chunks sent")
+
             await event_stream_manager.broadcast(session_id, {
                 "type": "preview_end",
                 "step_id": step_id,
                 "file_path": file_path,
             })
+            logger.info(f"[PREVIEW] Sent preview_end event")
 
         except Exception as e:
             logger.error(f"[PREVIEW] Failed to broadcast preview for session {session_id}: {e}")
