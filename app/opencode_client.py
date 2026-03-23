@@ -96,6 +96,36 @@ class OpenCodeClient:
         os.makedirs(workspace_base, exist_ok=True)
         self.server_api_base_url = os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
 
+        # ✅ 安全改进：从环境变量读取认证凭证，不使用默认密码
+        # 生产环境必须设置环境变量
+        self.server_username = os.getenv("OPENCODE_SERVER_USERNAME")
+        self.server_password = os.getenv("OPENCODE_SERVER_PASSWORD")
+
+        # ✅ 安全检查：确保凭证已配置
+        if not self.server_username or not self.server_password:
+            # 检查是否为生产环境
+            is_production = os.getenv("ENVIRONMENT", "development").lower() in ("production", "prod")
+
+            if is_production:
+                # 生产环境强制设置环境变量，不提供默认值
+                raise ValueError(
+                    "SECURITY: OPENCODE_SERVER_USERNAME and OPENCODE_SERVER_PASSWORD "
+                    "must be set in production environment. "
+                    "Current environment: production"
+                )
+            else:
+                # 开发环境使用默认凭证并记录警告
+                logger.warning(
+                    "Server credentials not configured. "
+                    "Set OPENCODE_SERVER_USERNAME and OPENCODE_SERVER_PASSWORD environment variables. "
+                    "Using default credentials for development only."
+                )
+                self.server_username = self.server_username or "opencode"
+                self.server_password = self.server_password or "opencode-dev-2026"
+
+        logger.debug(f"OpenCodeClient configured with server: {self.server_api_base_url}")
+        logger.debug(f"Basic auth configured for user: {self.server_username}")
+
         # 初始化history_service（使用正确的数据库路径）
         history_db_path = os.path.join(workspace_base, 'history.db')
         try:
@@ -229,7 +259,11 @@ class OpenCodeClient:
             })
 
             if file_content:
-                chunk_size = 100
+                # ✅ 平衡方案：既保证打字机效果，又不会太慢
+                # 对于1000字符文件：约1秒完成（20块 × 50ms = 1秒）
+                # 对于5000字符文件：约5秒完成（100块 × 50ms = 5秒）
+                chunk_size = 50  # 平衡：每个块50字符
+                TYPEWRITER_DELAY_MS = 0.05  # 50ms延迟，既有效果又不会太慢
                 for i in range(0, len(file_content), chunk_size):
                     chunk = file_content[i:i + chunk_size]
                     await event_stream_manager.broadcast(session_id, {
@@ -237,7 +271,7 @@ class OpenCodeClient:
                         "step_id": step_id,
                         "delta": {"type": "insert", "position": i, "content": chunk},
                     })
-                    await asyncio.sleep(0.03)
+                    await asyncio.sleep(TYPEWRITER_DELAY_MS)
 
             await event_stream_manager.broadcast(session_id, {
                 "type": "preview_end",
@@ -250,8 +284,14 @@ class OpenCodeClient:
 
     async def _bridge_global_events(self, base_url, request_params, server_session_id, session_id, assistant_message_id, stop_event, state):
         async def _stream_events(url):
+            # ✅ 添加Basic认证
             async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream("GET", url, params=request_params) as resp:
+                async with client.stream(
+                    "GET",
+                    url,
+                    params=request_params,
+                    auth=(self.server_username, self.server_password)
+                ) as resp:
                     resp.raise_for_status()
                     data_buf = []
                     async for line in resp.aiter_lines():
@@ -374,9 +414,26 @@ class OpenCodeClient:
         server_session_id = _SERVER_SESSION_ID_MAP.get(session_id)
         if not server_session_id:
             try:
-                resp = await httpx.AsyncClient().post(f"{base_url}/session")
+                # ✅ 添加Basic认证
+                resp = await httpx.AsyncClient().post(
+                    f"{base_url}/session",
+                    auth=(self.server_username, self.server_password)
+                )
+                resp.raise_for_status()
                 server_session_id = resp.json().get("id")
                 _SERVER_SESSION_ID_MAP[session_id] = server_session_id
+                logger.info(f"Created server session: {server_session_id}")
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 401:
+                    logger.error("Authentication failed: invalid username or password. Check OPENCODE_SERVER_USERNAME and OPENCODE_SERVER_PASSWORD")
+                elif e.response.status_code == 403:
+                    logger.error("Access forbidden: check server permissions")
+                else:
+                    logger.error(f"HTTP error {e.response.status_code}: {e}")
+                return False
+            except httpx.RequestError as e:
+                logger.error(f"Connection failed: is the server running at {base_url}? {e}")
+                return False
             except Exception as e:
                 logger.error(f"Failed to create server session: {e}")
                 return False
@@ -408,10 +465,13 @@ class OpenCodeClient:
             "parts": [{"type": "text", "text": user_prompt}]
         }
         try:
+            # ✅ 添加Basic认证
+            auth_tuple = (self.server_username, self.server_password)
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.post(
                     f"{base_url}/session/{server_session_id}/prompt_async",
-                    json=payload
+                    json=payload,
+                    auth=auth_tuple
                 )
                 if resp.status_code == 204:
                     logger.info(f"[EXEC] prompt_async sent for server_session={server_session_id}")
@@ -420,7 +480,8 @@ class OpenCodeClient:
                     # fallback：同步发消息（会阻塞直到 AI 回复完）
                     resp2 = await client.post(
                         f"{base_url}/session/{server_session_id}/message",
-                        json=payload
+                        json=payload,
+                        auth=auth_tuple
                     )
                     resp2.raise_for_status()
         except Exception as e:
@@ -455,14 +516,19 @@ class OpenCodeClient:
         async def _poll_parts():
             try:
                 # Limit 1 ensures we only get the latest message (assistant response)
+                # ✅ 添加Basic认证
                 async with httpx.AsyncClient() as client:
-                    r = await client.get(f"{base_url}/session/{server_session_id}/message", params={"limit": 1})
+                    r = await client.get(
+                        f"{base_url}/session/{server_session_id}/message",
+                        params={"limit": 1},
+                        auth=(self.server_username, self.server_password)
+                    )
                     if r.status_code == 200:
                         msgs = r.json()
                         for m in msgs:
                             if (m.get("info") or {}).get("role") == "assistant":
                                 return m.get("parts") or []
-            except Exception as e: 
+            except Exception as e:
                 logger.error(f"Failed to poll final parts: {e}")
             return []
 

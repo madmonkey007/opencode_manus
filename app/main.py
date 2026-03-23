@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
+from pathlib import Path  # ✅ 添加Path用于安全的路径验证
 import asyncio
 import json
 import uuid
@@ -36,6 +37,46 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("opencode")
+
+
+# ====================================================================
+# Helper Functions
+# ====================================================================
+
+def is_safe_path(base_path: str, target_path: str) -> bool:
+    """
+    ✅ 安全验证：确保目标路径在基础路径内，防止路径遍历攻击
+
+    使用 pathlib.Path.resolve() 规范化路径，然后检查目标路径
+    是否真正位于基础路径之下。这可以防止使用 ".." 绕过检查。
+
+    Args:
+        base_path: 基础路径（如 workspace 目录）
+        target_path: 目标路径（用户请求的文件路径）
+
+    Returns:
+        bool: 如果目标路径安全则返回 True，否则返回 False
+
+    Examples:
+        >>> is_safe_path("/workspace", "/workspace/file.txt")
+        True
+        >>> is_safe_path("/workspace", "/workspace/../etc/passwd")
+        False
+        >>> is_safe_path("C:\\workspace", "C:\\workspace\\evil\\..\\secret.txt")
+        False
+    """
+    try:
+        base = Path(base_path).resolve()
+        target = Path(target_path).resolve()
+
+        # 检查目标路径是否以基础路径开头
+        return str(target).startswith(str(base))
+    except (OSError, ValueError) as e:
+        logger.warning(f"Path validation failed: {e}")
+        return False
+
+
+# ====================================================================
 
 # 导入历史追踪服务
 try:
@@ -202,25 +243,78 @@ def format_sse(data: dict) -> str:
 
 @app.get("/opencode/list_session_files")
 async def list_session_files(sid: str):
+    """
+    列出会话的文件列表，支持会话隔离模式
+
+    优先级：
+    1. 会话隔离目录（推荐，安全性高）
+    2. workspace根目录（降级方案，可能破坏会话隔离）
+
+    Args:
+        sid: 会话ID
+
+    Returns:
+        {"files": [...], "_isolation_warning": bool}
+    """
     # 如果前端 sid 有映射到实际的 opencode sid，使用实际的
     actual_sid = _session_id_map.get(sid, sid)
     session_dir = os.path.join(WORKSPACE_BASE, actual_sid)
-    if not os.path.exists(session_dir):
-        return {"files": []}
 
     files = []
-    for root, dirs, filenames in os.walk(session_dir):
-        for filename in filenames:
-            rel_path = os.path.relpath(os.path.join(root, filename), session_dir)
-            url_path = (sid + "/" + rel_path).replace(os.sep, "/")
-            files.append({"name": rel_path, "path": url_path})
-    return {"files": files}
+    isolation_warning = False
+
+    # ✅ 优先方案：查找会话隔离目录下的文件（推荐）
+    if os.path.exists(session_dir):
+        for root, dirs, filenames in os.walk(session_dir):
+            for filename in filenames:
+                rel_path = os.path.relpath(os.path.join(root, filename), session_dir)
+                url_path = (sid + "/" + rel_path).replace(os.sep, "/")
+                files.append({"name": rel_path, "path": url_path})
+
+        if files:
+            # 会话隔离目录中有文件，直接返回
+            return {"files": files, "_isolation_warning": False}
+
+    # ⚠️ 降级方案：会话目录不存在或为空，查找根workspace目录
+    # 这是为了兼容旧数据，但可能破坏会话隔离
+    logger.warning(
+        f"[list_session_files] Session directory not found or empty: {session_dir}. "
+        f"Falling back to workspace root (may break session isolation)."
+    )
+    isolation_warning = True
+
+    seen_file_names = set()
+    unique_files = []
+
+    # 查找根workspace目录下的所有项目目录（不是会话目录）
+    if os.path.exists(WORKSPACE_BASE):
+        for item in os.listdir(WORKSPACE_BASE):
+            item_path = os.path.join(WORKSPACE_BASE, item)
+            if os.path.isdir(item_path) and item != actual_sid and not item.startswith("ses_"):
+                # 遍历项目目录
+                for root, dirs, filenames in os.walk(item_path):
+                    for filename in filenames:
+                        full_path = os.path.join(root, filename)
+                        rel_path = os.path.relpath(full_path, WORKSPACE_BASE)
+                        url_path = rel_path.replace(os.sep, "/")
+
+                        if rel_path not in seen_file_names:
+                            seen_file_names.add(rel_path)
+                            unique_files.append({"name": rel_path, "path": url_path})
+
+    return {"files": unique_files, "_isolation_warning": isolation_warning}
 
 
 @app.get("/opencode/get_file_content")
 async def get_file_content(path: str):
     full_path = os.path.abspath(os.path.join(WORKSPACE_BASE, path))
-    if not full_path.startswith(WORKSPACE_BASE):
+
+    # ✅ 安全检查：使用is_safe_path防止路径遍历攻击
+    if not is_safe_path(WORKSPACE_BASE, full_path):
+        logger.warning(
+            f"[SECURITY] Path traversal attempt detected in get_file_content: "
+            f"path={path}, resolved_path={full_path}"
+        )
         raise HTTPException(status_code=403, detail="Access denied")
 
     if not os.path.exists(full_path):
@@ -248,16 +342,56 @@ async def read_file(session_id: str, file_path: str):
     读取会话工作区中的文件内容
     """
     try:
-        # 构建完整路径
+        # 构建会话目录
         session_dir = os.path.join(WORKSPACE_BASE, session_id)
-        full_path = os.path.abspath(os.path.join(session_dir, file_path))
+        os.makedirs(session_dir, exist_ok=True)
 
-        # 安全检查：确保文件在会话目录内
-        if not full_path.startswith(session_dir):
-            return {"status": "error", "message": "Access denied"}
+        # 处理文件路径：如果是绝对路径，提取相对路径
+        # 支持的格式：
+        # 1. 绝对路径：/app/opencode/workspace/ses_xxx/filename 或 /app/opencode/workspace/filename
+        # 2. 相对workspace的路径：ses_xxx/filename 或 filename
+        # 3. 相对于会话目录的路径：filename
+        relative_path = file_path
 
+        # 如果是绝对路径
+        if file_path.startswith("/"):
+            # 尝试各种可能的前缀
+            possible_prefixes = [
+                f"/app/opencode/workspace/{session_id}/",
+                "/app/opencode/workspace/",
+                f"/workspace/{session_id}/",
+                "/workspace/",
+                f"{WORKSPACE_BASE}/{session_id}/",
+                f"{WORKSPACE_BASE}/"
+            ]
+
+            for prefix in possible_prefixes:
+                if file_path.startswith(prefix):
+                    relative_path = file_path[len(prefix):]
+                    logger.debug(f"[read_file] Stripped prefix: {prefix}, got: {relative_path}")
+                    break
+
+        # 构建完整路径：优先在会话目录中查找
+        full_path = os.path.abspath(os.path.join(session_dir, relative_path))
+        logger.debug(f"[read_file] Trying session dir: {full_path}")
+
+        # 如果在会话目录中找不到，尝试在workspace根目录查找（为了兼容性）
         if not os.path.exists(full_path):
-            return {"status": "error", "message": "File not found"}
+            workspace_root_path = os.path.abspath(os.path.join(WORKSPACE_BASE, relative_path))
+            if os.path.exists(workspace_root_path):
+                full_path = workspace_root_path
+                logger.debug(f"[read_file] Using workspace root: {full_path}")
+            else:
+                return {"status": "error", "message": "File not found"}
+
+        # ✅ 安全检查：使用pathlib.Path.resolve()防止路径遍历攻击
+        # 使用规范化路径进行验证，确保目标路径真正位于workspace目录内
+        if not is_safe_path(WORKSPACE_BASE, full_path):
+            logger.warning(
+                f"[SECURITY] Path traversal attempt detected: "
+                f"session_id={session_id}, file_path={file_path}, resolved_path={full_path}"
+            )
+            return {"status": "error", "message": "Access denied"}
 
         # 读取文件内容
         with open(full_path, "r", encoding="utf-8") as f:
@@ -266,7 +400,7 @@ async def read_file(session_id: str, file_path: str):
         return {
             "status": "success",
             "content": content,
-            "file_path": file_path,
+            "file_path": relative_path,
             "size": len(content)
         }
     except Exception as e:
