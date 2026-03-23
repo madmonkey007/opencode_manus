@@ -67,15 +67,62 @@
 
 ## 优先级
 
-| 优先级 | 问题 | 影响 | 修复难度 |
-|--------|------|------|----------|
-| P0 | Preview事件丢失 | 高 | 中 |
-| P1 | 文件路径不匹配 | 高 | 低 |
-| P2 | 前端文件查找 | 中 | 已修复 |
+| 优先级 | 问题 | 影响 | 修复难度 | 状态 |
+|--------|------|------|----------|------|
+| P0 | Preview事件丢失 | 高 | 中 | ✅ 已修复 |
+| P1 | 文件路径不匹配 | 高 | 低 | ⚠️ 待修复 |
+| P2 | 前端文件查找 | 中 | 低 | ✅ 已修复 |
+
+## 修复记录
+
+### ✅ P0: Preview事件丢失问题（已修复）
+
+**修复日期**: 2026-03-24
+
+**修复方案**: 在`app/opencode_client.py`的`_bridge_global_events`方法中：
+1. 在`session.idle`事件处理时，等待所有active preview任务完成
+2. 添加30秒超时保护，防止任务卡住
+3. 在finally块中取消未完成的任务并清理
+
+**核心代码**:
+```python
+if self._active_preview_tasks:
+    logger.info(f"Session idle detected, waiting for {len(self._active_preview_tasks)} preview task(s)...")
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(*self._active_preview_tasks, return_exceptions=True),
+            timeout=30.0
+        )
+        logger.info(f"All preview tasks completed for session {session_id}")
+    except asyncio.TimeoutError:
+        logger.warning(f"Preview tasks timed out after 30s")
+    finally:
+        for task in list(self._active_preview_tasks):
+            if not task.done():
+                task.cancel()
+        self._active_preview_tasks.clear()
+stop_event.set()
+```
+
+**Commit**: `4c0872b` - fix(opencode_client): 修复preview事件在session idle时丢失问题
+
+**代码审查结果**:
+- ✅ 修复策略正确
+- ✅ 添加超时保护
+- ✅ 添加任务取消机制
+- ✅ 错误处理完整
+
+### ⚠️ P1: 文件路径不匹配问题（待修复）
+
+**现象**: 文件生成在`/workspace/alarm-clock/index.html`而不是`/workspace/ses_dee5bb5d/alarm-clock/index.html`
+
+**影响**: 前端无法在正确的session目录下找到文件
+
+**待修复**: 需要确保文件写入时使用session隔离路径
 
 ## 下一步
 
 1. ✅ 已添加调试日志
-2. 🔧 需要修复文件路径映射
-3. 🔧 需要改进preview事件发送时机
+2. ✅ 已改进preview事件发送时机（P0修复）
+3. 🔧 需要修复文件路径映射（P1待修复）
 4. 🧪 需要测试验证修复效果
