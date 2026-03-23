@@ -242,7 +242,12 @@ function renderEnhancedTaskPanel(session) {
         // 2b. thoughtEvents（历史恢复时 thought 不在 phase.events 里）
         // 只在最后一轮插入，避免多轮对话重复显示
         // 包进伪 phase 卡片，样式与真实 phase 一致（兜底：phases 为空时也能显示）
-        if (i === turnsCount - 1 && session.thoughtEvents && session.thoughtEvents.length > 0) {
+        // ✅ 修复：如果phase.events中已有thought，不显示thoughtEvents避免重复
+        const hasThoughtInPhases = turnPhases && turnPhases.some(p =>
+            p.events && p.events.some(e => e.type === 'thought')
+        );
+
+        if (i === turnsCount - 1 && session.thoughtEvents && session.thoughtEvents.length > 0 && !hasThoughtInPhases) {
             const thoughtEvents = session.thoughtEvents.map(ev => ({
                 type: 'thought',
                 content: ev.content || ev.data?.text || '',

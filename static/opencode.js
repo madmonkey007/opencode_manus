@@ -9,7 +9,21 @@ window.state = {
     renderThrottle: null,
     fileFilter: 'all',
     fileSearch: '',
-    theme: localStorage.getItem('theme') || 'dark'
+    theme: localStorage.getItem('theme') || 'dark',
+
+    // ✅ 配置：高级功能开关
+    config: {
+        // 深度加载开关：是否从后端API恢复历史数据
+        // - false: 仅使用localStorage（Docker重启导致后端数据丢失时使用）
+        // - true: 同时使用localStorage和后端API（后端支持持久化存储时启用）
+        enableDeepLoad: false,
+
+        // 深度加载失败原因说明（只读）
+        deepLoadReason: 'Docker重启导致后端内存数据丢失，禁用深度加载以保护localStorage数据',
+
+        // 是否在控制台显示详细配置日志
+        verboseLogging: false
+    }
 };
 
 const FILE_TYPE_MAP = {
@@ -428,10 +442,11 @@ async function loadState() {
                     s._version = 1;
                 }
 
-                // ✅ 数据完整性修复：如果session已使用但actions为空，尝试深度加载
-                if (s.id.startsWith('ses_') && s.phases && s.phases.length > 0) {
+                // ✅ 可配置：深度加载开关（通过 window.state.config.enableDeepLoad 控制）
+                // 默认禁用：Docker重启导致后端内存数据丢失，仅使用localStorage
+                // 启用条件：后端支持持久化存储（数据库/Redis）时设置为 true
+                if (window.state.config.enableDeepLoad && s.id.startsWith('ses_') && s.phases && s.phases.length > 0) {
                     if (!s.actions || s.actions.length === 0) {
-                        // ✅ 修复C4: 使用统一的_isLoading标志防止竞态条件
                         if (!s._isLoading && !s._deepLoaded) {
                             console.log('[loadState] Detected used session with empty actions, triggering deep load:', s.id);
                             s._isLoading = true;
@@ -442,47 +457,113 @@ async function loadState() {
                                 apiClient.getMessages(s.id).then(data => {
                                     if (data && data.messages && data.messages.length > 0) {
                                         console.log('[loadState] Deep load recovered messages for', s.id);
-                                        s.response = '';
-                                        s.actions = [];
-                                        s.orphanEvents = [];
-                                        s.thoughtEvents = [];
-                                        // ✅ 修复：data.phases 为空时保留 localStorage 里的 phases
-                                        if (data.phases && data.phases.length > 0) {
-                                            s.phases = data.phases;
-                                        }
 
-                                        data.messages.forEach(msg => {
-                                            if ((msg.info?.role || msg.role) === 'user') {
-                                                const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
-                                                if (userText) s.prompt = userText;
-                                            } else {
-                                                msg.parts?.forEach(part => {
-                                                    if (part.type === 'text') {
-                                                        s.response += (part.content?.text || part.text || '');
-                                                    } else if (part.type === 'thought') {
-                                                        const thoughtText = part.content?.text || part.text || '';
-                                                        if (thoughtText) {
-                                                            s.thoughtEvents = s.thoughtEvents || [];
-                                                            s.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
+                                        // ✅ 修复重复事件：如果后端返回完整phases，使用phases数据
+                                        // 避免同时从messages重建events导致重复
+                                        const hasCompletePhases = data.phases && data.phases.length > 0 &&
+                                            data.phases.some(p => p.events && p.events.length > 0);
+
+                                        if (hasCompletePhases) {
+                                            // 后端返回了完整的phases（包含events），直接使用
+                                            console.log('[loadState] Using complete phases from backend, total phases:', data.phases.length);
+
+                                            // ✅ 修复phase重复：使用Map去重（按ID + number），保留后端的完整数据
+                                            const phaseMap = new Map();
+
+                                            data.phases.forEach(p => {
+                                                // 复合键：id + number，确保唯一性
+                                                const key = `${p.id}_n${p.number || 0}`;
+                                                if (!phaseMap.has(key)) {
+                                                    phaseMap.set(key, p);
+                                                } else {
+                                                    console.log('[loadState] Skipping duplicate phase:', p.id, 'number:', p.number, 'title:', p.title);
+                                                }
+                                            });
+
+                                            // 二次去重：如果有相同的number，只保留第一个（避免"1. Executing"和"1. 思考过程"同时存在）
+                                            const seenNumbers = new Set();
+                                            const dedupedPhases = [];
+                                            Array.from(phaseMap.values()).forEach(p => {
+                                                const num = p.number || 0;
+                                                if (!seenNumbers.has(num)) {
+                                                    seenNumbers.add(num);
+                                                    dedupedPhases.push(p);
+                                                } else {
+                                                    console.log('[loadState] Removing phase with duplicate number:', num, 'title:', p.title);
+                                                }
+                                            });
+
+                                            s.phases = dedupedPhases;
+
+                                            // 从messages重建prompt和response
+                                            s.response = '';
+                                            data.messages.forEach(msg => {
+                                                if ((msg.info?.role || msg.role) === 'user') {
+                                                    const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
+                                                    if (userText) s.prompt = userText;
+                                                } else {
+                                                    msg.parts?.forEach(part => {
+                                                        if (part.type === 'text') {
+                                                            s.response += (part.content?.text || part.text || '');
                                                         }
-                                                    } else if (part.type === 'tool' || part.type === 'action') {
-                                                        const toolContent = part.content || part;
-                                                        const toolEv = {
-                                                            type: 'action',
-                                                            id: part.id,
-                                                            data: {
-                                                                tool_name: toolContent.tool || toolContent.tool_name,
-                                                                input: toolContent.input || toolContent.state?.input,
-                                                                output: toolContent.output || toolContent.state?.output,
-                                                                status: toolContent.status || toolContent.state?.status
-                                                            }
-                                                        };
-                                                        s.orphanEvents.push(toolEv);
-                                                        s.actions.push(toolEv);
-                                                    }
+                                                    });
+                                                }
+                                            });
+
+                                            // 清空独立的事件数组，统一使用phase.events
+                                            s.actions = [];
+                                            s.orphanEvents = [];
+                                            s.thoughtEvents = [];
+
+                                            console.log('[loadState] Loaded from phases, skipping messages event rebuild');
+                                        } else {
+                                            // 后端没有返回完整phases，从messages重建
+                                            console.log('[loadState] Rebuilding from messages (no complete phases)');
+                                            s.response = '';
+                                            s.actions = [];
+                                            s.orphanEvents = [];
+                                            s.thoughtEvents = [];
+
+                                            // 保留现有的phases结构，但清空events
+                                            if (s.phases) {
+                                                s.phases.forEach(p => {
+                                                    if (p.events) p.events = [];
                                                 });
                                             }
-                                        });
+
+                                            data.messages.forEach(msg => {
+                                                if ((msg.info?.role || msg.role) === 'user') {
+                                                    const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
+                                                    if (userText) s.prompt = userText;
+                                                } else {
+                                                    msg.parts?.forEach(part => {
+                                                        if (part.type === 'text') {
+                                                            s.response += (part.content?.text || part.text || '');
+                                                        } else if (part.type === 'thought') {
+                                                            const thoughtText = part.content?.text || part.text || '';
+                                                            if (thoughtText) {
+                                                                s.thoughtEvents = s.thoughtEvents || [];
+                                                                s.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
+                                                            }
+                                                        } else if (part.type === 'tool' || part.type === 'action') {
+                                                            const toolContent = part.content || part;
+                                                            const toolEv = {
+                                                                type: 'action',
+                                                                id: part.id,
+                                                                data: {
+                                                                    tool_name: toolContent.tool || toolContent.tool_name,
+                                                                    input: toolContent.input || toolContent.state?.input,
+                                                                    output: toolContent.output || toolContent.state?.output,
+                                                                    status: toolContent.status || toolContent.state?.status
+                                                                }
+                                                            };
+                                                            s.orphanEvents.push(toolEv);
+                                                            s.actions.push(toolEv);
+                                                        }
+                                                    });
+                                                }
+                                            });
+                                        }
 
                                         // ✅ 修复C4: 保存修复后的数据并刷新界面
                                         saveState();
@@ -672,7 +753,14 @@ async function loadState() {
     if (typeof apiClient !== 'undefined') {
         try {
             const backendSessions = await apiClient.listSessions();
-            if (backendSessions && backendSessions.length > 0) {
+
+            // ✅ 修复：如果后端为空但本地有数据，保留本地数据（Docker重启导致后端内存数据丢失）
+            if ((!backendSessions || backendSessions.length === 0) && state.sessions.length > 0) {
+                console.warn('[Sync] Backend returned empty but localStorage has', state.sessions.length, 'sessions');
+                console.warn('[Sync] Preserving localStorage sessions (backend may have restarted)');
+                // 不更新state.sessions，保留localStorage的数据
+                // 不调用saveState，避免覆盖后端的空数据
+            } else if (backendSessions && backendSessions.length > 0) {
                 console.log('[Sync] Found', backendSessions.length, 'sessions from backend');
                 const merged = [...state.sessions];
                 backendSessions.forEach(bs => {
@@ -699,9 +787,9 @@ async function loadState() {
                             actions: [],
                             orphanEvents: [],
                             mode: bs.mode || null,
-                            project_id: bs.project_id || 'proj_default',  // ✅ 修复：确保project_id有默认值
+                            project_id: bs.project_id || 'proj_default',
                             _version: 1,
-                            _createdTime: Date.now()  // ✅ 添加创建时间，用于宽限期判断
+                            _createdTime: Date.now()
                         });
                     }
                 });

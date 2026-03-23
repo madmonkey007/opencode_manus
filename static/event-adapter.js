@@ -441,7 +441,7 @@ class EventAdapter {
                     tool_name: toolName,
                     title: title,
                     status: status,
-                    input: metadata.input || content.input || {},
+                    input: metadata.input || content.input || state.input || metadata.properties || metadata.args || {},
                     output: state.output || '',
                     timestamp: part.time?.start || Date.now()
                 },

@@ -164,6 +164,11 @@ class RightPanelManager {
         // Show web preview container
         if (this.webPreviewContainer) {
             this.webPreviewContainer.classList.remove('hidden');
+            
+            // ✅ 关键修复：确保隐藏 VNC IFrame，防止显示 6082 拒绝连接错误
+            const vncIframe = document.getElementById('uvn-frame');
+            if (vncIframe) vncIframe.style.display = 'none';
+
             const iframe = document.getElementById('web-preview-iframe');
             if (iframe) {
                 // ✅ 使用正确的API端点 /opencode/read_file
@@ -239,6 +244,11 @@ class RightPanelManager {
         // Hide iframe, show file editor
         const iframe = document.getElementById('uvn-frame');
         if (iframe) iframe.style.display = 'none';
+
+        // ✅ 关键修复：切换到编辑器时同时也隐藏 web-preview-container
+        if (this.webPreviewContainer) {
+            this.webPreviewContainer.classList.add('hidden');
+        }
 
         if (this.fileEditorContainer) {
             this.fileEditorContainer.classList.remove('hidden');

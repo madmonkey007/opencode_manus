@@ -1035,64 +1035,46 @@ window.Logger = {
         if (!s || typeof text !== 'string' || text.length === 0) return false;
 
         // ✅ v=33: 精确过滤timeline事件 - 避免误报AI的正常回复
-        // 问题：后端可能错误地把timeline信息包装成answer_chunk
         const TIMELINE_PATTERNS = [
-            // 模式1: 完整的timeline事件格式
             /^\s*Step ID:\s*[a-f0-9\-]+.*Action:\s*\w+.*$/mi,
-            // 模式2: Timeline event开头
             /^\s*Timeline event:\s*\w+.*$/mi,
-            // 模式3: 多个timeline字段组合（至少2个）
             /(?:Step ID:|Action:|tool_input:|file_path:|step_id:).*(?:Step ID:|Action:|tool_input:|file_path:)/mis
         ];
 
-        // ✅ 重要：如果文本在markdown代码块中，不应该被过滤
-        // AI的正常代码会包含"write"、"read"等，但会在```中
         const isInCodeBlock = /```\s*(?:javascript|python|json|bash|shell)?[\s\S]*?```/.test(text) ||
             text.trim().startsWith('```') ||
             text.includes('```代码');
 
-        let isTimelineEvent = false;
         if (!isInCodeBlock && text.length > 0) {
-            // 只有不在代码块中，才检查是否是timeline事件
-            isTimelineEvent = TIMELINE_PATTERNS.some(pattern => pattern.test(text));
-        }
-
-        if (isTimelineEvent) {
-            // ✅ 保存完整内容到debug变量，便于调试
-            if (!window._debugFilteredTimeline) {
-                window._debugFilteredTimeline = [];
+            if (TIMELINE_PATTERNS.some(pattern => pattern.test(text))) {
+                console.warn('[NewAPI] ⚠️ Filtered timeline event from answer_chunk');
+                return false;
             }
-            window._debugFilteredTimeline.push({
-                timestamp: Date.now(),
-                content: text,
-                preview: text.substring(0, 200)
-            });
+        }
 
-            console.warn('[NewAPI] ⚠️ Filtered structured timeline event from answer_chunk');
-            console.log('[NewAPI] Debug: Filtered content preview:', text.substring(0, 150));
-            console.log('[NewAPI] Debug: Total filtered events:', window._debugFilteredTimeline.length);
+        // 📝 逐步输出核心逻辑 (差值算法)
+        const currentResp = s.response || '';
+        let delta = '';
 
-            // 不添加到response中，跳过这段文本
+        if (text.startsWith(currentResp)) {
+            // 情况A: 传入的是全量包 (Full package)
+            delta = text.substring(currentResp.length);
+        } else if (currentResp.includes(text)) {
+            // 情况B: 传入的是已存在的旧内容 (Duplicate/Late package)
             return false;
+        } else {
+            // 情况C: 传入的是自然增量 (Natural delta)
+            delta = text;
         }
 
-        // 支持多轮对话分隔符
-        const pSep = '\n\n---\n\n';
-        const rSep = '\n\n---\n\n**新的回答：**\n\n';
-        const pCount = (s.prompt || '').split(pSep).length - 1;
-        const rCount = (s.response || '').split(rSep).length - 1;
-        if (pCount > rCount) {
-            s.response += rSep;
-        }
-        // ✅ v=39: 幂等检查 (P0 修复) - 防止文本重复叠加
-        // 原因：后端可能通过 SSE delta、SSE updated、以及最后的 Poll 三种途径发送相同内容的增量
-        // 如果文本已经存在于 s.response 的末尾，则不再重复追加
-        if (s.response && s.response.endsWith(text)) {
-            console.log('[NewAPI] 🛡️ Skipping idempotent append (text already at tail):', text.length > 50 ? text.substring(0, 50) + '...' : text);
-            return false;
-        }
+        if (!delta) return false;
 
-        s.response += text;
+        // 对接打字机效果
+        if (typeof TypingEffectManager !== 'undefined' && TypingEffectManager.append) {
+            TypingEffectManager.append(delta);
+        }
+        
+        s.response = (s.response || '') + delta;
         return true;
     }
 
@@ -1925,11 +1907,26 @@ window.Logger = {
                     window.rightPanelManager.setFileStatus('完成');
                 }
 
-                // ✅ v=35修复：移除renderResults()调用，避免无限循环
-                // 问题：file_preview_end → renderResults() → 重新渲染面板 → 触发预览 → file_preview_end → 循环
-                // 解决：文件预览结束不需要重新渲染整个面板，右侧面板已独立更新
-                console.log('[NewAPI] File preview end - skipping renderResults to prevent infinite loop');
+                // ✅ 补全：确保预览结束时，文件也同步到 deliverables 和侧边栏
+                if (adapted.file_path) {
+                    const path = adapted.file_path;
+                    const name = path.split('/').pop() || 'index.html';
+                    if (window.filesManager && typeof window.filesManager.addFile === 'function') {
+                        window.filesManager.addFile({ name, path, type: name.split('.').pop() || 'text' });
+                    }
+                    addFileToDeliverables(s, path, 'preview_end');
 
+                    // ✅ 新增：如果是 HTML 文件，写入结束后自动切换到 Web 预览模式
+                    if (name.toLowerCase().endsWith('.html') || name.toLowerCase().endsWith('.htm')) {
+                        if (window.rightPanelManager && typeof window.rightPanelManager.showWebPreview === 'function') {
+                            setTimeout(() => {
+                                window.rightPanelManager.showWebPreview(s.id, path);
+                            }, 300); // 稍作延迟确保后端文件持久化
+                        }
+                    }
+                }
+
+                console.log('[NewAPI] File preview end - skipping renderResults to prevent infinite loop');
                 return;
             }
 
@@ -2438,8 +2435,13 @@ window.Logger = {
                         }
                     }
                 } else if (isError) {
-                    // 错误总结
-                    if (typeof window.addSystemMessage === 'function') {
+                    // ✅ 修复：仅在后端明确告知系统级错误时才显示全局失败标识
+                    // 防止 Bash 返回非 0 等工具级错误误导用户认为整个任务崩溃
+                    const isSystemError = adapted.value === 'error' || 
+                                        adapted.status === 'error' || 
+                                        (adapted.data && (adapted.data.type === 'error' || adapted.data.status === 'error'));
+                    
+                    if (isSystemError && typeof window.addSystemMessage === 'function') {
                         window.addSystemMessage('❌ 任务执行失败', 'error');
                     }
                 }
@@ -2495,6 +2497,26 @@ window.Logger = {
                         s._hasToolError = true;
                     }
 
+                    // 🛠️ 增强：多字段路径嗅探 (支持 path, file_path, file, filename, filePath)
+                    const filePath = actionInput.path || 
+                                   actionInput.file_path || 
+                                   actionInput.file || 
+                                   actionInput.filename || 
+                                   actionInput.filePath || 
+                                   'unknown';
+                    
+                    const toolName = actionData.tool_name || actionData.tool || 'unknown';
+                    console.log(`[NewAPI] 显示写入文件: ${filePath} (Tool: ${toolName})`);
+
+                    // 实时同步到右侧面板
+                    if (window.rightPanelManager) {
+                        if (['write', 'read', 'edit', 'patch', 'file_editor'].includes(toolName.toLowerCase())) {
+                            window.rightPanelManager.showFileEditor(filePath, toolName.toLowerCase() === 'write' ? '正在写入内容...' : (actionData.output || ''));
+                        } else if (toolName.toLowerCase() === 'bash') {
+                            window.rightPanelManager.showFileEditor(`Terminal: ${actionInput.command || 'bash'}`, actionData.output || '正在执行...');
+                        }
+                    }
+
                     // 确保 actions 和 orphanEvents 数组存在
                     if (!s.actions) s.actions = [];
                     if (!s.orphanEvents) s.orphanEvents = [];
@@ -2506,10 +2528,10 @@ window.Logger = {
                     // 避免同一个事件被添加两次到 phase.events
                     // 通用处理器已经有完整的去重和更新逻辑（第1942-1961行）
 
-                    console.log('[NewAPI] Added action to session:', actionEvent.data.tool_name, 'total actions:', s.actions.length);
+                    console.log('[NewAPI] Added action to session:', toolName, 'total actions:', s.actions.length);
                 }
 
-                        // 实时显示到右侧面板
+                        // 实时显示到右侧面板 (旧逻辑保留 adapted.data 兼容性)
                         if (window.rightPanelManager) {
                             const data = adapted.data || {};
                             const toolName = data.tool_name || data.tool || data.name || data.action || adapted.tool || (adapted.data && adapted.data.tool) || '';
@@ -2823,13 +2845,24 @@ window.Logger = {
 
         if (!exists) {
             // ✅ v=38.4.22优化：存储为对象格式，包含turn_index信息
-            // 这样可以按轮次过滤交付物，解决追问时交付物位置混乱的问题
             session.deliverables.push({
                 path: filePath,
                 turn_index: window._turnIndex || 1,
                 timestamp: Date.now()
             });
-            console.log('[Deliverables] Added file:', filePath, 'turn:', window._turnIndex || 1);
+            console.log('[Deliverables] Added file:', filePath, 'turn:', window._turnIndex || 1, 'source:', source);
+
+            // ✅ 关键：强制保存状态并请求 UI 重绘
+            if (typeof window.saveState === 'function') {
+                window.saveState();
+            }
+            
+            // 实时触发渲染，让用户立刻看到卡片
+            if (typeof throttledRenderResults === 'function') {
+                throttledRenderResults(session.id);  // ✅ 修复：传入 sessionId 参数
+            } else if (typeof window.renderResults === 'function') {
+                window.renderResults();
+            }
         }
     }
 
