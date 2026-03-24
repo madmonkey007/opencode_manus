@@ -189,7 +189,10 @@ class OpenCodeClient:
             if "content" not in part: part["content"] = {"text": part.get("text", "")}
             if part.get("type") == "tool":
                 state = part.get("state") or {}
-                content = {"tool": part.get("tool", "unknown"), "call_id": part.get("id"), "state": state, "text": state.get("output", "")}
+                tool_name = part.get("tool", "unknown")
+                # 🔍 调试：记录工具调用详情
+                logger.info(f"[PART] Tool part received: tool={tool_name}, id={part.get('id')}, state_input={state.get('input', {})}")
+                content = {"tool": tool_name, "call_id": part.get("id"), "state": state, "text": state.get("output", "")}
                 metadata = part.get("metadata") or {}
                 if "input" not in metadata: metadata["input"] = state.get("input", {})
                 if "status" not in metadata: metadata["status"] = state.get("status")
@@ -273,6 +276,7 @@ class OpenCodeClient:
 
             logger.info(f"[PREVIEW] Generating preview for {tool_name}: {file_path} ({len(file_content)} chars)")
             logger.info(f"[PREVIEW] Session ID: {session_id}, Step ID: {step_id}")
+            logger.debug(f"[PREVIEW] part keys: {list(part.keys())}, content keys: {list(content.keys()) if isinstance(content, dict) else 'not dict'}")
 
             # ✅ 检查session是否在event_stream_manager.listeners中
             from .api import event_stream_manager
@@ -528,7 +532,7 @@ class OpenCodeClient:
             except Exception as e:
                 logger.warning(f"[BRIDGE] Bridge failed at {p}: {e}", exc_info=True)
 
-    async def _execute_via_server_api(self, session_id, assistant_message_id, user_prompt, mode, model_id):
+    async def _execute_via_server_api(self, session_id, assistant_message_id, user_prompt, mode, model_id, user_message_id=None):
         base_url = self.server_api_base_url
         # ✅ session_id 直接就是 opencode server session id（在 api.py create_session 时已透传）
         server_session_id = session_id
@@ -542,7 +546,14 @@ class OpenCodeClient:
             model_name = model_id
 
         stop_event = asyncio.Event()
-        sse_state = {"events": 0, "completed": False, "saw_tool": False, "user_message_id": None, "user_prompt": user_prompt}
+        sse_state = {
+            "events": 0,
+            "completed": False,
+            "saw_tool": False,
+            "user_message_id": user_message_id,
+            "user_prompt": user_prompt,
+            "turn_index": int(time.time()),  # 用时间戳作为轮次标识，保证单调递增
+        }
 
         # ✅ 关键修复：先启动 bridge 监听事件流，再用 prompt_async 发消息（立即返回 204）
         # 原来的做法是先 POST /message（同步等待完整回复），再启动 bridge，
@@ -684,12 +695,12 @@ class OpenCodeClient:
         
         return True
 
-    async def execute_message(self, session_id, assistant_message_id, user_prompt, mode="auto"):
+    async def execute_message(self, session_id, assistant_message_id, user_prompt, mode="auto", user_message_id=None):
         # Minimal implementation for now to restore functionality
         logger.info(f"Executing {assistant_message_id} for {session_id}")
         await self._broadcast_event(session_id, {"type": "message.updated", "properties": {"info": {"id": assistant_message_id, "session_id": session_id, "role": "assistant", "time": {"created": int(time.time())}}}})
         
-        server_ok = await self._execute_via_server_api(session_id, assistant_message_id, user_prompt, mode, os.getenv("OPENAI_MODEL", "deepseek-chat"))
+        server_ok = await self._execute_via_server_api(session_id, assistant_message_id, user_prompt, mode, os.getenv("OPENAI_MODEL", "deepseek-chat"), user_message_id=user_message_id)
         
         if server_ok:
             # Wait for any in-flight preview tasks before signalling completion
@@ -703,10 +714,10 @@ class OpenCodeClient:
 
 _cleanup_task_started = False
 
-async def execute_opencode_message_with_manager(session_id, message_id, user_prompt, workspace_base, mode="auto"):
+async def execute_opencode_message_with_manager(session_id, message_id, user_prompt, workspace_base, mode="auto", user_message_id=None):
     global _cleanup_task_started
     if not _cleanup_task_started:
         asyncio.create_task(_cleanup_cursors())
         _cleanup_task_started = True
     client = OpenCodeClient(workspace_base)
-    await client.execute_message(session_id, message_id, user_prompt, mode=mode)
+    await client.execute_message(session_id, message_id, user_prompt, mode=mode, user_message_id=user_message_id)

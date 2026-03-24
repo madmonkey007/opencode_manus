@@ -13,11 +13,12 @@ import asyncio
 import json
 import logging
 import os
-import sqlite3  # ✅ P1-3修复：导入sqlite3用于细化异常处理
-from .models import MessageTime
+import sqlite3
 import time
+import httpx
 from datetime import datetime
 import sys
+from .models import MessageTime
 
 # 将当前目录添加到 sys.path 以确保导入正常
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -117,12 +118,10 @@ async def create_session(
         # 这样前端 session id == server session id，无需两层映射
         server_session_id = None
         try:
-            import httpx as _httpx
-            import os as _os
-            _server_url = _os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
-            _username = _os.getenv("OPENCODE_SERVER_USERNAME", "opencode")
-            _password = _os.getenv("OPENCODE_SERVER_PASSWORD", "opencode-dev-2026")
-            async with _httpx.AsyncClient(timeout=10) as _client:
+            _server_url = os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
+            _username = os.getenv("OPENCODE_SERVER_USERNAME", "opencode")
+            _password = os.getenv("OPENCODE_SERVER_PASSWORD", "opencode-dev-2026")
+            async with httpx.AsyncClient(timeout=10) as _client:
                 _resp = await _client.post(
                     f"{_server_url}/session",
                     json={"title": title},
@@ -600,8 +599,6 @@ async def send_message(
         # ✅ v=38.4.3修复：更新数据库中的session title和prompt
         # 这样Go CLI查询时能获取正确的title（非NULL）
         try:
-            import sqlite3
-            import time
             from app.main import WORKSPACE_BASE
 
             db_path = os.path.join(WORKSPACE_BASE, "history.db")
@@ -707,6 +704,7 @@ async def send_message(
             enhanced_user_text,
             workspace_base,
             run_mode,
+            user_message_id,
         )
 
 
