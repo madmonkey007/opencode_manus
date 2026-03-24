@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sqlite3
 import time
 import httpx
@@ -141,7 +142,6 @@ async def create_session(
 
         # 创建workspace目录
         from app.main import WORKSPACE_BASE
-        import os
         session_dir = os.path.join(WORKSPACE_BASE, session.id)
         os.makedirs(session_dir, exist_ok=True)
 
@@ -339,14 +339,13 @@ async def recover_session_from_disk(session_id: str) -> bool:
 
         # 创建session对象并添加到sessions字典
         from .models import Session, SessionTime, SessionStatus
-        import time as time_module  # ✅ 避免命名冲突
         recovered_session = Session(
             id=session_id,
             title=f"Recovered: {session_id}",
             version="1.0.0",
             time=SessionTime(
-                created=int(time_module.time()),
-                updated=int(time_module.time())
+                created=int(time.time()),
+                updated=int(time.time())
             ),
             status=SessionStatus.ACTIVE
         )
@@ -372,7 +371,6 @@ async def get_messages(session_id: str):
     获取会话的所有消息历史
     """
     # ✅ S1: 路径验证 - 防止路径遍历攻击
-    import re
     if not re.match(r'^[a-zA-Z0-9_]+$', session_id):
         raise HTTPException(
             status_code=400,
@@ -663,7 +661,6 @@ async def send_message(
 
         # 4. 后台执行 OpenCode CLI 任务 - 使用全局OpenCodeServerManager实现性能优化
         # Import from managers_internal module to avoid circular imports
-        from app.managers_internal import get_opencode_server_manager
         from .opencode_client import execute_opencode_message_with_manager
 
         workspace_base = os.path.abspath(

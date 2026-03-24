@@ -475,12 +475,7 @@ window.Logger = {
                 dropdown.querySelectorAll('.mode-option').forEach(o => o.classList.remove('active'));
                 option.classList.add('active');
 
-                const labels = {
-                    'plan': 'Plan (分析)',
-                    'build': 'Build (开发)',
-                    'auto': 'Auto (智能)'
-                };
-                activeLabel.textContent = labels[mode];
+                activeLabel.textContent = MODE_CONFIG[mode].label;
                 window._currentMode = mode;
 
                 dropdown.classList.remove('show');

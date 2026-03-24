@@ -261,8 +261,7 @@ class OpenCodeClient:
             logger.info(f"[PREVIEW] Generating preview for {tool_name}: {file_path} ({len(file_content)} chars)")
             logger.info(f"[PREVIEW] Session ID: {session_id}, Step ID: {step_id}")
 
-            # ✅ 检查session是否在event_stream_manager.listeners中
-            from .api import event_stream_manager
+            # ✅ 检查session是否在event_stream_manager.listeners中（使用顶部已导入的 event_stream_manager）
             listener_count = event_stream_manager.get_listener_count(session_id)
             logger.info(f"[PREVIEW] Current listener count for session {session_id}: {listener_count}")
 
@@ -508,14 +507,13 @@ class OpenCodeClient:
         # ✅ CRITICAL: Only use /event (the session-specific stream)
         # Using /global/event is redundant and often causes duplicates when sequential connection is used
         logger.info(f"[BRIDGE] Starting event bridge for server_session={server_session_id}")
-        for p in ["/event"]:
-            if stop_event.is_set(): break
+        if not stop_event.is_set():
             try:
-                await _stream_events(f"{base_url}{p}")
+                await _stream_events(f"{base_url}/event")
             except Exception as e:
-                logger.warning(f"[BRIDGE] Bridge failed at {p}: {e}", exc_info=True)
+                logger.warning(f"[BRIDGE] Bridge failed at /event: {e}", exc_info=True)
 
-    async def _execute_via_server_api(self, session_id, assistant_message_id, user_prompt, mode, model_id, user_message_id=None):
+    async def _execute_via_server_api(self, session_id, assistant_message_id, user_prompt, mode, user_message_id=None):
         base_url = self.server_api_base_url
         # ✅ session_id 直接就是 opencode server session id（在 api.py create_session 时已透传）
         server_session_id = session_id
@@ -683,7 +681,7 @@ class OpenCodeClient:
         logger.info(f"Executing {assistant_message_id} for {session_id}")
         await self._broadcast_event(session_id, {"type": "message.updated", "properties": {"info": {"id": assistant_message_id, "session_id": session_id, "role": "assistant", "time": {"created": int(time.time())}}}})
         
-        server_ok = await self._execute_via_server_api(session_id, assistant_message_id, user_prompt, mode, os.getenv("OPENAI_MODEL", "deepseek-chat"), user_message_id=user_message_id)
+        server_ok = await self._execute_via_server_api(session_id, assistant_message_id, user_prompt, mode, user_message_id=user_message_id)
         
         if server_ok:
             # Wait for any in-flight preview tasks before signalling completion
