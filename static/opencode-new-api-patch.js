@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OpenCode.js 新 API 扩展 (V2.8)
  * 修复 404 错误：强制丢弃前端生成的旧版伪造 Session ID
  * 完整功能修复：找回丢失的 executeSubmission, prepareSession 等核心函数
@@ -2062,12 +2062,13 @@ window.Logger = {
                 const isNewTurn = currentTurnIndex > maxExistingTurnIndex;
 
                 if (window.DEBUG_MODE) {
-                    console.log('[phases_init] Debug:', {
-                    maxExistingTurnIndex,
-                    currentTurnIndex,
-                    isNewTurn,
-                    phasesCount: adapted.phases?.length
-                });
+                        console.log('[phases_init] Debug:', {
+                        maxExistingTurnIndex,
+                        currentTurnIndex,
+                        isNewTurn,
+                        phasesCount: adapted.phases?.length
+                    });
+                }
 
                 const newPhases = (adapted.phases || []).map(p => {
                     // ✅ P0修复v3：新轮次时创建独立的phase对象，不复用旧phase
