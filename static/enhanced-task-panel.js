@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Enhanced Task Panel - Manus-style Progressive Disclosure
  * 实现类似 Manus 的逐级展开任务面板
  */
@@ -229,7 +229,7 @@ function renderEnhancedTaskPanel(session) {
                 return !p.turn_index || isNaN(phaseTurn);
             });
             // ✅ 历史恢复兜底：如果所有 phases 都没有 turn_index，全部显示
-            const phasesToShow = unassociatedPhases.length > 0 ? unassociatedPhases : session.phases;
+            const phasesToShow = unassociatedPhases; // fix: 只显示无turn_index的phases，不fallback到所有phases（避免追问时旧phases闪现）
             if (phasesToShow.length > 0) {
                 const phasesCard = createPhasesCard(phasesToShow, session.currentPhase);
                 turnContainer.appendChild(phasesCard);
