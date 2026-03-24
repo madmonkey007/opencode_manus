@@ -144,8 +144,15 @@ class OpenCodeClient:
         self._skip_preview_sessions = set()
         # Track active preview tasks so errors surface and cleanup is possible
         self._active_preview_tasks: set = set()
-        # 可配置的preview任务超时时间（秒），0表示不限制，默认5分钟
-        self._preview_task_timeout = float(os.getenv("PREVIEW_TASK_TIMEOUT", "300"))
+        # 可配置的preview任务超时时间（秒）
+        # None = 不限制（默认），让任务自然完成
+        # 0 = 不限制（兼容旧配置）
+        # >0 = 设置超时，用于特殊场景
+        timeout_config = os.getenv("PREVIEW_TASK_TIMEOUT", "").strip()
+        if timeout_config == "" or timeout_config == "0":
+            self._preview_task_timeout = None  # 默认不限制
+        else:
+            self._preview_task_timeout = float(timeout_config)
 
     def _extract_session_id_from_payload(self, payload: Dict[str, Any]) -> Optional[str]:
         props = payload.get("properties") or {}
@@ -408,27 +415,31 @@ class OpenCodeClient:
                                 if self._active_preview_tasks:
                                     task_count = len(self._active_preview_tasks)
                                     timeout_setting = self._preview_task_timeout
-                                    timeout_display = f"{timeout_setting}s" if timeout_setting > 0 else "unlimited"
 
                                     logger.info(
-                                        f"[BRIDGE] Session idle detected, waiting for {task_count} preview task(s) to complete "
-                                        f"(timeout: {timeout_display})..."
+                                        f"[BRIDGE] Session idle detected, waiting for {task_count} preview task(s) to complete..."
                                     )
 
                                     start_time = time.time()
 
                                     try:
-                                        # 如果超时设置为0，表示不限制等待时间
-                                        if timeout_setting <= 0:
-                                            # 无超时限制，但添加进度报告
+                                        # 默认不设置超时，让任务自然完成
+                                        # 因为preview任务的执行时间是可预测的（基于文件大小和打字机效果）
+                                        # 只有用户明确配置时才使用超时
+                                        if timeout_setting is None or timeout_setting <= 0:
+                                            # 无超时限制，让任务自然完成
                                             await asyncio.gather(*self._active_preview_tasks, return_exceptions=True)
                                             elapsed = time.time() - start_time
                                             logger.info(
                                                 f"[BRIDGE] All {task_count} preview tasks completed for session {session_id} "
-                                                f"in {elapsed:.1f}s"
+                                                f"in {elapsed:.1f}s (avg {elapsed/task_count:.1f}s per task)"
                                             )
                                         else:
-                                            # 使用配置的超时时间
+                                            # 用户配置了超时时间（特殊场景）
+                                            logger.warning(
+                                                f"[BRIDGE] Using custom timeout ({timeout_setting}s) for preview tasks. "
+                                                f"This may interrupt tasks that are still processing."
+                                            )
                                             await asyncio.wait_for(
                                                 asyncio.gather(*self._active_preview_tasks, return_exceptions=True),
                                                 timeout=timeout_setting
@@ -444,8 +455,8 @@ class OpenCodeClient:
                                         logger.warning(
                                             f"[BRIDGE] ⚠️ Preview tasks timed out after {elapsed:.1f}s "
                                             f"(limit: {timeout_setting}s) for session {session_id}. "
-                                            f"Consider increasing PREVIEW_TASK_TIMEOUT if this happens frequently. "
-                                            f"Continuing with {task_count} pending task(s)."
+                                            f"Some preview events may be lost. "
+                                            f"Consider removing PREVIEW_TASK_TIMEOUT to let tasks complete naturally."
                                         )
                                     except Exception as e:
                                         elapsed = time.time() - start_time
