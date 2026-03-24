@@ -263,6 +263,30 @@
         #vm-panel {
             transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        /* ✅ UI修复：添加淡入动画，平滑显示交付面板和文件卡片 */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .web-file-card {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+
+        .web-file-card:hover {
+            transform: translateY(-2px);
+        }
     </style>
     <style>
         .tab-btn:hover:not(.active) {
@@ -1298,7 +1322,7 @@
     <script src="/static/ui-layout-refactor.js?v=1.0"></script>
     <script src="/static/config-manager.js?v=1.0"></script>
 
-    <script src="/static/opencode.js?v=38.4.2"></script>
+    <script src="/static/opencode.js?v=38.5.0"></script>
 
     <!-- 初始化时间轴和预览组件 -->
     <script>
