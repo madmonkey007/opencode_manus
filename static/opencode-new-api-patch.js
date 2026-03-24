@@ -1342,15 +1342,13 @@ window.Logger = {
             console.log('[NewAPI] Follow-up detected, will insert separator before first chunk');
         }
 
-        // ✅ 追问时重置 phases/actions/thoughtEvents，避免旧事件重播
-        // 保留 prompt/response 用于历史气泡显示
+        // ✅ 追问时重置 thoughtEvents/currentPhase，避免旧思考事件残留
+        // 注意：不清空 s.phases！phases 带有 turn_index，渲染器会按轮次过滤
+        // 清空 phases 会导致 SSE 重连时后端重播旧 phases 事件，造成历史 phases 重新出现
         if (s.response && s.response.trim()) {
-            s.phases = [];
-            s.actions = [];
-            s.orphanEvents = [];
             s.thoughtEvents = [];
             s.currentPhase = null;
-            console.log('[NewAPI] Follow-up: reset phases/actions for new turn');
+            console.log('[NewAPI] Follow-up: reset thoughtEvents/currentPhase for new turn (phases preserved for turn_index filtering)');
         }
 
         // ✅ P1修复：网络重连时清理thinking消息
