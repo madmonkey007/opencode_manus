@@ -457,29 +457,15 @@ class EventAdapter {
             return adaptedEvent;
         }
 
-        // STEP-START 类型
+        // STEP-START 类型：opencode 的步骤开始信号，不是真正的 phase，直接忽略
+        // 真正的 phase 来自 phases_init 事件；step-start 只是工具调用步骤的开始
         if (partType === 'step-start' || partType === 'step_start') {
-            const metadata = part.metadata || {};
-            // 根据 phase_id 推断友好名称（opencode 的 step id 通常是 step_1, step_2 等）
-            const phaseId = part.id || '';
-            const stepNum = phaseId.match(/(\d+)$/)?.[1];
-            const fallbackTitle = stepNum ? `步骤 ${stepNum}` : '执行中';
-            return {
-                type: 'phase_start',
-                phase_id: phaseId,
-                title: metadata.title || part.content?.text || fallbackTitle,
-                description: metadata.description || '',
-                message_id: part.message_id
-            };
+            return null;
         }
 
-        // STEP-FINISH 类型
+        // STEP-FINISH 类型：同上，忽略
         if (partType === 'step-finish' || partType === 'step_finish') {
-            return {
-                type: 'phase_finish',
-                phase_id: part.id,
-                message_id: part.message_id
-            };
+            return null;
         }
 
         // FILE 类型
