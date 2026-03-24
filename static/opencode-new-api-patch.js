@@ -1338,8 +1338,11 @@ window.Logger = {
 
         // ✅ 追问标记：如果 session 已有回复内容，标记下一个 chunk 前需要插入分隔符
         if (s.response && s.response.trim()) {
-            s._needsResponseSeparator = true;
-            console.log('[NewAPI] Follow-up detected, will insert separator before first chunk');
+            // fix: 立即插入分隔符，不等 chunk（避免无回复轮次导致 responses 偏移）
+            const RESPONSE_SEP = '\n\n---\n\n**新的回答：**\n\n';
+            s.response = s.response + RESPONSE_SEP;
+            s._needsResponseSeparator = false;
+            console.log('[NewAPI] Follow-up: inserted response separator immediately');
         }
 
         // ✅ 追问时重置 thoughtEvents/currentPhase，避免旧思考事件残留
