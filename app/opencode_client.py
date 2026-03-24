@@ -277,9 +277,12 @@ class OpenCodeClient:
             logger.info(f"[PREVIEW] Generating preview for {tool_name}: {file_path} ({len(file_content)} chars)")
             logger.info(f"[PREVIEW] Session ID: {session_id}, Step ID: {step_id}")
             logger.debug(f"[PREVIEW] part keys: {list(part.keys())}, content keys: {list(content.keys()) if isinstance(content, dict) else 'not dict'}")
+            logger.info(f"[PREVIEW] About to import event_stream_manager...")
 
             # ✅ 检查session是否在event_stream_manager.listeners中
+            logger.info(f"[PREVIEW] Importing event_stream_manager...")
             from .api import event_stream_manager
+            logger.info(f"[PREVIEW] Getting listener count for session {session_id}...")
             listener_count = event_stream_manager.get_listener_count(session_id)
             logger.info(f"[PREVIEW] Current listener count for session {session_id}: {listener_count}")
 
