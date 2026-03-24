@@ -222,6 +222,23 @@ function renderEnhancedTaskPanel(session) {
             return phaseTurn === i + 1;
         }) : [];
 
+        // 🔍 调试：记录每一轮的 phases 匹配情况
+        console.log(`[Render] Turn ${i + 1}:`, {
+            totalPhases: session.phases?.length || 0,
+            matchedPhases: turnPhases.length,
+            phaseIds: turnPhases.map(p => `${p.id}(turn=${p.turn_index})`),
+            allPhaseIds: session.phases?.map(p => `${p.id}(turn=${p.turn_index})`) || [],
+            filterCondition: `turn_index === ${i + 1}`
+        });
+
+        // 🔍 调试：记录每一轮的 phases 匹配情况
+        console.log(`[Render] Turn ${i + 1}:`, {
+            totalPhases: session.phases?.length || 0,
+            matchedPhases: turnPhases.length,
+            phaseIds: turnPhases.map(p => `${p.id}(turn=${p.turn_index})`),
+            phaseEventsCount: turnPhases.reduce((sum, p) => sum + (p.events?.length || 0), 0)
+        });
+
         // 兜底：最后一轮且没有匹配 turn_index 时，显示所有 phases（含历史恢复的无 turn_index phases）
         if (i === turnsCount - 1 && turnPhases.length === 0 && session.phases && session.phases.length > 0) {
             const unassociatedPhases = session.phases.filter(p => {
@@ -261,6 +278,24 @@ function renderEnhancedTaskPanel(session) {
                     events: thoughtEvents
                 }], null);
                 turnContainer.appendChild(thoughtPhaseCard);
+            }
+        }
+
+        // 2c. orphanEvents 平铺渲染（没有真实 phase 时，action/thought/error 直接平铺）
+        // 只在最后一轮插入，避免多轮对话重复显示
+        if (i === turnsCount - 1 && session.orphanEvents && session.orphanEvents.length > 0) {
+            // 过滤出属于当前轮次的 orphanEvents（或没有 _turnIndex 的旧数据）
+            const orphanForThisTurn = session.orphanEvents.filter(ev => {
+                return !ev._turnIndex || ev._turnIndex === i + 1;
+            });
+            if (orphanForThisTurn.length > 0) {
+                const orphanCard = createPhasesCard([{
+                    id: '_orphan_pseudo_phase',
+                    title: '执行过程',
+                    status: 'done',
+                    events: orphanForThisTurn
+                }], null);
+                turnContainer.appendChild(orphanCard);
             }
         }
 
@@ -422,6 +457,13 @@ function createPhaseItem(phase, index, currentPhaseId, isLast) {
     if (phase.events) {
         const sortedEvents = window.sortEventsByTimestamp(phase.events);
 
+        // 🔍 调试：记录事件详情
+        console.log(`[Render] Phase ${phase.id}:`, {
+            totalEvents: sortedEvents.length,
+            eventTypes: sortedEvents.map(e => e.type || 'unknown'),
+            eventIds: sortedEvents.map(e => e.id || e.data?.tool_name || 'no-id').slice(0, 5)
+        });
+
         if (sortedEvents.length > 0) {
             sortedEvents.forEach((event, eventIdx) => {
                 const eventItem = createEventItem(event, eventIdx);
@@ -453,8 +495,10 @@ function createPhaseItem(phase, index, currentPhaseId, isLast) {
             }
         };
 
-        // 如果是当前活动阶段或已完成阶段，默认展开
-        if (isActive || isDone) {
+        // ✅ 修复：放宽展开条件 - 有事件的phase也自动展开
+        // 原因：用户需要看到执行进度，即使phase不是active或done状态
+        const hasEvents = eventCount > 0;
+        if (isActive || isDone || hasEvents) {
             body.classList.remove('hidden');
             const expandIcon = header.querySelector('.expand-icon');
             if (expandIcon) {
@@ -779,7 +823,7 @@ function createDeliverableCard(session) {
     if (!hasDeliverables) {
         // ✅ 代码审查修复 #1: 使用safeRenderMarkdown防止XSS，而不是marked.parse
         card.innerHTML = `
-            <div class="space-y-4">
+            <div class="space-y-4 fade-in">
                 ${session.response ? `
                     <div>
                         ${safeRenderMarkdown(session.response)}
