@@ -1044,15 +1044,19 @@ function renderSidebar() {
                                         s.actions = [];
                                         s.thoughtEvents = [];
 
+                                        const pSep = '\n\n---\n\n';
+                                        const rSep = '\n\n---\n\n**新的回答：**\n\n';
+                                        const userTexts = [];
+                                        const assistantTexts = [];
                                         data.messages.forEach(msg => {
                                             if ((msg.info?.role || msg.role) === 'user') {
-                                                // 更新 Prompt（如果有的话）
                                                 const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
-                                                if (userText) s.prompt = userText;
+                                                if (userText) userTexts.push(userText);
                                             } else {
+                                                let assistantText = '';
                                                 msg.parts?.forEach(part => {
                                                     if (part.type === 'text') {
-                                                        s.response += (part.content?.text || part.text || '');
+                                                        assistantText += (part.content?.text || part.text || '');
                                                     } else if (part.type === 'thought') {
                                                         const thoughtText = part.content?.text || part.text || '';
                                                         if (thoughtText) {
@@ -1075,8 +1079,11 @@ function renderSidebar() {
                                                         s.actions.push(toolEv);
                                                     }
                                                 });
+                                                if (assistantText) assistantTexts.push(assistantText);
                                             }
                                         });
+                                        if (userTexts.length > 0) s.prompt = userTexts.join(pSep);
+                                        if (assistantTexts.length > 0) s.response = assistantTexts.join(rSep);
                                         console.log('[History] Deep load complete for:', s.id);
 
                                         // 保存到localStorage，下次无需重新加载
@@ -1183,15 +1190,19 @@ function renderSidebar() {
                             s.actions = [];
                             s.thoughtEvents = [];
 
+                            const pSep = '\n\n---\n\n';
+                            const rSep = '\n\n---\n\n**新的回答：**\n\n';
+                            const userTexts = [];
+                            const assistantTexts = [];
                             data.messages.forEach(msg => {
                                 if ((msg.info?.role || msg.role) === 'user') {
-                                    // 更新 Prompt（如果有的话）
                                     const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
-                                    if (userText) s.prompt = userText;
+                                    if (userText) userTexts.push(userText);
                                 } else {
+                                    let assistantText = '';
                                     msg.parts?.forEach(part => {
                                         if (part.type === 'text') {
-                                            s.response += (part.content?.text || part.text || '');
+                                            assistantText += (part.content?.text || part.text || '');
                                         } else if (part.type === 'thought') {
                                             const thoughtText = part.content?.text || part.text || '';
                                             if (thoughtText) {
@@ -1214,8 +1225,11 @@ function renderSidebar() {
                                             s.actions.push(toolEv);
                                         }
                                     });
+                                    if (assistantText) assistantTexts.push(assistantText);
                                 }
                             });
+                            if (userTexts.length > 0) s.prompt = userTexts.join(pSep);
+                            if (assistantTexts.length > 0) s.response = assistantTexts.join(rSep);
                             console.log('[History] Deep load complete for:', s.id);
 
                             // 保存到localStorage，下次无需重新加载
