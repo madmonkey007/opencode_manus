@@ -1209,6 +1209,10 @@ window.Logger = {
             // ✅ 追问场景：直接复用现有 session，不拼接历史 prompt
             // opencode server 自己维护上下文，前端只需记录最新一条 prompt 用于 UI 展示
             existing._lastPrompt = prompt;
+            //  追问：把新 prompt 追加到 existing.prompt，用分隔符隔开，确保 query 气泡正确渲染
+            const pSep = '\n\n---\n\n';
+            existing.prompt = (existing.prompt || '') + pSep + prompt;
+
 
             // ✅ 重置本轮状态标志，避免影响新一轮的完成判断
             existing._hasCompletionSummary = false;
