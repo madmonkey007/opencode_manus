@@ -1064,11 +1064,6 @@ window.Logger = {
 
         if (!delta) return false;
 
-        // 对接打字机效果
-        if (typeof TypingEffectManager !== 'undefined' && TypingEffectManager.append) {
-            TypingEffectManager.append(delta);
-        }
-        
         s.response = (s.response || '') + delta;
         return true;
     }
@@ -2511,14 +2506,6 @@ window.Logger = {
                             return;
                         }
 
-                        // ✅ P1 FIX: 只检查空内容，移除重复检测（会导致误判）
-                        // 原因：重复检测逻辑会误判跨session的相同问题为重复
-                        // 影响：正常的thought事件被跳过，导致用户看不到思考过程
-                        if (!content || !content.trim()) {
-                            console.log('[NewAPI] Skipping empty thought content');
-                            return;
-                        }
-
                         // ✅ v=35: 改进日志 - 显示完整长度信息
                         const preview = content.length > 100
                             ? content.substring(0, 100) + `... (${content.length} chars)`
@@ -2796,7 +2783,7 @@ window.Logger = {
             
             // 实时触发渲染，让用户立刻看到卡片
             if (typeof throttledRenderResults === 'function') {
-                throttledRenderResults(session.id);  // ✅ 修复：传入 sessionId 参数
+                throttledRenderResults();
             } else if (typeof window.renderResults === 'function') {
                 window.renderResults();
             }
@@ -2823,13 +2810,7 @@ window.Logger = {
         try {
             console.log(`[History] Loading timeline for session: ${sessionId}`);
 
-            const response = await fetch(`/opencode/session/${sessionId}/timeline`);
-            if (!response.ok) {
-                console.error(`[History] Failed to load timeline: ${response.status}`);
-                return;
-            }
-
-            const data = await response.json();
+            const data = await window.apiClient.getTimeline(sessionId);
             const timeline = data.timeline || [];
 
             console.log(`[History] Loaded ${timeline.length} timeline events`);
@@ -2862,12 +2843,7 @@ window.Logger = {
         console.log(`[History] Loading session: ${sessionId}`);
 
         try {
-            const response = await fetch(`/opencode/session/${sessionId}/messages`);
-            if (!response.ok) {
-                throw new Error(`Failed to load session: ${response.status}`);
-            }
-
-            const data = await response.json();
+            const data = await window.apiClient.getMessages(sessionId);
 
             // ✅ 修复：sessions是数组，不是对象
             if (!window.state.sessions) {

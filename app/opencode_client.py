@@ -662,7 +662,7 @@ class OpenCodeClient:
                 if self.history_service:
                     raw_id = part.get("id")
                     # 有原始 id 直接用；fallback 时加 mapped_type 后缀保证 text/thought 不互相覆盖
-                    part_id = raw_id if raw_id else f"final_{global_key}_{mapped_type}"
+                    part_id = raw_id if raw_id else f"final_{global_key}"
                     try:
                         await self.history_service.save_part(session_id, assistant_message_id, {
                             "id": part_id,
