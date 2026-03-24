@@ -460,10 +460,14 @@ class EventAdapter {
         // STEP-START 类型
         if (partType === 'step-start' || partType === 'step_start') {
             const metadata = part.metadata || {};
+            // 根据 phase_id 推断友好名称（opencode 的 step id 通常是 step_1, step_2 等）
+            const phaseId = part.id || '';
+            const stepNum = phaseId.match(/(\d+)$/)?.[1];
+            const fallbackTitle = stepNum ? `步骤 ${stepNum}` : '执行中';
             return {
                 type: 'phase_start',
-                phase_id: part.id,
-                title: metadata.title || part.content?.text || 'Executing',
+                phase_id: phaseId,
+                title: metadata.title || part.content?.text || fallbackTitle,
                 description: metadata.description || '',
                 message_id: part.message_id
             };

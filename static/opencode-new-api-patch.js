@@ -665,8 +665,29 @@ window.Logger = {
                 window.state.activeSSE.close();
                 window.state.activeSSE = null;
             }
-            document.getElementById('stopStream')?.classList.add('hidden');
-            document.getElementById('runStream')?.classList.remove('hidden');
+            // ✅ 添加淡出动画 - 平滑隐藏停止按钮
+            const stopBtn = document.getElementById('stopStream');
+            const runBtn = document.getElementById('runStream');
+            if (stopBtn) {
+                stopBtn.style.transition = 'opacity 0.3s ease-in-out';
+                stopBtn.style.opacity = '0';
+                setTimeout(() => {
+                    stopBtn.classList.add('hidden');
+                    stopBtn.style.opacity = ''; // 重置opacity
+                }, 300);
+            }
+            if (runBtn) {
+                runBtn.classList.remove('hidden');
+                runBtn.style.opacity = '0';
+                runBtn.style.transition = 'opacity 0.3s ease-in-out';
+                // 触发重排以确保transition生效
+                requestAnimationFrame(() => {
+                    runBtn.style.opacity = '1';
+                    setTimeout(() => {
+                        runBtn.style.opacity = ''; // 重置
+                    }, 300);
+                });
+            }
             return;
         }
 
@@ -1079,12 +1100,27 @@ window.Logger = {
     }, 500);
 
     /**
-     * ✅ 代码质量改进：节流版本的渲染函数 - 限制UI更新频率（每250ms最多一次）
+     * ✅ 动态节流延迟 - 根据事件类型调整渲染延迟
+     * 优化流式显示体验：高频事件快速显示，低频事件正常延迟
+     */
+    const getThrottleDelay = (eventType) => {
+        switch(eventType) {
+            case 'action': return 100;   // 工具调用快速显示
+            case 'thought': return 200;  // 思考事件适中延迟
+            case 'phase_start':
+            case 'phase_finish': return 150;  // 阶段更新较快
+            default: return 250;         // 其他事件保持原样
+        }
+    };
+
+    /**
+     * ✅ 代码质量改进：节流版本的渲染函数 - 限制UI更新频率
      * 防止每次事件都触发完整的DOM重渲染，提升性能
+     * 使用动态节流延迟优化流式显示体验
      */
     const throttledRenderResults = throttle(() => {
         // 允许在打字机效果（如右侧写代码）期间，左侧任务面板也能实时更新进度
-        // 这解决了用户看到的“右侧写完很久左侧才出事件”的延迟感
+        // 这解决了用户看到的”右侧写完很久左侧才出事件”的延迟感
 
         try {
             if (typeof window.renderResults === 'function') {
@@ -2260,12 +2296,69 @@ window.Logger = {
                     s.status = isError ? 'error' : 'completed';
                     s.currentPhase = null;
 
-                    const stopBtn = document.getElementById('stopStream');
-                    const runBtn = document.getElementById('runStream');
-                    if (stopBtn) stopBtn.classList.add('hidden');
-                    if (runBtn) runBtn.classList.remove('hidden');
+                    // ✅ 等待右侧预览完成后再隐藏停止按钮（带超时保护）
+                    const MAX_WAIT_TIME = 5000; // 最大等待5秒
+                    const startTime = Date.now();
 
-                    console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}, all phases cleaned up.`);
+                    const checkTypingAndHide = () => {
+                        const isTyping = window.rightPanelManager?.isTyping();
+                        const elapsed = Date.now() - startTime;
+
+                        // ✅ 添加多重检查条件，避免误判
+                        const hasFileEditor = document.getElementById('file-editor-container')?.classList.contains('hidden') === false;
+                        const preElement = document.getElementById('file-code-content');
+                        const hasTypingCursor = document.getElementById('typing-cursor')?.style.display !== 'none';
+
+                        // 详细日志
+                        console.log('[Stop Button] State check:', {
+                            isTyping,
+                            hasFileEditor,
+                            hasTypingCursor,
+                            elapsed: elapsed + 'ms',
+                            maxWait: MAX_WAIT_TIME + 'ms'
+                        });
+
+                        // ✅ 决定是否继续等待（需要满足所有条件：isTyping=true、有实际UI元素、未超时）
+                        const shouldWait = isTyping && hasFileEditor && elapsed < MAX_WAIT_TIME;
+
+                        if (shouldWait) {
+                            // 打字机还在进行，等待完成
+                            const remainingTime = window.rightPanelManager?.getTypingRemainingTime() || 0;
+                            const delay = Math.min(Math.max(remainingTime + 100, 200), 1000); // 最多等1秒，避免过长等待
+                            console.log('[Stop Button] Waiting:', delay, 'ms (remaining time:', remainingTime, 'ms)');
+                            setTimeout(checkTypingAndHide, delay);
+                        } else {
+                            // 打字机完成或超时，隐藏停止按钮
+                            const reason = elapsed >= MAX_WAIT_TIME ? 'timeout' : 'completed';
+                            console.log('[Stop Button] Hiding (' + reason + '), elapsed:', elapsed + 'ms');
+
+                            const stopBtn = document.getElementById('stopStream');
+                            const runBtn = document.getElementById('runStream');
+                            if (stopBtn) {
+                                stopBtn.style.transition = 'opacity 0.3s ease-in-out';
+                                stopBtn.style.opacity = '0';
+                                setTimeout(() => {
+                                    stopBtn.classList.add('hidden');
+                                    stopBtn.style.opacity = '';
+                                }, 300);
+                            }
+                            if (runBtn) {
+                                runBtn.classList.remove('hidden');
+                                runBtn.style.opacity = '0';
+                                runBtn.style.transition = 'opacity 0.3s ease-in-out';
+                                requestAnimationFrame(() => {
+                                    runBtn.style.opacity = '1';
+                                    setTimeout(() => {
+                                        runBtn.style.opacity = '';
+                                    }, 300);
+                                });
+                            }
+                            console.log(`[NewAPI] Task session ${isError ? 'failed' : 'completed'}, all phases cleaned up.`);
+                        }
+                    };
+
+                    // 开始检查
+                    checkTypingAndHide();
                 }
 
                 // ✅ v=33: 修复总结不显示 - 强制刷新UI确保总结可见（绕过节流）
@@ -2395,15 +2488,30 @@ window.Logger = {
                         events: [],
                         turn_index: window._turnIndex || 0 // ✅ v=38.4.12.1: 关联到当前轮次
                     };
+
+                    // 🔍 调试：记录 phase 创建
+                    console.log('[Phase Start] Creating new phase:', {
+                        phaseId: phase.id,
+                        turnIndex: phase.turn_index,
+                        windowTurnIndex: window._turnIndex,
+                        sessionTurnIndex: s.turnIndex
+                    });
+
                     s.phases.push(phase);
                 } else {
                     phase.status = 'active';
                     // 如果后端提供了更具体的标题，更新它
-                    if (adapted.title && adapted.title !== 'Executing') {
+                    if (adapted.title && adapted.title !== 'Executing' && adapted.title !== '执行中') {
                         phase.title = adapted.title;
                     }
                 }
                 s.currentPhase = phase.id;
+
+                // ✅ 使用节流渲染 - 实现流式显示而非批量输出
+                if (typeof window.throttledRenderResults === 'function') {
+                    window.throttledRenderResults();
+                }
+
             } else if (adapted.type === 'phase_finish') {
                 const phase = s.phases.find(p => p.id === adapted.phase_id);
                 if (phase) phase.status = 'completed';
@@ -2461,6 +2569,11 @@ window.Logger = {
                     // 通用处理器已经有完整的去重和更新逻辑（第1942-1961行）
 
                     console.log('[NewAPI] Added action to session:', toolName, 'total actions:', s.actions.length);
+
+                    // ✅ 使用节流渲染 - 实现流式显示
+                    if (typeof window.throttledRenderResults === 'function') {
+                        window.throttledRenderResults();
+                    }
                 }
 
                         // 实时显示到右侧面板 (旧逻辑保留 adapted.data 兼容性)
@@ -2525,24 +2638,20 @@ window.Logger = {
                                 });
                                 console.log('[NewAPI] Thought added to phase.events, phase:', currentPhase.id);
                             } else {
-                                // phase未找到，添加到orphanEvents（兜底）
-                                if (!s.orphanEvents) s.orphanEvents = [];
-                                s.orphanEvents.push({
-                                    type: 'thought',
-                                    content: content,
-                                    timestamp: Date.now()
-                                });
-                                console.log('[NewAPI] Thought added to orphanEvents (phase not found)');
+                                // phase未找到 - 由最后的统一添加逻辑处理
+                                console.log('[NewAPI] Phase not found, will add to orphanEvents via unified logic');
                             }
                         } else {
-                            // 没有active phase，添加到thoughtEvents
+                            // ✅ 没有active phase - 由最后的统一添加逻辑处理
+                            console.log('[NewAPI] No active phase, will add to orphanEvents via unified logic');
+
+                            // 保留到 thoughtEvents 用于其他可能的用途
                             if (!s.thoughtEvents) s.thoughtEvents = [];
                             s.thoughtEvents.push({
                                 type: 'thought',
                                 content: content,
                                 timestamp: Date.now()
                             });
-                            console.log('[NewAPI] Thought added to thoughtEvents (no active phase), total:', s.thoughtEvents.length);
                         }
 
                         // Store last thought for fallback use only if final answer is missing
@@ -2550,11 +2659,23 @@ window.Logger = {
                             s._lastThoughtContent = content;
                         }
 
-                        // ✅ 触发渲染，确保thought实时显示
-                        throttledRenderResults();
+                        // ✅ 修复：总是添加到 orphanEvents（增强任务面板需要）
+                        if (!s.orphanEvents) s.orphanEvents = [];
+                        s.orphanEvents.push({
+                            type: 'thought',
+                            content: content,
+                            timestamp: Date.now()
+                        });
+                        console.log('[NewAPI] Thought also added to orphanEvents for panel display');
 
-                        // 不在右侧面板显示，避免覆盖文件预览
-                        return;
+                        // ✅ 使用节流渲染 - 实现流式显示
+                        if (typeof window.throttledRenderResults === 'function') {
+                            window.throttledRenderResults();
+                        }
+
+                        // ❌ 移除提前 return，让通用流程继续处理
+                        // 这样可以确保 thought 被正确添加到 targetPhase.events
+                        // return;
                     } else if (adapted.type === 'action') {
                         // 显示工具操作
                         const output = data.output || '';
@@ -2567,7 +2688,7 @@ window.Logger = {
                             } catch (err) {
                                 console.error('[NewAPI] Failed to enqueue question:', err);
                             }
-                            return;
+                            // ✅ 修复：不提前return，让事件被添加到phase.events
                         }
 
                         if (toolLower === 'read') {
@@ -2585,17 +2706,18 @@ window.Logger = {
 
                             // ✅ 验证输出内容，避免保存空命令
                             if (!output || output.trim() === '') {
-                                console.log('[NewAPI] 命令输出为空，跳过保存:', title);
+                                console.log('[NewAPI] 命令输出为空，跳过保存到deliverables:', title);
                                 window.rightPanelManager.showFileEditor(title, output || '(无输出)');
-                                return;
-                            }
+                                // ✅ 修复：不提前return，让事件仍被添加到phase.events
+                            } else {
+                                // ✅ 只在有输出时保存到deliverables
 
                             console.log('[NewAPI] 显示终端输出:', title);
                             window.rightPanelManager.showFileEditor(title, output);
 
-                            // ✅ 将命令输出保存到 deliverables，刷新后可查看
+                            // ✅ 将命令输出保存到 deliverables，刷新后可查看（仅在有输出时）
                             if (!s.deliverables) s.deliverables = [];
-                            
+
                             // 检查是否已存在（避免重复保存）
                             const exists = s.deliverables.some(d => {
                                 if (typeof d === 'string') return d === title;
@@ -2611,6 +2733,7 @@ window.Logger = {
                                 console.log('[NewAPI] 命令输出已保存到 deliverables:', title);
                                 saveState();
                             }
+                            } // ✅ 修复：关闭else块（只在有输出时保存）
                         } else if (toolLower === 'write' || toolLower === 'edit' || toolLower === 'file_editor') {
                             // write/edit - 显示正在写入
                             const input = data.input || {};
@@ -2622,6 +2745,12 @@ window.Logger = {
 
                             // 如果有内容，使用打字机效果
                             if (content && typeof content === 'string') {
+                                // ✅ 设置打字机状态追踪
+                                window.rightPanelManager._isTyping = true;
+                                window.rightPanelManager._typingStartTime = Date.now();
+                                window.rightPanelManager._typingTotalLength = content.length;
+                                console.log('[Typewriter] Started:', content.length, 'chars');
+
                                 setTimeout(() => {
                                     if (window.rightPanelManager.fileEditorContainer) {
                                         window.rightPanelManager.fileEditorContainer.classList.remove('hidden');
@@ -2635,6 +2764,12 @@ window.Logger = {
                                                     pre.textContent += content.charAt(i);
                                                     i++;
                                                     setTimeout(typeWriter, 5); // 5ms 打字速度
+                                                } else {
+                                                    // ✅ 打字机完成，清除状态
+                                                    window.rightPanelManager._isTyping = false;
+                                                    window.rightPanelManager._typingStartTime = null;
+                                                    const elapsed = Date.now() - window.rightPanelManager._typingStartTime;
+                                                    console.log('[Typewriter] Completed in:', (elapsed / 1000).toFixed(2), 's');
                                                 }
                                             };
                                             typeWriter();
@@ -2666,60 +2801,67 @@ window.Logger = {
                 }
 
                 // 处理 action/thought/error
-                if (!s.phases || s.phases.length === 0) {
-                    s.phases = [{
-                        id: 'phase_executing',
-                        title: '🚀 任务执行中',
-                        status: 'active',
-                        events: [],
-                        turn_index: window._turnIndex || 0 // ✅ v=38.4.12.1: 关联到当前轮次
-                    }];
-                    s.currentPhase = 'phase_executing';
+                // ✅ 方案A：没有真实 phase 时，直接放入 orphanEvents，不创建假 phase
+                const hasRealPhase = s.phases && s.phases.length > 0;
+
+                if (!adapted.timestamp) {
+                    adapted.timestamp = adapted.time || Date.now();
                 }
+                // 标记所属轮次，渲染时用于分组
+                adapted._turnIndex = window._turnIndex || 0;
 
-                const targetPhase = s.phases.find(p => p.id === s.currentPhase) || s.phases[s.phases.length - 1];
-                if (targetPhase) {
-                    if (!targetPhase.events) targetPhase.events = [];
-
+                if (!hasRealPhase) {
+                    // 没有真实 phase：放入 orphanEvents，渲染时平铺显示
+                    if (!s.orphanEvents) s.orphanEvents = [];
                     const eventId = adapted.id || (adapted.data && (adapted.data.id || adapted.data.call_id)) || adapted.message_id;
-
-                    // ✅ 修复：统一的事件更新逻辑（删除了冗余的去重检查）
-                    let existingEventIndex = -1;
-
-                    if (eventId) {
-                        existingEventIndex = targetPhase.events.findIndex(e => {
-                            const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;
-                            return eId === eventId;
-                        });
-                    }
-
-                    if (existingEventIndex > -1) {
-                        // 更新现有事件
-                        const existing = targetPhase.events[existingEventIndex];
-                        if (adapted.type === 'action' && existing.type === 'action') {
-                            existing.data = { ...existing.data, ...adapted.data };
-
-                            // ✅ 修复：更新action事件时也收集文件
-                            collectFileToDeliverables(s, adapted.data);
+                    const existingIdx = eventId ? s.orphanEvents.findIndex(e => {
+                        const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;
+                        return eId === eventId;
+                    }) : -1;
+                    if (existingIdx > -1) {
+                        if (adapted.type === 'action' && s.orphanEvents[existingIdx].type === 'action') {
+                            s.orphanEvents[existingIdx].data = { ...s.orphanEvents[existingIdx].data, ...adapted.data };
                         } else {
-                            targetPhase.events[existingEventIndex] = adapted;
+                            s.orphanEvents[existingIdx] = adapted;
+                        }
+                    } else {
+                        s.orphanEvents.push(adapted);
+                    }
+                    // 文件收集
+                    if (adapted.type === 'action' && adapted.data) {
+                        collectFileToDeliverables(s, adapted.data);
+                    }
+                } else {
+                    // 有真实 phase：放入对应 phase 的 events
+                    const targetPhase = s.phases.find(p => p.id === s.currentPhase) || s.phases[s.phases.length - 1];
+                    if (targetPhase) {
+                        if (!targetPhase.events) targetPhase.events = [];
 
-                            // ✅ 修复：更新其他类型事件时也尝试收集文件
+                        const eventId = adapted.id || (adapted.data && (adapted.data.id || adapted.data.call_id)) || adapted.message_id;
+                        let existingEventIndex = -1;
+                        if (eventId) {
+                            existingEventIndex = targetPhase.events.findIndex(e => {
+                                const eId = e.id || (e.data && (e.data.id || e.data.call_id)) || e.message_id;
+                                return eId === eventId;
+                            });
+                        }
+
+                        if (existingEventIndex > -1) {
+                            const existing = targetPhase.events[existingEventIndex];
+                            if (adapted.type === 'action' && existing.type === 'action') {
+                                existing.data = { ...existing.data, ...adapted.data };
+                                collectFileToDeliverables(s, adapted.data);
+                            } else {
+                                targetPhase.events[existingEventIndex] = adapted;
+                                if (adapted.type === 'action' && adapted.data) {
+                                    collectFileToDeliverables(s, adapted.data);
+                                }
+                            }
+                        } else {
+                            targetPhase.events.push(adapted);
                             if (adapted.type === 'action' && adapted.data) {
                                 collectFileToDeliverables(s, adapted.data);
                             }
-                        }
-                    } else {
-                        // 只有在新事件时才追加
-                        // ✅ 方案A修复：添加timestamp确保排序正确
-                        if (!adapted.timestamp) {
-                            adapted.timestamp = adapted.time || Date.now();
-                        }
-                        targetPhase.events.push(adapted);
-
-                        // 文件收集：如果是write/edit/file_editor工具，将文件添加到deliverables
-                        if (adapted.type === 'action' && adapted.data) {
-                            collectFileToDeliverables(s, adapted.data);
                         }
                     }
                 }
@@ -2780,7 +2922,12 @@ window.Logger = {
             if (typeof window.saveState === 'function') {
                 window.saveState();
             }
-            
+
+            // ✅ 新增：更新文件列表（让用户立刻看到新文件）
+            if (typeof window.renderFiles === 'function') {
+                window.renderFiles();
+            }
+
             // 实时触发渲染，让用户立刻看到卡片
             if (typeof throttledRenderResults === 'function') {
                 throttledRenderResults();
