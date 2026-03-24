@@ -1047,6 +1047,15 @@ window.Logger = {
             }
         }
 
+        // ✅ 追问分隔符：第一个 chunk 到来时插入分隔符，此时 s.response 还是上一轮的内容
+        // 在差值算法之前插入，确保 currentResp 包含分隔符，算法能正确处理
+        const RESPONSE_SEP = '\n\n---\n\n**新的回答：**\n\n';
+        if (s._needsResponseSeparator) {
+            s._needsResponseSeparator = false;
+            s.response = (s.response || '') + RESPONSE_SEP;
+            console.log('[NewAPI] Inserted response separator for follow-up turn');
+        }
+
         // 📝 逐步输出核心逻辑 (差值算法)
         const currentResp = s.response || '';
         let delta = '';
@@ -1204,6 +1213,7 @@ window.Logger = {
             // ✅ 重置本轮状态标志，避免影响新一轮的完成判断
             existing._hasCompletionSummary = false;
             existing._hasAnswerChunk = false;
+            existing._needsResponseSeparator = false; // 由 handleNewAPIConnection 重新设置
 
             console.log('[NewAPI] Follow-up: reusing session', existing.id, 'prompt length:', prompt.length);
 
@@ -1322,11 +1332,10 @@ window.Logger = {
             window.state.activeSSE.close();
         }
 
-        // ✅ 追问分隔符：如果 session 已有回复内容，插入分隔符让渲染器创建新气泡
-        const RESPONSE_SEP = '\n\n---\n\n**新的回答：**\n\n';
+        // ✅ 追问标记：如果 session 已有回复内容，标记下一个 chunk 前需要插入分隔符
         if (s.response && s.response.trim()) {
-            s.response += RESPONSE_SEP;
-            console.log('[NewAPI] Follow-up detected, inserted response separator');
+            s._needsResponseSeparator = true;
+            console.log('[NewAPI] Follow-up detected, will insert separator before first chunk');
         }
 
         // ✅ P1修复：网络重连时清理thinking消息
@@ -1454,29 +1463,8 @@ window.Logger = {
                     debouncedSaveState();
                 }
 
-                // 🔍 时序诊断：记录渲染调用时间
-                if (window.DEBUG_MODE) {
-                    const now = Date.now();
-                    const timeSinceLastRender = s._lastRenderTime ? now - s._lastRenderTime : 0;
-                    console.log('[Render] Triggering render:', {
-                        eventType: adapted.type,
-                        timeSinceLastRender: timeSinceLastRender + 'ms',
-                        willThrottle: !['phases_init', 'phase_start', 'phase_finish', 'action', 'thought'].includes(adapted.type)
-                    });
-                    s._lastRenderTime = now;
-                }
-
-                // ✅ 关键事件立即渲染，高频事件使用节流
-                const immediateRenderEvents = ['phases_init', 'phase_start', 'phase_finish', 'action', 'thought'];
-                if (immediateRenderEvents.includes(adapted.type)) {
-                    // 立即渲染，不使用节流
-                    if (typeof window.renderResults === 'function') {
-                        window.renderResults();
-                    }
-                } else {
-                    // 其他事件使用节流（如text delta）
-                    throttledRenderResults();
-                }
+                // ✅ 代码质量改进：使用节流版本减少DOM更新频率
+                throttledRenderResults();
 
                 // 检查是否完成
                 if (adapted.type === 'status' && (adapted.value === 'done' || adapted.value === 'completed')) {
