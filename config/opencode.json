@@ -313,10 +313,19 @@
             "environment": {
                 "TAVILY_API_KEY": "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"
             }
+        },
+        "rag_search": {
+            "type": "remote",
+            "url": "http://10.141.103.7:9021/mcp",
+            "enabled": true,
+            "timeout": 60000,
+            "environment": {
+                "COLLECTION_ID": "customize_ybHP-22kTXa2ENSR6BAycQ"
+            }
         }
     },
-    "model": "new-api/glm-4.7",
-    "small_model": "new-api/glm-4.7",
+    "model": "zai-coding-plan/glm-4.7",
+    "small_model": "zai-coding-plan/glm-4.5-air",
     "provider": {
         "google-ai-key1": {
             "npm": "@ai-sdk/google",
@@ -371,6 +380,33 @@
                 }
             }
         },
+       "openrouter": {
+     	 "name": "OpenRouter",
+     	 "options": {
+        	"baseURL": "https://openrouter.ai",
+        	"apiKey": "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"
+     	 },
+     	 "models": {
+       	 "minimax/minimax-m2.7": {
+          "name": "MiniMax M2.7 :free",
+          "params": {
+                "stream": false
+            }
+        },
+    	 "xiaomi/mimo-v2-pro": {
+          "name": "Xiaomi MiMo V2 Pro :free",
+          "params": {
+                "stream": false
+            }
+        },
+        "xiaomi/mimo-v2-omni": {
+          "name": "Xiaomi MiMo V2 Omni :free",
+          "params": {
+                "stream": false
+            }
+   	     }
+  	    }
+  	  },
         "zhipu-glm": {
             "npm": "@ai-sdk/openai",
             "name": "GLM Coding Lite",

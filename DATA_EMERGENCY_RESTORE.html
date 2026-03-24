@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>OpenCode 数据恢复工具</title>
+</head>
+<body>
+    <h1>OpenCode 数据恢复工具</h1>
+    <div id="status"></div>
+
+    <script>
+        const status = document.getElementById('status');
+
+        function log(msg) {
+            const p = document.createElement('p');
+            p.textContent = msg;
+            status.appendChild(p);
+            console.log(msg);
+        }
+
+        async function emergencyRestore() {
+            log('=== 开始紧急数据恢复 ===\n');
+
+            // 1. 检查所有localStorage键
+            log('1. 扫描localStorage...');
+            const allKeys = Object.keys(localStorage);
+            log(`   找到 ${allKeys.length} 个键`);
+
+            const relevantKeys = allKeys.filter(k =>
+                k.includes('opencode') || k.includes('session') || k.includes('state')
+            );
+            log(`   相关键: ${relevantKeys.join(', ')}`);
+
+            // 2. 尝试读取所有可能的备份数据
+            let foundData = false;
+
+            for (const key of relevantKeys) {
+                try {
+                    const value = localStorage.getItem(key);
+                    if (value) {
+                        const parsed = JSON.parse(value);
+                        if (parsed.sessions && parsed.sessions.length > 0) {
+                            log(`\n✓ 在 "${key}" 中找到 ${parsed.sessions.length} 个sessions!`);
+                            foundData = true;
+                            parsed.sessions.forEach((s, i) => {
+                                const title = (s.prompt || s.title || 'No title').substring(0, 50);
+                                log(`  ${i+1}. ${s.id}: ${title}...`);
+                            });
+
+                            // 恢复数据
+                            log(`\n正在恢复数据...`);
+                            localStorage.setItem('opencode_state', JSON.stringify(parsed));
+                            log(`✓ 数据已恢复到 localStorage`);
+                            log(`请刷新主页面 (http://127.0.0.1:8089) 查看历史记录`);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    log(`   解析 "${key}" 失败: ${e.message}`);
+                }
+            }
+
+            // 3. 检查IndexedDB
+            log('\n2. 检查IndexedDB...');
+            try {
+                const dbs = await indexedDB.databases();
+                log(`   找到 ${dbs.length} 个数据库`);
+                for (const db of dbs) {
+                    log(`   - ${db.name}`);
+                }
+            } catch (e) {
+                log(`   IndexedDB检查失败: ${e.message}`);
+            }
+
+            // 4. 检查sessionStorage
+            log('\n3. 检查sessionStorage...');
+            const sessionKeys = Object.keys(sessionStorage);
+            log(`   找到 ${sessionKeys.length} 个键`);
+
+            // 5. 尝试从浏览器历史恢复
+            log('\n4. 检查浏览器历史...');
+            if (window.history.length > 1) {
+                log(`   历史记录数: ${window.history.length}`);
+            }
+
+            if (!foundData) {
+                log('\n❌ 未找到可恢复的数据');
+                log('\n可能的原因:');
+                log('  1. 浏览器缓存被清空');
+                log('  2. 隐私模式/无痕模式');
+                log('  3. 其他设备清除数据');
+                log('\n建议:');
+                log('  1. 检查浏览器其他标签页是否还在运行OpenCode');
+                log('  2. 检查浏览器下载历史（可能导出过数据）');
+                log('  3. 检查是否有其他浏览器/配置文件保存了数据');
+            }
+
+            log('\n=== 恢复完成 ===');
+        }
+
+        // 页面加载后自动执行
+        emergencyRestore();
+    </script>
+</body>
+</html>

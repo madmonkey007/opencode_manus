@@ -144,6 +144,8 @@ class OpenCodeClient:
         self._skip_preview_sessions = set()
         # Track active preview tasks so errors surface and cleanup is possible
         self._active_preview_tasks: set = set()
+        # 可配置的preview任务超时时间（秒），0表示不限制，默认5分钟
+        self._preview_task_timeout = float(os.getenv("PREVIEW_TASK_TIMEOUT", "300"))
 
     def _extract_session_id_from_payload(self, payload: Dict[str, Any]) -> Optional[str]:
         props = payload.get("properties") or {}
@@ -404,28 +406,65 @@ class OpenCodeClient:
                                 # ✅ 修复：等待所有preview任务完成后再设置stop_event
                                 # 防止preview事件发送时SSE连接已经断开
                                 if self._active_preview_tasks:
+                                    task_count = len(self._active_preview_tasks)
+                                    timeout_setting = self._preview_task_timeout
+                                    timeout_display = f"{timeout_setting}s" if timeout_setting > 0 else "unlimited"
+
                                     logger.info(
-                                        f"[BRIDGE] Session idle detected, waiting for {len(self._active_preview_tasks)} preview task(s) to complete..."
+                                        f"[BRIDGE] Session idle detected, waiting for {task_count} preview task(s) to complete "
+                                        f"(timeout: {timeout_display})..."
                                     )
+
+                                    start_time = time.time()
+
                                     try:
-                                        # 添加30秒超时保护，防止任务卡住
-                                        await asyncio.wait_for(
-                                            asyncio.gather(*self._active_preview_tasks, return_exceptions=True),
-                                            timeout=30.0
-                                        )
-                                        logger.info(f"[BRIDGE] All preview tasks completed for session {session_id}")
+                                        # 如果超时设置为0，表示不限制等待时间
+                                        if timeout_setting <= 0:
+                                            # 无超时限制，但添加进度报告
+                                            await asyncio.gather(*self._active_preview_tasks, return_exceptions=True)
+                                            elapsed = time.time() - start_time
+                                            logger.info(
+                                                f"[BRIDGE] All {task_count} preview tasks completed for session {session_id} "
+                                                f"in {elapsed:.1f}s"
+                                            )
+                                        else:
+                                            # 使用配置的超时时间
+                                            await asyncio.wait_for(
+                                                asyncio.gather(*self._active_preview_tasks, return_exceptions=True),
+                                                timeout=timeout_setting
+                                            )
+                                            elapsed = time.time() - start_time
+                                            logger.info(
+                                                f"[BRIDGE] All {task_count} preview tasks completed for session {session_id} "
+                                                f"in {elapsed:.1f}s"
+                                            )
+
                                     except asyncio.TimeoutError:
+                                        elapsed = time.time() - start_time
                                         logger.warning(
-                                            f"[BRIDGE] ⚠️ Preview tasks timed out after 30s for session {session_id}. "
-                                            f"Continuing with {len(self._active_preview_tasks)} pending task(s)."
+                                            f"[BRIDGE] ⚠️ Preview tasks timed out after {elapsed:.1f}s "
+                                            f"(limit: {timeout_setting}s) for session {session_id}. "
+                                            f"Consider increasing PREVIEW_TASK_TIMEOUT if this happens frequently. "
+                                            f"Continuing with {task_count} pending task(s)."
                                         )
                                     except Exception as e:
-                                        logger.error(f"[BRIDGE] Error waiting for preview tasks: {e}")
+                                        elapsed = time.time() - start_time
+                                        logger.error(
+                                            f"[BRIDGE] Error waiting for preview tasks after {elapsed:.1f}s: {e}"
+                                        )
                                     finally:
                                         # 取消未完成的任务并清理
+                                        cancelled_count = 0
                                         for task in list(self._active_preview_tasks):
                                             if not task.done():
                                                 task.cancel()
+                                                cancelled_count += 1
+
+                                        if cancelled_count > 0:
+                                            logger.info(
+                                                f"[BRIDGE] Cancelled {cancelled_count}/{task_count} incomplete preview tasks"
+                                            )
+
                                         self._active_preview_tasks.clear()
 
                                 stop_event.set()

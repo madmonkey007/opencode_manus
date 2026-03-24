@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark transition-theme">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>OpenCode - AI Agent Interface</title>
+    <link rel="icon" href="data:,">
+    
+    <!-- ✅ 全局DEBUG开关：控制所有调试日志输出 -->
+    <script>
+        // 🔧 生产环境：设为false禁用调试日志（性能优化）
+        // 🔧 开发环境：设为true启用调试日志（便于调试）
+        window.DEBUG_MODE = false;  
+        
+        // 🔧 自动检测环境（可选）：本地环境自动启用
+        // window.DEBUG_MODE = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        
+        // 📝 调试信息
+        if (window.DEBUG_MODE) {
+            console.log('[DEBUG] 🔧 调试模式已启用');
+            console.log('[DEBUG] 🔧 禁用方式：window.DEBUG_MODE = false');
+        }
+    </script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        rel="stylesheet" />
+    <script>
+        // Marked 库加载配置：先尝试 CDN，失败则使用备用方案
+        window.markedLoaded = false;
+        window.markedFallback = function () {
+            if (!window.markedLoaded) {
+                console.warn('Marked library failed to load from CDN, using fallback');
+                // 提供简单的 markdown 解析 fallback
+                window.marked = {
+                    parse: function (text) {
+                        return text
+                            .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                            .replace(/`([^`]+)`/g, '<code>$1</code>')
+                            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                            .replace(/\n/g, '<br>');
+                    }
+                };
+                window.markedLoaded = true;
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" onerror="window.markedFallback()"></script>
+    <script>
+        // 检测 marked 是否加载成功
+        if (typeof marked !== 'undefined') {
+            window.markedLoaded = true;
+        }
+    </script>
+    <script>
+        // Tailwind 配置
+        if (typeof tailwind !== 'undefined') {
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: "#3B82F6",
+                            "background-light": "#F9FAFB",
+                            "background-dark": "#121214",
+                            "surface-light": "#FFFFFF",
+                            "surface-dark": "#1E1E20",
+                            "card-light": "#f7f7f8",
+                            "card-dark": "#2d2d2d",
+                            "border-light": "#E5E7EB",
+                            "border-dark": "#334155",
+                        },
+                        fontFamily: {
+                            sans: ['"Plus Jakarta Sans"', '"Noto Sans SC"', 'sans-serif'],
+                            display: ['"Noto Sans SC"', 'sans-serif'],
+                        },
+                        borderRadius: {
+                            DEFAULT: "0.5rem",
+                            'xl': '0.75rem',
+                            '2xl': '1rem',
+                        },
+                        typography: (theme) => ({
+                            DEFAULT: {
+                                css: {
+                                    color: theme('colors.gray.700'),
+                                    h1: {
+                                        color: theme('colors.gray.900'),
+                                        fontWeight: '700',
+                                        fontFamily: theme('fontFamily.display'),
+                                    },
+                                    h2: {
+                                        color: theme('colors.gray.900'),
+                                        fontWeight: '600',
+                                        fontFamily: theme('fontFamily.display'),
+                                    },
+                                    strong: {
+                                        color: theme('colors.gray.900'),
+                                        fontWeight: '600',
+                                    },
+                                },
+                            },
+                            dark: {
+                                css: {
+                                    color: theme('colors.gray.300'),
+                                    h1: {
+                                        color: theme('colors.gray.100'),
+                                    },
+                                    h2: {
+                                        color: theme('colors.gray.100'),
+                                    },
+                                    strong: {
+                                        color: theme('colors.gray.100'),
+                                    },
+                                },
+                            },
+                        }),
+                        animation: {
+                            'fade-in': 'fadeIn 0.3s ease-out forwards',
+                        },
+                        keyframes: {
+                            fadeIn: {
+                                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                                '100%': { opacity: '1', transform: 'translateY(0)' },
+                            }
+                        }
+                    },
+                },
+            };
+        } else {
+            console.error('Tailwind CSS failed to load. Using fallback styles.');
+        }
+    </script>
+    <style>
+        /* 基础样式 */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+            background-color: #f9fafb;
+            color: #1f2937;
+        }
+
+        .dark body {
+            background-color: #121214;
+            color: #f3f4f6;
+        }
+
+        #app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 260px;
+            flex-shrink: 0;
+            background-color: white;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dark #sidebar {
+            background-color: #1e1e20;
+            border-color: #334155;
+        }
+
+        #main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #chat-scroll-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        #input-area {
+            padding: 1.5rem;
+            background-color: white;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .dark #input-area {
+            background-color: #121214;
+            border-color: #334155;
+        }
+
+        /* Material Symbols Fallback */
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+
+        /* 移除侧边栏图标的线框背景 */
+        .sidebar-section-title .material-symbols-outlined {
+            outline: none;
+            border: none;
+            background: transparent;
+        }
+
+        /* 滚动条样式 */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #E5E7EB;
+            border-radius: 20px;
+        }
+
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #3F3F46;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #D1D5DB;
+        }
+
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #52525B;
+        }
+
+        /* Tab Buttons */
+        .tab-btn {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            border-bottom: none;
+        }
+
+        .tab-btn.active {
+            color: #3b82f6;
+        }
+
+        /* VM Panel */
+        #vm-panel {
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+    <style>
+        .tab-btn:hover:not(.active) {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .dark .tab-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .transition-theme {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        html.transition-theme,
+        html.transition-theme *,
+        html.transition-theme *::before,
+        html.transition-theme *::after {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease !important;
+            transition-delay: 0s !important;
+        }
+
+        /* Message Bubbles */
+        .message-bubble {
+            border-radius: 1.5rem;
+            padding: 1rem 1.5rem;
+            max-width: 85%;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+            font-size: 15px;
+            line-height: 1.625;
+        }
+
+        .user-bubble {
+            background: #f1f5f9;
+            color: #1e293b;
+            border-radius: 20px 20px 4px 20px;
+            padding: 12px 20px;
+            max-width: 85%;
+            width: fit-content;
+            margin-left: auto;
+            margin-bottom: 2.5rem;
+            box-shadow: none;
+            text-align: right;
+        }
+
+        .assistant-bubble {
+            background-color: #FFFFFF;
+            color: #1F2937;
+            border: 1px solid #E5E7EB;
+            border-top-left-radius: 0;
+            margin-right: auto;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+
+        .dark .assistant-bubble {
+            background-color: #1E1E20;
+            color: #F3F4F6;
+            border-color: #2D2D2F;
+        }
+
+        /* Timeline */
+        .timeline-line {
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, transparent, #E5E7EB 20px, #E5E7EB calc(100% - 20px), transparent);
+        }
+
+        .dark .timeline-line {
+            background: linear-gradient(to bottom, transparent, #2D2D2F 20px, #2D2D2F calc(100% - 20px), transparent);
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 16px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #3B82F6;
+            border: 2px solid white;
+            z-index: 10;
+        }
+
+        .dark .timeline-dot {
+            border-color: #121214;
+        }
+
+        .tab-pane {
+            background-color: #F9FAFB;
+        }
+
+        .dark .tab-pane {
+            background-color: #121214;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Input Zone Refined (from Manus) */
+        .input-zone-refined {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid #e5e7eb;
+            border-radius: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s;
+        }
+
+        .dark .input-zone-refined {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: #334155;
+        }
+
+        .input-zone-refined:focus-within {
+            border-color: #94a3b8;
+            box-shadow: 0 0 0 8px rgba(148, 163, 184, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .dark .input-zone-refined:focus-within {
+            border-color: #475569;
+            box-shadow: 0 0 0 8px rgba(71, 85, 105, 0.2);
+        }
+
+        /* Top Action Buttons */
+        .top-action-btn {
+            display: flex;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .top-action-btn.active {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .top-action-btn:hover:not(.active) {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .dark .top-action-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Tool Cards Hover Effect */
+        .tool-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tool-card:hover {
+            border-color: #3B82F6;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.1);
+        }
+
+        .dark .tool-card:hover {
+            border-color: #3B82F6;
+            box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Session Items (Left Sidebar) */
+        .session-item {
+            position: relative;
+            padding: 8px 12px;
+            margin: 4px 0;
+            border-radius: 8px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            min-height: 40px;
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .dark .session-item {
+            background: rgba(255, 255, 255, 0.03);
+            color: #9ca3af;
+        }
+
+        .session-item:hover {
+            background: #f1f5f9;
+        }
+
+        .dark .session-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .session-item.active {
+            background: #f1f5f9;
+            color: #1f2937;
+        }
+
+        .dark .session-item.active {
+            background: rgba(255, 255, 255, 0.08);
+            color: #f3f4f6;
+        }
+
+        .session-item-icon {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #d1d5db;
+            color: #9ca3af;
+            transition: all 0.25s;
+        }
+
+        .dark .session-item-icon {
+            border-color: #4b5563;
+        }
+
+        .session-item:hover .session-item-icon,
+        .session-item.active .session-item-icon {
+            border-color: #9ca3af;
+            color: #6b7280;
+        }
+
+        .session-item-title {
+            font-weight: 500;
+            line-height: 1.4;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 140px;
+        }
+
+        .session-item .session-delete-btn {
+            opacity: 0;
+            padding: 4px;
+            border-radius: 4px;
+            color: #9ca3af;
+            transition: all 0.2s;
+            margin-left: auto;
+        }
+
+        .session-item:hover .session-delete-btn {
+            opacity: 1;
+        }
+
+        .session-item .session-delete-btn:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        /* File Items (Right Panel) */
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            margin: 4px 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dark .file-item {
+            background: #2d2d2d;
+            border-color: #404040;
+        }
+
+        .file-item:hover {
+            background: #f9fafb;
+            border-color: #3b82f6;
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+        }
+
+        .dark .file-item:hover {
+            background: #3a3a3a;
+        }
+
+        /* Input Zone - Glassmorphism */
+        .input-zone-refined {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid #e5e7eb;
+            border-radius: 2.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dark .input-zone-refined {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: #334155;
+        }
+
+        .input-zone-refined:focus-within {
+            border-color: #94a3b8;
+            box-shadow: 0 0 0 8px rgba(148, 163, 184, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .dark .input-zone-refined:focus-within {
+            border-color: #475569;
+            box-shadow: 0 0 0 8px rgba(71, 85, 105, 0.2);
+        }
+
+        /* Suggestion Items (from newtask_table.html) */
+        .suggestion-item {
+            background-color: rgba(0, 0, 0, 0.015);
+            border-radius: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .suggestion-item:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .dark .suggestion-item {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .dark .suggestion-item:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Selected Tag Badge (from newtask_table.html) */
+        .selected-tag-badge {
+            background-color: #f1f5ff;
+            color: #4d7fff;
+        }
+
+        .dark .selected-tag-badge {
+            background-color: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        /* 任务6：Phase 和 Event 间距优化 */
+        .phase-item {
+            margin-bottom: 1rem;
+            /* 16px */
+        }
+
+        .phase-item:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Event 项间距 */
+        .event-item {
+            margin-bottom: 0.75rem;
+            /* 12px */
+        }
+
+        .event-item:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Phase body 内部间距 */
+        .phase-body {
+            padding-left: 2.25rem;
+            /* 36px = 9 * 4px */
+            padding-right: 0.75rem;
+            /* 12px */
+            padding-top: 0.5rem;
+            /* 8px */
+            padding-bottom: 0.5rem;
+            /* 8px */
+        }
+
+        /* 事件卡片内容截断 */
+        .event-item .text-sm {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Line clamp for long thoughts */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Code Block Styles */
+        .code-block-wrapper {
+            border-radius: 0.5rem;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .code-block-header {
+            user-select: none;
+        }
+
+        .code-block-content pre {
+            margin: 0;
+            padding: 0;
+            background: transparent !important;
+        }
+
+        .code-block-content code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: #d4d4d4;
+        }
+
+        /* Syntax highlighting colors (basic) */
+        .code-block-content .keyword {
+            color: #569cd6;
+        }
+
+        .code-block-content .string {
+            color: #ce9178;
+        }
+
+        .code-block-content .comment {
+            color: #6a9955;
+        }
+
+        .code-block-content .function {
+            color: #dcdcaa;
+        }
+
+        /* Prose styles for markdown content */
+        .prose {
+            color: #374151;
+            max-width: none;
+        }
+
+        .dark .prose {
+            color: #d1d5db;
+        }
+
+        .prose pre {
+            background: transparent;
+            padding: 0;
+            margin: 0;
+        }
+
+        .prose code {
+            color: #374151;
+            background: #f3f4f6;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-size: 0.875em;
+        }
+
+        .dark .prose code {
+            color: #d1d5db;
+            background: #374151;
+        }
+
+        .prose p {
+            margin-bottom: 1rem;
+            line-height: 1.75;
+        }
+
+        .prose h1,
+        .prose h2,
+        .prose h3,
+        .prose h4 {
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        .prose h1 {
+            font-size: 1.875rem;
+        }
+
+        .prose h2 {
+            font-size: 1.5rem;
+        }
+
+        .prose h3 {
+            font-size: 1.25rem;
+        }
+
+        .prose ul,
+        .prose ol {
+            padding-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .prose li {
+            margin-bottom: 0.5rem;
+        }
+
+        .prose a {
+            color: #3b82f6;
+            text-decoration: underline;
+        }
+
+        .dark .prose a {
+            color: #60a5fa;
+        }
+
+        .prose blockquote {
+            border-left: 4px solid #e5e7eb;
+            padding-left: 1rem;
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        .dark .prose blockquote {
+            border-left-color: #374151;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-sans h-screen w-screen overflow-hidden text-gray-800 dark:text-gray-200 flex transition-theme">
+
+    <!-- Sidebar -->
+    <aside id="sidebar"
+        class="w-[260px] flex-shrink-0 bg-background-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark flex flex-col h-full transition-all duration-300 relative">
+        <!-- 展开按钮（收起时显示，绝对定位） -->
+        <button id="expand-sidebar"
+            class="hidden absolute top-3.5 left-0 w-14 h-7 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center justify-center z-50"
+            title="展开侧边栏">
+            <span class="material-symbols-outlined">right_panel_open</span>
+        </button>
+
+        <!-- 侧边栏内容区域 -->
+        <div id="sidebar-content" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div class="h-14 flex items-center justify-between px-4 relative z-10">
+                <!-- Logo 和 标题 -->
+                <div id="sidebar-logo"
+                    class="flex items-center gap-2 font-bold text-gray-900 dark:text-white relative z-10">
+                    <span class="material-symbols-outlined text-2xl text-primary">eco</span>
+                    <span>OpenCode</span>
+                </div>
+                <!-- 收起按钮 -->
+                <button id="toggle-sidebar"
+                    class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center justify-center relative z-20"
+                    title="收起侧边栏">
+                    <span class="material-symbols-outlined">left_panel_close</span>
+                </button>
+            </div>
+
+            <div class="flex-1 flex flex-col min-h-0 overflow-hidden px-3">
+                <!-- 新建任务按钮 -->
+                <div class="mb-3">
+                    <button id="new-task"
+                        class="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors rounded-lg">
+                        <span class="material-symbols-outlined text-[18px]">edit_square</span>
+                        <span>新任务</span>
+                    </button>
+                </div>
+
+                <!-- 新建项目按钮 -->
+                <button id="new-project" class="w-full flex items-center gap-2 px-3 py-2 
+                       text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 
+                       rounded-lg transition-colors mb-2">
+                    <span class="material-symbols-outlined text-[18px]">create_new_folder</span>
+                    <span>新建项目</span>
+                </button>
+
+                <!-- 历史记录按钮（收起时显示） -->
+                <button id="history-btn"
+                    class="hidden w-full flex items-center justify-center p-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors rounded-lg"
+                    title="历史记录">
+                    <span class="material-symbols-outlined text-gray-400 dark:text-gray-300">history</span>
+                </button>
+
+                <div
+                    class="px-1 text-xs font-medium text-gray-400 uppercase tracking-wider mb-1 flex justify-between items-center sidebar-section-title">
+                    所有任务
+                    <span class="material-symbols-outlined text-sm">filter_list</span>
+                </div>
+                <div id="session-list" class="flex-1 overflow-y-auto no-scrollbar space-y-1">
+                    <!-- Sessions will be injected here -->
+                </div>
+            </div>
+
+            <!-- 底部设置区域 -->
+            <div id="bottom-settings"
+                class="p-3 border-t border-border-light dark:border-border-dark flex items-center gap-2">
+                <button id="my-profile-btn"
+                    class="flex-1 flex items-center gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer group">
+                    <div id="profile-avatar"
+                        class="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-white text-sm font-bold uppercase flex-shrink-0">
+                        O</div>
+                    <div class="flex-1 min-w-0 text-left">
+                        <div class="text-sm font-semibold truncate text-gray-900 dark:text-white">我的</div>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-tighter">设置</div>
+                    </div>
+                </button>
+                <button id="theme-toggle"
+                    class="flex items-center justify-center w-11 h-11 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 flex-shrink-0"
+                    title="切换主题">
+                    <span class="material-symbols-outlined text-[20px] dark:hidden">dark_mode</span>
+                    <span class="material-symbols-outlined text-[20px] hidden dark:inline">light_mode</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 bg-[#FFFDFA] dark:bg-background-dark relative transition-theme">
+        <!-- Header -->
+        <header
+            class="h-14 flex-shrink-0 border-b border-border-light dark:border-border-dark flex items-center justify-between px-6 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-theme">
+            <div class="flex items-center gap-4">
+                <button id="open-sidebar"
+                    class="hidden material-symbols-outlined text-gray-400 text-xl hover:text-gray-600 dark:hover:text-gray-200 transition-colors">menu</button>
+                <div
+                    class="flex items-center gap-2 px-3 py-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                    <div id="current-task-title"
+                        class="text-sm font-medium text-gray-600 dark:text-gray-300 truncate max-w-[300px]">OpenCode 1.0
+                    </div>
+                    <span class="material-symbols-outlined text-gray-400 text-sm">expand_more</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <!-- 文件和预览按钮（仅在任务页显示） -->
+                <div id="files-preview-buttons"
+                    class="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl shadow-inner hidden">
+                    <button id="toggle-files-panel" class="top-action-btn text-gray-500" data-panel="files">
+                        <span class="material-symbols-outlined text-[16px]">description</span>
+                        <span class="ml-1">文件</span>
+                    </button>
+                    <button id="toggle-preview-panel" class="top-action-btn active text-gray-500" data-panel="preview">
+                        <span class="material-symbols-outlined text-[16px]">visibility</span>
+                        <span class="ml-1">预览</span>
+                    </button>
+                </div>
+                <div class="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
+                <div
+                    class="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full text-[12px] border border-border-light dark:border-white/10 transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span class="text-gray-600 dark:text-gray-400">UVN Projection Active</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <div id="chat-scroll-area"
+            class="flex-1 overflow-y-auto custom-scrollbar bg-[#FFFDFA] dark:bg-background-dark transition-theme">
+            <div class="max-w-4xl mx-auto px-6 py-8">
+                <!-- Welcome Interface (for new tasks) -->
+                <div id="welcome-interface" class="h-full flex flex-col items-center justify-center space-y-12">
+                    <h1
+                        class="text-4xl md:text-5xl font-normal tracking-tight text-center text-gray-900 dark:text-white">
+                        今天可以帮你做什么？
+                    </h1>
+
+                    <!-- Mode Selector for Welcome Page -->
+                    <div class="w-full max-w-3xl mb-4">
+                        <div class="flex justify-center">
+                            <div id="welcome-mode-selector"
+                                class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1">
+                                <button
+                                    class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all"
+                                    data-mode="plan">
+                                    <span class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined !text-[18px]">psychology</span>
+                                        <span>Plan 分析</span>
+                                    </span>
+                                </button>
+                                <button
+                                    class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all bg-white dark:bg-gray-700 shadow"
+                                    data-mode="build">
+                                    <span class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined !text-[18px]">build</span>
+                                        <span>Build 开发</span>
+                                    </span>
+                                </button>
+                                <button
+                                    class="mode-btn-welcome px-6 py-2 rounded-full text-sm font-medium transition-all"
+                                    data-mode="auto">
+                                    <span class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined !text-[18px]">auto_awesome</span>
+                                        <span>Auto 智能</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Centered Input for New Tasks -->
+                    <div class="w-full max-w-3xl relative">
+                        <div
+                            class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl shadow-lg p-5 flex flex-col min-h-[160px]">
+                            <!-- Selected Tags Container -->
+                            <div id="selected-tags-container" class="hidden flex flex-wrap items-center gap-2 mb-3">
+                                <!-- Selected tag will be shown here -->
+                            </div>
+                            <textarea id="prompt-welcome" rows="1" placeholder="输入 '/' 选择技能"
+                                class="w-full flex-grow resize-none border-none focus:ring-0 text-lg placeholder:text-gray-300 p-2 dark:text-gray-100 dark:bg-transparent"></textarea>
+                            <div class="flex items-center justify-between mt-4 px-2">
+                                <div class="flex items-center space-x-4 text-gray-400">
+                                    <button class="hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                                        <span class="material-symbols-outlined">add</span>
+                                    </button>
+                                    <button class="hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                                        <span class="material-symbols-outlined">hub</span>
+                                    </button>
+                                    <button class="hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                                        <span class="material-symbols-outlined">bolt</span>
+                                    </button>
+                                    <button id="attach-file-btn-welcome"
+                                        class="hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                                        <span class="material-symbols-outlined">description</span>
+                                    </button>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <button
+                                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                                        <span class="material-symbols-outlined">mic</span>
+                                    </button>
+                                    <button id="runStream-welcome"
+                                        class="bg-black dark:bg-white dark:text-black text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors">
+                                        <span
+                                            class="material-symbols-outlined !text-white dark:!text-black">arrow_upward</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tag Suggestions (shown when tag is selected) -->
+                        <div id="tag-suggestions" class="hidden mt-8 flex flex-col items-start w-full space-y-1">
+                        </div>
+
+                        <!-- Task Type Tags -->
+                        <div class="w-full flex flex-col items-center space-y-4 mt-6">
+                            <div class="flex flex-wrap justify-center gap-3">
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="生成幻灯片">
+                                    <span class="material-symbols-outlined !text-[18px]">present_to_all</span>
+                                    <span>生成幻灯片</span>
+                                </button>
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="撰写文档">
+                                    <span class="material-symbols-outlined !text-[18px]">description</span>
+                                    <span>撰写文档</span>
+                                </button>
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="生成设计">
+                                    <span class="material-symbols-outlined !text-[18px]">palette</span>
+                                    <span>生成设计</span>
+                                </button>
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="创建故事绘本">
+                                    <span class="material-symbols-outlined !text-[18px]">auto_stories</span>
+                                    <span>创建故事绘本</span>
+                                </button>
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="批量调研">
+                                    <span class="material-symbols-outlined !text-[18px]">manage_search</span>
+                                    <span>批量调研</span>
+                                </button>
+                            </div>
+                            <div class="flex flex-wrap justify-center gap-3">
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="分析数据">
+                                    <span class="material-symbols-outlined !text-[18px]">bar_chart</span>
+                                    <span>分析数据</span>
+                                </button>
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="创建网页">
+                                    <span class="material-symbols-outlined !text-[18px]">language</span>
+                                    <span>创建网页</span>
+                                </button>
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="翻译PDF">
+                                    <span class="material-symbols-outlined !text-[18px]">picture_as_pdf</span>
+                                    <span>翻译 PDF</span>
+                                </button>
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="总结视频">
+                                    <span class="material-symbols-outlined !text-[18px]">movie</span>
+                                    <span>总结视频</span>
+                                </button>
+                                <button
+                                    class="task-tag flex items-center space-x-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-sm font-normal transition-colors"
+                                    data-tag="转写音频">
+                                    <span class="material-symbols-outlined !text-[18px]">audio_file</span>
+                                    <span>转写音频</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Messages (hidden by default) -->
+                <div id="chat-messages" class="hidden flex flex-col space-y-8 pb-48"></div>
+            </div>
+        </div>
+
+        <!-- Bottom Floating Input (hidden by default) -->
+        <div id="bottom-input-container"
+            class="hidden absolute bottom-2 left-0 right-0 px-6 max-w-4xl mx-auto w-full z-30">
+            <div id="input-drop-zone"
+                class="group flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-[24px] shadow-2xl transition-all duration-300 focus-within:ring-4 focus-within:ring-primary/5 relative">
+                <textarea id="prompt" rows="1" placeholder="给 OpenCode 发送消息..."
+                    class="w-full p-5 pb-2 max-h-62 bg-transparent border-none focus:ring-0 text-[15px] leading-relaxed resize-none text-gray-900 dark:text-gray-100 placeholder-gray-400 no-scrollbar"></textarea>
+                <div class="flex items-center justify-between px-3 pb-3">
+                    <div class="flex items-center gap-1">
+                        <button id="attach-file-btn"
+                            class="p-2 text-gray-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-all"
+                            title="上传文件">
+                            <span class="material-symbols-outlined">attach_file</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <!-- 停止按钮（黑圆白方块） -->
+                        <button id="stopStream"
+                            class="hidden flex items-center justify-center w-10 h-10 bg-black dark:bg-white rounded-full hover:bg-gray-800 dark:hover:bg-gray-200 transition-all shadow-lg">
+                            <span class="material-symbols-outlined text-[24px] !text-white dark:!text-black"
+                                style="font-variation-settings: 'FILL' 1">stop</span>
+                        </button>
+                        <!-- 发送按钮 -->
+                        <button id="runStream"
+                            class="flex items-center justify-center w-10 h-10 bg-black dark:bg-white dark:text-black text-white rounded-full hover:bg-gray-800 dark:hover:bg-gray-200 transition-all shadow-lg disabled:opacity-30">
+                            <span
+                                class="material-symbols-outlined text-[22px] !text-white dark:!text-black">arrow_upward</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p class="text-center mt-3 text-[10px] text-gray-400 font-medium tracking-wide opacity-60">按 Enter 执行任务 ·
+                Shift + Enter 换行 · 拖拽文件到输入框可快速上传</p>
+        </div>
+    </main>
+
+    <!-- Right Panel (VM / Computer Preview) -->
+    <div id="vm-panel"
+        class="w-0 border-l border-border-light dark:border-border-dark flex flex-col bg-background-light dark:bg-background-dark transition-all duration-300 overflow-hidden">
+        <div
+            class="h-14 border-b border-border-light dark:border-border-dark flex items-center px-4 justify-between bg-white dark:bg-surface-dark shrink-0 transition-theme">
+            <div class="flex items-center gap-4">
+                <button class="tab-btn text-sm font-medium px-2 py-4 text-gray-500 dark:text-gray-400"
+                    data-tab="preview">
+                    <span class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">computer</span>
+                        <span>Manus's Computer</span>
+                    </span>
+                </button>
+                <button class="tab-btn active-tab text-sm font-medium px-2 py-4" data-tab="files">
+                    <span class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">folder</span>
+                        <span>Files</span>
+                    </span>
+                </button>
+            </div>
+            <button id="close-vm-panel" class="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors"
+                title="Close">
+                <span class="material-symbols-outlined text-[20px] text-gray-500">close</span>
+            </button>
+        </div>
+
+        <div class="flex-1 relative overflow-hidden bg-white dark:bg-background-dark transition-theme">
+            <!-- Preview Tab (UVN Projection) -->
+            <div id="tab-preview" class="tab-pane hidden h-full flex flex-col">
+                <!-- noVNC iframe -->
+                <iframe id="uvn-frame" data-src="" class="w-full flex-1 border-none"></iframe>
+                <script>
+                    (function () {
+                        const iframe = document.getElementById('uvn-frame');
+                        const vncPort = 6082; // Host port mapped to 6080
+                        const vncUrl = window.location.protocol + "//" + window.location.hostname + ":" + vncPort + "/vnc.html?autoconnect=true&resize=scale";
+                        iframe.setAttribute('data-src', vncUrl);
+                    })();
+                </script>
+
+
+                <!-- Overlay for Status -->
+                <div
+                    class="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-surface-dark/90 p-3 rounded-xl border border-border-light dark:border-border-dark shadow-xl flex items-center justify-between z-50 backdrop-blur-sm transition-theme">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-blue-500 animate-spin">sync</span>
+                        <div>
+                            <div
+                                class="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-widest">
+                                UVN System Status</div>
+                            <div id="vm-status" class="text-sm font-bold text-gray-900 dark:text-white">OPERATING</div>
+                        </div>
+                    </div>
+                    <div id="vm-detail-status" class="text-[12px] text-gray-500 dark:text-gray-400 font-medium">
+                        Playwright in Docker</div>
+                </div>
+
+                <!-- 时间轴进度条容器 -->
+                <div id="timeline-progress-container"
+                    class="hidden absolute bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-700 p-3 z-40">
+                    <div id="timeline-progress"></div>
+                </div>
+            </div>
+
+            <!-- Files Tab -->
+            <div id="tab-files" class="tab-pane h-full flex flex-col transition-theme">
+                <!-- Filter Pills -->
+                <div class="px-5 py-4 flex items-center gap-2 overflow-x-auto scrollbar-hide shrink-0">
+                    <button id="filter-all"
+                        class="px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black rounded-full text-xs font-medium whitespace-nowrap transition-colors">All</button>
+                    <button id="filter-docs"
+                        class="px-4 py-1.5 bg-white border border-border-light dark:bg-surface-dark dark:border-border-dark text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 whitespace-nowrap transition-colors">Documents</button>
+                    <button id="filter-images"
+                        class="px-4 py-1.5 bg-white border border-border-light dark:bg-surface-dark dark:border-border-dark text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 whitespace-nowrap transition-colors">Images</button>
+                    <button id="filter-code"
+                        class="px-4 py-1.5 bg-white border border-border-light dark:bg-surface-dark dark:border-border-dark text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 whitespace-nowrap transition-colors">Code</button>
+                    <button id="filter-links"
+                        class="px-4 py-1.5 bg-white border border-border-light dark:bg-surface-dark dark:border-border-dark text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 dark:hover:bg-zinc-700 whitespace-nowrap transition-colors">Links</button>
+                </div>
+
+                <!-- Search Bar (Sticky at top) -->
+                <div class="px-5 py-2 shrink-0">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            <span class="material-symbols-outlined text-[18px]">search</span>
+                        </span>
+                        <input id="file-search"
+                            class="w-full bg-gray-100 dark:bg-surface-dark border-none rounded-xl py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20 placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-white transition-all"
+                            placeholder="Search files..." type="text" />
+                    </div>
+                </div>
+
+                <!-- File List -->
+                <div id="file-list-view" class="flex-1 overflow-y-auto custom-scrollbar px-5 py-2 space-y-1">
+                    <div class="text-sm text-gray-500 italic">No files generated yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 核心功能组件 -->
+    <script src="/static/tool-icons.js?v=7"></script>
+    <script src="/static/preview-config.js?v=2"></script>
+    <script src="/static/code-preview-enhanced.js?v=2"></script>
+    <script src="/static/timeline-progress.js?v=2"></script>
+    <script src="/static/enhanced-task-panel.js?v=37"></script>
+     <script src="/static/right-panel-manager.js?v=14"></script>
+    <!-- 新架构 API 客户端和事件适配器 -->
+    <script src="/static/api-client.js?v=2"></script>
+    <script src="/static/event-adapter.js?v=38.4.2"></script>
+    <!-- 新 API 扩展（Monkey patch submitTask）- 暂时禁用，因为找不到 submitTask 函数 -->
+    <script src="/static/opencode-new-api-patch.js?v=38.4.23"></script>
+
+    <!-- Mock 数据：仅对 demo session 启用，真实 session 使用 API -->
+    <!-- <script src="/static/mock-data.js?v=7"></script> -->
+    <!-- <script src="/static/enable-mock.js?v=8"></script> -->
+    <script src="/static/opencode.js?v=38.4.2"></script>
+
+    <!-- 初始化时间轴和预览组件 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化时间轴组件
+            if (document.getElementById('timeline-progress')) {
+                window.initTimelineProgress('#timeline-progress');
+
+                // 设置点击事件: 查看历史内容
+                if (window.timelineProgress) {
+                    window.timelineProgress.onStepClick(async (stepId) => {
+                        console.log('Timeline step clicked:', stepId);
+
+                        // 获取步骤信息
+                        try {
+                            const res = await fetch(`/opencode/get_step_info?step_id=${stepId}`);
+                            const stepInfo = await res.json();
+
+                            console.log('Step info:', stepInfo);
+
+                            // 如果是文件操作，显示历史内容
+                            if (stepInfo.file_path && window.rightPanelManager) {
+                                await window.rightPanelManager.showHistoryFile(
+                                    state.activeId,
+                                    stepInfo.file_path,
+                                    stepId
+                                );
+                            }
+                        } catch (e) {
+                            console.error('Failed to get step info:', e);
+                        }
+                    });
+                }
+            }
+
+            // 当切换到预览标签时显示时间轴
+            const previewTabBtn = document.querySelector('[data-tab="preview"]');
+            const timelineContainer = document.getElementById('timeline-progress-container');
+
+            if (previewTabBtn && timelineContainer) {
+                previewTabBtn.addEventListener('click', () => {
+                    // 检查是否有时间轴数据
+                    if (window.timelineProgress && window.timelineProgress.timeline.length > 0) {
+                        timelineContainer.classList.remove('hidden');
+                    }
+                });
+            }
+        });
+    </script>
+
+    <!-- Material Symbols Icon Fallback -->
+    <script>
+        (function () {
+            // 检测Material Symbols字体是否加载成功
+            setTimeout(function () {
+                const testElement = document.createElement('span');
+                testElement.style.fontFamily = 'Material Symbols Outlined';
+                testElement.textContent = 'test';
+                testElement.style.position = 'absolute';
+                testElement.style.visibility = 'hidden';
+                document.body.appendChild(testElement);
+
+                const fontsLoaded = window.getComputedStyle(testElement).fontFamily.includes('Material Symbols');
+                document.body.removeChild(testElement);
+
+                if (!fontsLoaded) {
+                    console.log('[Icon Fallback] Material Symbols not loaded, using emoji fallback');
+                    // 为常用图标添加emoji fallback
+                    const iconMap = {
+                        'add': '➕',
+                        'arrow_upward': '↑',
+                        'delete': '🗑️',
+                        'close': '✕',
+                        'send': '➤',
+                        'stop': '⏹',
+                        'refresh': '🔄',
+                        'schedule': '⏱',
+                        'check': '✅',
+                        'error': '❌',
+                        'psychology': '🧠',
+                        'edit_note': '📝',
+                        'terminal': '💻',
+                        'code': '💻',
+                        'description': '📄',
+                        'palette': '🎨',
+                        'auto_stories': '📚',
+                        'manage_search': '🔍',
+                        'extension': '🔌',
+                        'image': '🖼️',
+                        'folder_open': '📂',
+                        'more_horiz': '⋯',
+                        'present_to_all': '📺',
+                        'play_arrow': '▶️',
+                        'settings': '⚙️',
+                        'menu': '☰',
+                        'home': '🏠',
+                        'history': '📜',
+                        'smart_toy': '🤖',
+                        'lightbulb': '💡',
+                        'search': '🔍',
+                        'content_copy': '📋'
+                    };
+
+                    // 替换所有Material Symbols图标为emoji
+                    document.querySelectorAll('.material-symbols-outlined').forEach(el => {
+                        const text = el.textContent.trim();
+                        if (iconMap[text]) {
+                            el.textContent = iconMap[text];
+                            el.style.fontFamily = 'Apple Color Emoji, "Segoe UI Emoji", sans-serif';
+                        }
+                    });
+                }
+            }, 1000);
+        })();
+    </script>
+    <script src="/static/history-fix.js?v=2"></script>
+
+    <!-- 新建项目弹窗 -->
+    <div id="new-project-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-96 p-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">新建项目</h3>
+            <input type="text" id="project-name-input" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="输入项目名称" maxlength="50">
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="cancel-project-btn"
+                    class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    取消
+                </button>
+                <button id="confirm-project-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    创建
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
