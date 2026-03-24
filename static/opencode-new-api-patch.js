@@ -1342,6 +1342,17 @@ window.Logger = {
             console.log('[NewAPI] Follow-up detected, will insert separator before first chunk');
         }
 
+        // ✅ 追问时重置 phases/actions/thoughtEvents，避免旧事件重播
+        // 保留 prompt/response 用于历史气泡显示
+        if (s.response && s.response.trim()) {
+            s.phases = [];
+            s.actions = [];
+            s.orphanEvents = [];
+            s.thoughtEvents = [];
+            s.currentPhase = null;
+            console.log('[NewAPI] Follow-up: reset phases/actions for new turn');
+        }
+
         // ✅ P1修复：网络重连时清理thinking消息
         // 防止旧的thinking消息残留
         if (s._isLoadingThinking) {
@@ -2977,34 +2988,31 @@ window.Logger = {
             }
 
             if (data.messages && Array.isArray(data.messages)) {
+                // 直接从 messages 重建 prompt/response，按 user/assistant 角色分组
+                // 避免通过 processEvent 导致多轮内容混在一起
+                const pSep = '\n\n---\n\n';
+                const rSep = '\n\n---\n\n**新的回答：**\n\n';
+                const userTexts = [];
+                const assistantTexts = [];
+
                 data.messages.forEach(msg => {
                     const info = msg.info || {};
                     const parts = msg.parts || [];
+                    const textPart = parts.find(p => p.type === 'text');
+                    const text = textPart?.content?.text || '';
+                    if (!text.trim()) return;
 
-                    parts.forEach(part => {
-                        let adapted;
-                        if (part.type === 'text') {
-                            adapted = {
-                                type: info.role === 'user' ? 'user_message' : 'text',
-                                content: part.content.text || '',
-                                id: info.id
-                            };
-                            processEvent(s, adapted);
-                        } else if (part.type === 'tool') {
-                            const content = part.content;
-                            adapted = {
-                                type: 'action',
-                                data: {
-                                    tool_name: content.tool,
-                                    id: content.call_id,
-                                    input: content.tool_input
-                                },
-                                id: content.call_id
-                            };
-                            processEvent(s, adapted);
-                        }
-                    });
+                    if (info.role === 'user') {
+                        userTexts.push(text);
+                    } else {
+                        assistantTexts.push(text);
+                    }
                 });
+
+                if (userTexts.length > 0) s.prompt = userTexts.join(pSep);
+                if (assistantTexts.length > 0) s.response = assistantTexts.join(rSep);
+
+                console.log('[History] Rebuilt prompt/response from messages:', userTexts.length, 'user,', assistantTexts.length, 'assistant');
             }
 
             await loadSessionTimeline(sessionId);
