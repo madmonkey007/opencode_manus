@@ -645,7 +645,8 @@ class SessionManager:
     async def create_session(
         self,
         title: str = "New Session",
-        version: str = "1.0.0"
+        version: str = "1.0.0",
+        session_id: Optional[str] = None,
     ) -> Session:
         """
         创建新会话
@@ -653,11 +654,12 @@ class SessionManager:
         Args:
             title: 会话标题
             version: API 版本
+            session_id: 指定 session id（透传 opencode server 返回的 id）
 
         Returns:
             创建的会话对象
         """
-        session_id = generate_session_id()
+        session_id = session_id or generate_session_id()
         session = Session(
             id=session_id,
             title=title,

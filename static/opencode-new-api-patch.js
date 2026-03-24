@@ -1207,29 +1207,11 @@ window.Logger = {
                 window.saveState();
             }
         } else {
-            // ✅ P0修复：追问场景 - 追加新的prompt到现有session
-            //
-            // 说明：
-            // - 使用分隔符 '\n\n---\n\n' 追加prompt
-            // - renderResults会根据分隔符split渲染多个query气泡
-            // - turnIndex由handleNewAPIConnection负责递增，不要在这里修改！
-            //
-            const pSep = '\n\n---\n\n';
+            // ✅ 追问场景：直接复用现有 session，不拼接历史 prompt
+            // opencode server 自己维护上下文，前端只需记录最新一条 prompt 用于 UI 展示
+            existing._lastPrompt = prompt;
 
-            // 验证prompt参数
-            if (typeof prompt !== 'string' || prompt.trim().length === 0) {
-                console.error('[NewAPI] Invalid prompt for follow-up:', typeof prompt);
-                return existing;
-            }
-
-            // 追加prompt
-            existing.prompt = existing.prompt ?
-                existing.prompt + pSep + prompt :
-                prompt;
-
-            console.log('[NewAPI] Follow-up: appended prompt to session');
-            console.log('[NewAPI] Updated prompt length:', existing.prompt.length);
-            console.log('[NewAPI] Total prompts:', existing.prompt.split(pSep).length);
+            console.log('[NewAPI] Follow-up: reusing session', existing.id, 'prompt length:', prompt.length);
 
             // ✅ 保存更新后的session到localStorage
             if (typeof window.saveState === 'function') {
@@ -1511,16 +1493,9 @@ window.Logger = {
                         }, CHILD_SESSION_CLEANUP_DELAY_MS);
                     }
                     
-                    // ✅ P0修复：在任务完成时同步turnIndex状态到session对象
-                    // 这确保了window._turnIndex的值被正确保存到session中
-                    // 然后通过saveState()持久化到localStorage
+                    // ✅ 任务完成时同步 turnIndex 到 session
                     if (s && window._turnIndex) {
                         s.turnIndex = window._turnIndex;
-                        s._lastPromptCount = s._lastPromptCount || 0;
-                        console.log('[NewAPI] 💾 Saving turnIndex state on completion:', {
-                            turnIndex: s.turnIndex,
-                            _lastPromptCount: s._lastPromptCount
-                        });
                     }
                 }
             },
@@ -1531,45 +1506,16 @@ window.Logger = {
             }
         );
 
-        // ✅ v=38.4.23修复：正确处理多轮对话的turnIndex递增
-        // 问题描述：追问时turnIndex不递增，导致所有文件的turn_index都是1
-        // 根本原因：isNewSubmission只表示"是否新任务"，不表示"是否新轮次"
-        // 解决方案：使用prompt数量检测新轮次，不依赖isNewSubmission
+        // ✅ 直接发送当前 prompt（不再拼接历史，server 自己维护上下文）
+        // 追问时用 _lastPrompt，首次用 s.prompt
+        const currentPrompt = s._lastPrompt || s.prompt || '';
+        // 清掉 _lastPrompt，避免重复使用
+        s._lastPrompt = null;
 
-        const pSep = '\n\n---\n\n';
-        const promptCount = (s.prompt || '').split(pSep).length;
+        // turnIndex：简单递增，用于 UI 区分不同轮次
+        window._turnIndex = (window._turnIndex || 0) + 1;
+        s.turnIndex = window._turnIndex;
 
-        // ✅ 从session恢复turnIndex（处理页面刷新场景）
-        if (s && s.turnIndex && (!window._turnIndex || window._turnIndex < s.turnIndex)) {
-            window._turnIndex = s.turnIndex;
-            console.log('[NewAPI] Restored turnIndex from session:', window._turnIndex);
-        }
-
-        // 初始化计数器（持久化到session）
-        s._lastPromptCount = s._lastPromptCount || 0;
-
-        // ✅ 检测新轮次：prompt数量增加
-        if (promptCount > s._lastPromptCount) {
-            window._turnIndex = (window._turnIndex || 0) + 1;
-            s.turnIndex = window._turnIndex;
-            s._lastPromptCount = promptCount;
-
-            console.log('[NewAPI] 🔄 New turn detected:', {
-                turnIndex: window._turnIndex,
-                promptCount: promptCount,
-                lastPromptCount: s._lastPromptCount - 1,
-                isNewSubmission: isNewSubmission
-            });
-        } else {
-            console.log('[NewAPI] 📝 Existing turn:', {
-                turnIndex: window._turnIndex,
-                promptCount: promptCount,
-                isNewSubmission: isNewSubmission
-            });
-        }
-
-        // ✅ 总是发送消息到后端（无论是新任务还是追问）
-        const currentPrompt = s.prompt.split(pSep).pop();
         console.log('[NewAPI] 📤 Sending message (Mode:', window._currentMode, ', Turn:', window._turnIndex, ', Prompt length:', currentPrompt.length, ')');
         await window.apiClient.sendTextMessage(s.id, currentPrompt, { mode: window._currentMode });
 
@@ -2068,18 +2014,14 @@ window.Logger = {
                 // 处理阶段初始化
                 const currentTurnIndex = window._turnIndex || 0;
 
-                // ✅ P0修复：追问时强制创建新phase对象，不复用旧phase
-                // 判断是否是新对话轮次（通过比较prompt数量和现有phases的最大turn_index）
-                const pSep = '\n\n---\n\n';
-                const promptCount = (s.prompt || '').split(pSep).length;
+                // ✅ 用 turnIndex 判断是否新轮次（不再依赖 prompt 拼接计数）
                 const maxExistingTurnIndex = s.phases && s.phases.length > 0
                     ? Math.max(...s.phases.map(p => parseInt(p.turn_index, 10) || 0))
                     : 0;
 
-                const isNewTurn = promptCount > maxExistingTurnIndex;
+                const isNewTurn = currentTurnIndex > maxExistingTurnIndex;
 
                 console.log('[phases_init] Debug:', {
-                    promptCount,
                     maxExistingTurnIndex,
                     currentTurnIndex,
                     isNewTurn,

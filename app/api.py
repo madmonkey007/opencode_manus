@@ -113,7 +113,32 @@ async def create_session(
     # 使用默认值
     project_id = project_id or "proj_default"
     try:
-        session = await session_manager.create_session(title=title, version=version)
+        # ✅ 先向 opencode server 创建 session，拿到真实 id
+        # 这样前端 session id == server session id，无需两层映射
+        server_session_id = None
+        try:
+            import httpx as _httpx
+            import os as _os
+            _server_url = _os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
+            _username = _os.getenv("OPENCODE_SERVER_USERNAME", "opencode")
+            _password = _os.getenv("OPENCODE_SERVER_PASSWORD", "opencode-dev-2026")
+            async with _httpx.AsyncClient(timeout=10) as _client:
+                _resp = await _client.post(
+                    f"{_server_url}/session",
+                    json={"title": title},
+                    auth=(_username, _password),
+                )
+                if _resp.status_code in (200, 201):
+                    server_session_id = _resp.json().get("id")
+                    logger.info(f"[create_session] Got server session id: {server_session_id}")
+                else:
+                    logger.warning(f"[create_session] Server returned {_resp.status_code}, will use local id")
+        except Exception as _e:
+            logger.warning(f"[create_session] Could not reach opencode server: {_e}, using local id")
+
+        session = await session_manager.create_session(
+            title=title, version=version, session_id=server_session_id
+        )
 
         # 创建workspace目录
         from app.main import WORKSPACE_BASE
