@@ -38,8 +38,8 @@ except ImportError:
 
 logger = logging.getLogger("opencode.client")
 
-# Server API session reuse: map app session_id -> server session_id
-_SERVER_SESSION_ID_MAP: Dict[str, str] = {}
+# Server API session reuse: session_id IS the server session id (set at creation time via api.py)
+# No mapping needed - the frontend session id equals the opencode server session id.
 
 # Constants
 CLI_EVENT_TYPE_TOOL_USE = 'tool_use'
@@ -152,7 +152,20 @@ class OpenCodeClient:
         if timeout_config == "" or timeout_config == "0":
             self._preview_task_timeout = None  # 默认不限制
         else:
-            self._preview_task_timeout = float(timeout_config)
+            try:
+                timeout = float(timeout_config)
+                if timeout <= 0:
+                    logger.warning(
+                        f"PREVIEW_TASK_TIMEOUT must be positive, got {timeout}, using None (unlimited)"
+                    )
+                    self._preview_task_timeout = None
+                else:
+                    self._preview_task_timeout = timeout
+            except ValueError as e:
+                logger.warning(
+                    f"Invalid PREVIEW_TASK_TIMEOUT value: '{timeout_config}', using None (unlimited): {e}"
+                )
+                self._preview_task_timeout = None
 
     def _extract_session_id_from_payload(self, payload: Dict[str, Any]) -> Optional[str]:
         props = payload.get("properties") or {}
@@ -430,9 +443,11 @@ class OpenCodeClient:
                                             # 无超时限制，让任务自然完成
                                             await asyncio.gather(*self._active_preview_tasks, return_exceptions=True)
                                             elapsed = time.time() - start_time
+                                            # 防御性编程：防止除零错误（虽然逻辑上task_count>0）
+                                            avg_time = elapsed / max(task_count, 1)
                                             logger.info(
                                                 f"[BRIDGE] All {task_count} preview tasks completed for session {session_id} "
-                                                f"in {elapsed:.1f}s (avg {elapsed/task_count:.1f}s per task)"
+                                                f"in {elapsed:.1f}s (avg {avg_time:.1f}s per task)"
                                             )
                                         else:
                                             # 用户配置了超时时间（特殊场景）
@@ -515,32 +530,8 @@ class OpenCodeClient:
 
     async def _execute_via_server_api(self, session_id, assistant_message_id, user_prompt, mode, model_id):
         base_url = self.server_api_base_url
-        server_session_id = _SERVER_SESSION_ID_MAP.get(session_id)
-        if not server_session_id:
-            try:
-                # ✅ 添加Basic认证
-                resp = await httpx.AsyncClient().post(
-                    f"{base_url}/session",
-                    auth=(self.server_username, self.server_password)
-                )
-                resp.raise_for_status()
-                server_session_id = resp.json().get("id")
-                _SERVER_SESSION_ID_MAP[session_id] = server_session_id
-                logger.info(f"Created server session: {server_session_id}")
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 401:
-                    logger.error("Authentication failed: invalid username or password. Check OPENCODE_SERVER_USERNAME and OPENCODE_SERVER_PASSWORD")
-                elif e.response.status_code == 403:
-                    logger.error("Access forbidden: check server permissions")
-                else:
-                    logger.error(f"HTTP error {e.response.status_code}: {e}")
-                return False
-            except httpx.RequestError as e:
-                logger.error(f"Connection failed: is the server running at {base_url}? {e}")
-                return False
-            except Exception as e:
-                logger.error(f"Failed to create server session: {e}")
-                return False
+        # ✅ session_id 直接就是 opencode server session id（在 api.py create_session 时已透传）
+        server_session_id = session_id
 
         # Parse model from env
         model_id = os.getenv("OPENCODE_MODEL_ID", os.getenv("OPENAI_MODEL", "new-api/glm-4.7"))
