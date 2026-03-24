@@ -1201,6 +1201,10 @@ window.Logger = {
             // opencode server 自己维护上下文，前端只需记录最新一条 prompt 用于 UI 展示
             existing._lastPrompt = prompt;
 
+            // ✅ 重置本轮状态标志，避免影响新一轮的完成判断
+            existing._hasCompletionSummary = false;
+            existing._hasAnswerChunk = false;
+
             console.log('[NewAPI] Follow-up: reusing session', existing.id, 'prompt length:', prompt.length);
 
             // ✅ 保存更新后的session到localStorage
@@ -1316,6 +1320,13 @@ window.Logger = {
         if (window.state.activeSSE) {
             console.log('[NewAPI] Closing existing SSE');
             window.state.activeSSE.close();
+        }
+
+        // ✅ 追问分隔符：如果 session 已有回复内容，插入分隔符让渲染器创建新气泡
+        const RESPONSE_SEP = '\n\n---\n\n**新的回答：**\n\n';
+        if (s.response && s.response.trim()) {
+            s.response += RESPONSE_SEP;
+            console.log('[NewAPI] Follow-up detected, inserted response separator');
         }
 
         // ✅ P1修复：网络重连时清理thinking消息
@@ -1443,8 +1454,29 @@ window.Logger = {
                     debouncedSaveState();
                 }
 
-                // ✅ 代码质量改进：使用节流版本减少DOM更新频率
-                throttledRenderResults();
+                // 🔍 时序诊断：记录渲染调用时间
+                if (window.DEBUG_MODE) {
+                    const now = Date.now();
+                    const timeSinceLastRender = s._lastRenderTime ? now - s._lastRenderTime : 0;
+                    console.log('[Render] Triggering render:', {
+                        eventType: adapted.type,
+                        timeSinceLastRender: timeSinceLastRender + 'ms',
+                        willThrottle: !['phases_init', 'phase_start', 'phase_finish', 'action', 'thought'].includes(adapted.type)
+                    });
+                    s._lastRenderTime = now;
+                }
+
+                // ✅ 关键事件立即渲染，高频事件使用节流
+                const immediateRenderEvents = ['phases_init', 'phase_start', 'phase_finish', 'action', 'thought'];
+                if (immediateRenderEvents.includes(adapted.type)) {
+                    // 立即渲染，不使用节流
+                    if (typeof window.renderResults === 'function') {
+                        window.renderResults();
+                    }
+                } else {
+                    // 其他事件使用节流（如text delta）
+                    throttledRenderResults();
+                }
 
                 // 检查是否完成
                 if (adapted.type === 'status' && (adapted.value === 'done' || adapted.value === 'completed')) {
@@ -1735,6 +1767,24 @@ window.Logger = {
     function processEvent(s, adapted, depth = 0) {
         // ✅ 添加错误边界：确保任何事件处理异常都不会中断整个数据流
         try {
+            // 🔍 调试日志：仅在DEBUG模式下追踪所有事件
+            if (window.DEBUG_MODE) {
+                const now = Date.now();
+                const timeSinceLastEvent = s._lastEventTime ? now - s._lastEventTime : 0;
+                s._lastEventTime = now;
+
+                console.log('[processEvent] Event received:', {
+                    type: adapted.type,
+                    sessionId: s.id,
+                    currentPhase: s.currentPhase,
+                    phasesCount: s.phases?.length || 0,
+                    actionsCount: s.actions?.length || 0,
+                    depth: depth,
+                    timestamp: now,
+                    timeSinceLastEvent: timeSinceLastEvent + 'ms'
+                });
+            }
+
             // ====================================================================
             // 🔴 CRITICAL FIX: 递归深度检查
             // Early Exit: 防止过深的递归导致栈溢出
@@ -2001,6 +2051,18 @@ window.Logger = {
                 // This prevents the "thinking" content from appearing in the visible chat output
                 return;
             } else if (adapted.type === 'phases_init') {
+                // 🔍 时序诊断：记录phases_init事件到达时间
+                if (window.DEBUG_MODE) {
+                    const now = Date.now();
+                    const timeSinceSessionStart = s._sessionStartTime ? now - s._sessionStartTime : 0;
+                    console.log('[phases_init] Event received:', {
+                        timestamp: now,
+                        timeSinceSessionStart: timeSinceSessionStart + 'ms',
+                        phasesCount: adapted.phases?.length || 0
+                    });
+                    if (!s._sessionStartTime) s._sessionStartTime = now;
+                }
+
                 // 处理阶段初始化
                 const currentTurnIndex = window._turnIndex || 0;
 
@@ -2011,7 +2073,8 @@ window.Logger = {
 
                 const isNewTurn = currentTurnIndex > maxExistingTurnIndex;
 
-                console.log('[phases_init] Debug:', {
+                if (window.DEBUG_MODE) {
+                    console.log('[phases_init] Debug:', {
                     maxExistingTurnIndex,
                     currentTurnIndex,
                     isNewTurn,
@@ -2258,7 +2321,12 @@ window.Logger = {
                         });
                     }
                     s.status = isError ? 'error' : 'completed';
-                    s.currentPhase = null;
+                    // Fix: Keep currentPhase for rendering after task completion
+                    // Setting currentPhase to null would cause rendering to fail
+                    // s.currentPhase = null; // REMOVED: Causes rendering issues
+                    if (window.DEBUG_MODE) {
+                        console.log('[processEvent] Task completed, keeping currentPhase:', s.currentPhase);
+                    }
 
                     const stopBtn = document.getElementById('stopStream');
                     const runBtn = document.getElementById('runStream');
@@ -2408,7 +2476,56 @@ window.Logger = {
                 const phase = s.phases.find(p => p.id === adapted.phase_id);
                 if (phase) phase.status = 'completed';
             } else if (adapted.type === 'action' || adapted.type === 'thought' || adapted.type === 'error') {
-                // ✅ 修复：更新 session 的 actions 和 orphanEvents 数组
+                // Debug: Log action/thought/error events only in DEBUG mode
+                if (window.DEBUG_MODE) {
+                    console.log('[processEvent] Action/Thought/Error event:', {
+                        type: adapted.type,
+                        currentPhase: s.currentPhase,
+                        hasPhases: !!s.phases,
+                        phasesCount: s.phases?.length || 0,
+                        toolName: adapted.data?.tool_name || adapted.data?.tool
+                    });
+                }
+
+                // Fallback: Auto-create default phase if no currentPhase exists
+                // This handles cases where backend doesn't send phases_init event
+                if (!s.currentPhase && adapted.type === 'action') {
+                    try {
+                        // Check if default phase already exists to prevent duplicates
+                        let defaultPhase = s.phases?.find(p => p.id.startsWith('phase_default_'));
+
+                        if (!defaultPhase) {
+                            if (window.DEBUG_MODE) {
+                                console.warn('[processEvent] No current phase, creating default phase');
+                            }
+
+                            const defaultPhaseId = `phase_default_${Date.now()}`;
+                            defaultPhase = {
+                                id: defaultPhaseId,
+                                title: '执行任务',
+                                description: '正在执行任务',
+                                status: 'active',
+                                events: [],
+                                turn_index: window._turnIndex || 1,
+                                number: 1
+                            };
+
+                            if (!s.phases) s.phases = [];
+                            s.phases.push(defaultPhase);
+
+                            if (window.DEBUG_MODE) {
+                                console.log('[processEvent] Created default phase:', defaultPhaseId);
+                            }
+                        }
+
+                        s.currentPhase = defaultPhase.id;
+                    } catch (error) {
+                        console.error('[processEvent] Failed to create default phase:', error);
+                        // Continue processing without interrupting event flow
+                    }
+                }
+
+                // Fix: Update session's actions and orphanEvents arrays
                 if (adapted.type === 'action') {
                     const actionEvent = {
                         type: 'action',
