@@ -2760,9 +2760,29 @@ window.Logger = {
                             : content;
                         console.log('[NewAPI] Thought event received:', preview);
 
-                        // ✅ thought 事件由下方统一处理逻辑处理（有去重）
-                        // 不在这里直接添加，避免重复
-                        console.log('[NewAPI] Thought event will be processed by unified logic with deduplication');
+                        // ✅ Option C: 判断当前是否有active phase
+                        if (s.currentPhase && s.phases) {
+                            const currentPhase = s.phases.find(p => p.id === s.currentPhase);
+                            if (currentPhase) {
+                                // 添加到当前phase的events
+                                if (!currentPhase.events) currentPhase.events = [];
+                                currentPhase.events.push({
+                                    type: 'thought',
+                                    content: content,
+                                    timestamp: Date.now()
+                                });
+                                console.log('[NewAPI] Thought added to phase.events, phase:', currentPhase.id);
+                            } else {
+                                // phase未找到 - 由最后的统一添加逻辑处理
+                                console.log('[NewAPI] Phase not found, will add to orphanEvents via unified logic');
+                            }
+                        } else {
+                            // ✅ 没有active phase - 由最后的统一添加逻辑处理
+                            console.log('[NewAPI] No active phase, will add to orphanEvents via unified logic');
+
+                            // orphanEvents 由下方方案A统一处理，不加 thoughtEvents
+
+                        }
 
                         // Store last thought for fallback use only if final answer is missing
                         if (content) {
