@@ -2374,7 +2374,7 @@ window.Logger = {
                     const startTime = Date.now();
 
                     const checkTypingAndHide = () => {
-                        const isTyping = window.rightPanelManager?.isTyping();
+                        const isTyping = window.rightPanelManager?._isTyping;
                         const elapsed = Date.now() - startTime;
 
                         // ✅ 添加多重检查条件，避免误判
@@ -3192,3 +3192,4 @@ window.Logger = {
     });
     console.log('[NewAPI] ChildSessionManager exposed to global scope');
 })();
+
