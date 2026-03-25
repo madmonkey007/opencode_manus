@@ -2767,27 +2767,27 @@ window.Logger = {
                             // ✅ 没有active phase - 由最后的统一添加逻辑处理
                             console.log('[NewAPI] No active phase, will add to orphanEvents via unified logic');
 
-                            // 保留到 thoughtEvents 用于其他可能的用途
-                            if (!s.thoughtEvents) s.thoughtEvents = [];
-                            s.thoughtEvents.push({
-                                type: 'thought',
-                                content: content,
-                                timestamp: Date.now()
-                            });
+                            // orphanEvents 由下方方案A统一处理，不加 thoughtEvents
+
+
+
+
+
+
                         }
 
                         // Store last thought for fallback use only if final answer is missing
                         if (content) {
                             s._lastThoughtContent = content;
                         }
+                        // orphanEvents 由下方方案A统一处理，此处不重复添加
 
-                        // ✅ 修复：总是添加到 orphanEvents（增强任务面板需要）
-                        if (!s.orphanEvents) s.orphanEvents = [];
-                        s.orphanEvents.push({
-                            type: 'thought',
-                            content: content,
-                            timestamp: Date.now()
-                        });
+
+
+
+
+
+
                         console.log('[NewAPI] Thought also added to orphanEvents for panel display');
 
                         // ✅ 使用节流渲染 - 实现流式显示
