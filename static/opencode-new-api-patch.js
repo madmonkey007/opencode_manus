@@ -2769,11 +2769,6 @@ window.Logger = {
 
                             // orphanEvents 由下方方案A统一处理，不加 thoughtEvents
 
-
-
-
-
-
                         }
 
                         // Store last thought for fallback use only if final answer is missing
@@ -2787,9 +2782,7 @@ window.Logger = {
 
 
 
-
                         console.log('[NewAPI] Thought also added to orphanEvents for panel display');
-
                         // ✅ 使用节流渲染 - 实现流式显示
                         if (typeof window.throttledRenderResults === 'function') {
                             window.throttledRenderResults();

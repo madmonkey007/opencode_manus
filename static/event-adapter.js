@@ -1,4 +1,4 @@
-﻿/**
+/**
  * OpenCode Event Adapter
  *
  * 将新架构的 SSE 事件适配为前端现有代码期望的格式

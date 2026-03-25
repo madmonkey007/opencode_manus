@@ -1,6 +1,12 @@
 const el = (sel) => document.querySelector(sel);
 const els = (sel) => Array.from(document.querySelectorAll(sel));
 
+// ✅ 多轮对话分隔符常量（便于维护和国际化）
+const MULTI_TURN_SEPARATOR = {
+    PROMPT: '\n\n---\n\n',
+    RESPONSE: '\n\n---\n\n**新的回答：**\n\n'
+};
+
 window.state = {
     sessions: [],
     activeId: null,
@@ -335,8 +341,27 @@ function _executeSave(retryCount = 0) {
 
 //  多轮对话重建公共函数：从后端 messages 正确重建 prompt/response（带分隔符）
 function rebuildMultiTurnFromMessages(s, messages) {
-    const pSep = '\n\n---\n\n';
-    const rSep = '\n\n---\n\n**新的回答：**\n\n';
+    // ✅ 输入验证：防止 null/undefined 导致运行时错误
+    if (!s || typeof s !== 'object') {
+        console.warn('[rebuildMultiTurnFromMessages] Invalid session object:', s);
+        return;
+    }
+    // ✅ 验证 session 必需字段
+    if (!s.id) {
+        console.warn('[rebuildMultiTurnFromMessages] Session missing id:', s);
+        return;
+    }
+    if (!messages || !Array.isArray(messages)) {
+        console.warn('[rebuildMultiTurnFromMessages] Invalid messages:', messages);
+        return;
+    }
+    if (messages.length === 0) {
+        console.log('[rebuildMultiTurnFromMessages] Empty messages array for session:', s.id, '- skipping');
+        return;
+    }
+
+    const pSep = MULTI_TURN_SEPARATOR.PROMPT;
+    const rSep = MULTI_TURN_SEPARATOR.RESPONSE;
     const userTexts = [];
     const assistantTexts = [];
 
@@ -345,6 +370,10 @@ function rebuildMultiTurnFromMessages(s, messages) {
     s.thoughtEvents = [];
 
     messages.forEach(msg => {
+        // ✅ 跳过无效消息
+        if (!msg || (typeof msg !== 'object')) {
+            return;
+        }
         const role = msg.info?.role || msg.role;
         if (role === 'user') {
             const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
@@ -764,8 +793,8 @@ async function loadState() {
                 // ✅ 格式检测：检查 localStorage 里的旧格式数据（多轮但无分隔符）
                 // 条件：有 actions（说明之前保存过完整数据）但 prompt/response 无分隔符
                 if (s.id.startsWith('ses_') && !s._needsFormatFix && !s._deepLoaded && !s._isLoading) {
-                    const pSep = '\n\n---\n\n';
-                    const rSep = '\n\n---\n\n**新的回答：**\n\n';
+                    const pSep = MULTI_TURN_SEPARATOR.PROMPT;
+                    const rSep = MULTI_TURN_SEPARATOR.RESPONSE;
                     const hasMultiTurnActions = s.actions && s.actions.length > 0;
                     const promptHasSep = s.prompt && s.prompt.includes(pSep);
                     const responseHasSep = s.response && s.response.includes(rSep);
@@ -788,29 +817,36 @@ async function loadState() {
             const needsFixSessions = state.sessions.filter(s => s._needsFormatFix && !s._isLoading);
             if (needsFixSessions.length > 0 && typeof apiClient !== 'undefined') {
                 console.log('[loadState] Fixing old-format sessions:', needsFixSessions.length);
-                needsFixSessions.forEach(async s => {
-                    s._isLoading = true;
-                    try {
-                        const data = await apiClient.getMessages(s.id);
-                        if (data && data.messages && data.messages.length > 0) {
-                            if (data.phases && data.phases.length > 0) {
-                                s.phases = data.phases;
+                // ✅ 修复内存泄漏：使用 for...of 替代 forEach，确保正确等待每个异步操作
+                (async () => {
+                    for (const s of needsFixSessions) {
+                        s._isLoading = true;
+                        try {
+                            const data = await apiClient.getMessages(s.id);
+                            if (data && data.messages && data.messages.length > 0) {
+                                if (data.phases && data.phases.length > 0) {
+                                    s.phases = data.phases;
+                                }
+                                rebuildMultiTurnFromMessages(s, data.messages);
+                                s._needsFormatFix = false;
+                                s._deepLoaded = true;
+                                console.log('[loadState] Format fix complete for:', s.id);
+                                saveState();
+                                if (state.activeId === s.id && typeof renderAll === 'function') {
+                                    renderAll();
+                                }
                             }
-                            rebuildMultiTurnFromMessages(s, data.messages);
-                            s._needsFormatFix = false;
-                            s._deepLoaded = true;
-                            console.log('[loadState] Format fix complete for:', s.id);
-                            saveState();
-                            if (state.activeId === s.id && typeof renderAll === 'function') {
-                                renderAll();
-                            }
+                        } catch (e) {
+                            console.warn('[loadState] Format fix failed for:', s.id, e);
+                            // ✅ 保存错误信息，允许用户重试
+                            s._formatFixError = String(e);
+                            // 不设置 _needsFormatFix = false，允许刷新后重试
+                        } finally {
+                            s._isLoading = false;
                         }
-                    } catch (e) {
-                        console.warn('[loadState] Format fix failed for:', s.id, e);
-                        s._needsFormatFix = false; // 避免无限重试
-                    } finally {
-                        s._isLoading = false;
                     }
+                })().catch(err => {
+                    console.error('[loadState] Unexpected error during format fix:', err);
                 });
             }
 
@@ -904,67 +940,70 @@ async function loadState() {
 
                 if (newSessions.length > 0) {
                     console.log('[Sync] Deep loading', newSessions.length, 'new sessions...');
-                    newSessions.forEach(async bs => {
-                        const session = state.sessions.find(s => s.id === bs.id);
-                        if (!session || session._isLoading) return;
+                    // ✅ 修复内存泄漏：使用 IIFE + for...of 替代 forEach，确保正确等待
+                    (async () => {
+                        for (const bs of newSessions) {
+                            const session = state.sessions.find(s => s.id === bs.id);
+                            if (!session || session._isLoading) continue;
 
-                        session._isLoading = true;
-                        try {
-                            const data = await apiClient.getMessages(bs.id);
-                            if (data && data.messages) {
-                                // ✅ 修复：data.phases 为空时保留 localStorage 里的 phases，不覆盖
-                                if (data.phases && data.phases.length > 0) {
-                                    session.phases = data.phases;
-                                }
-                                // ✅ 多轮重建：用 pSep/rSep 正确拼接多轮 prompt/response
-                                rebuildMultiTurnFromMessages(session, data.messages);
-                                console.log('[Sync] Deep load complete for:', bs.id, '(', session.actions.length, 'actions)');
-                            }
-                        } catch (e) {
-                            console.warn('[Sync] Failed to deep load', bs.id, ':', e);
-
-                            // ✅ v=38.1修复：降级尝试timeline API（从steps表获取工具调用）
-                            if (typeof apiClient !== 'undefined' && apiClient.getTimeline) {
-                                try {
-                                    console.log('[Sync] Attempting timeline API fallback for:', bs.id);
-                                    const timelineData = await apiClient.getTimeline(bs.id);
-
-                                    if (timelineData && timelineData.timeline && timelineData.timeline.length > 0) {
-                                        // 转换timeline steps为actions格式
-                                        session.actions = timelineData.timeline.map(step => ({
-                                            type: 'action',
-                                            id: step.step_id,
-                                            data: {
-                                                tool_name: step.tool_name,
-                                                input: step.tool_input ? JSON.parse(step.tool_input) : {},
-                                                output: null, // steps表没有output字段
-                                                status: 'completed',
-                                                action_type: step.action_type,
-                                                file_path: step.file_path
-                                            }
-                                        }));
-
-                                        // 同时添加到orphanEvents以保持兼容
-                                        session.orphanEvents = [...session.actions];
-
-                                        console.log('[Sync] Timeline fallback successful for:', bs.id, '(', session.actions.length, 'actions from timeline)');
-                                    } else {
-                                        console.log('[Sync] Timeline API returned empty data for:', bs.id);
+                            session._isLoading = true;
+                            try {
+                                const data = await apiClient.getMessages(bs.id);
+                                if (data && data.messages) {
+                                    // ✅ 修复：data.phases 为空时保留 localStorage 里的 phases，不覆盖
+                                    if (data.phases && data.phases.length > 0) {
+                                        session.phases = data.phases;
                                     }
-                                } catch (timelineError) {
-                                    console.warn('[Sync] Timeline API fallback also failed:', bs.id, timelineError);
+                                    // ✅ 多轮重建：用 pSep/rSep 正确拼接多轮 prompt/response
+                                    rebuildMultiTurnFromMessages(session, data.messages);
+                                    console.log('[Sync] Deep load complete for:', bs.id, '(', session.actions.length, 'actions)');
                                 }
-                            }
-                        } finally {
-                            session._isLoading = false;
-                        }
-                    });
+                            } catch (e) {
+                                console.warn('[Sync] Failed to deep load', bs.id, ':', e);
 
-                    // 等待所有深度加载完成后保存
-                    setTimeout(() => {
+                                // ✅ v=38.1修复：降级尝试timeline API（从steps表获取工具调用）
+                                if (typeof apiClient !== 'undefined' && apiClient.getTimeline) {
+                                    try {
+                                        console.log('[Sync] Attempting timeline API fallback for:', bs.id);
+                                        const timelineData = await apiClient.getTimeline(bs.id);
+
+                                        if (timelineData && timelineData.timeline && timelineData.timeline.length > 0) {
+                                            // 转换timeline steps为actions格式
+                                            session.actions = timelineData.timeline.map(step => ({
+                                                type: 'action',
+                                                id: step.step_id,
+                                                data: {
+                                                    tool_name: step.tool_name,
+                                                    input: step.tool_input ? JSON.parse(step.tool_input) : {},
+                                                    output: null, // steps表没有output字段
+                                                    status: 'completed',
+                                                    action_type: step.action_type,
+                                                    file_path: step.file_path
+                                                }
+                                            }));
+
+                                            // 同时添加到orphanEvents以保持兼容
+                                            session.orphanEvents = [...session.actions];
+
+                                            console.log('[Sync] Timeline fallback successful for:', bs.id, '(', session.actions.length, 'actions from timeline)');
+                                        } else {
+                                            console.log('[Sync] Timeline API returned empty data for:', bs.id);
+                                        }
+                                    } catch (timelineError) {
+                                        console.warn('[Sync] Timeline API fallback also failed:', bs.id, timelineError);
+                                    }
+                                }
+                            } finally {
+                                session._isLoading = false;
+                            }
+                        }
+
+                        // ✅ 等待所有深度加载完成后保存（在 for...of 循环后自然执行）
                         console.log('[Sync] Saving state after deep loads');
                         saveState();
-                    }, 1000);
+                    })().catch(err => {
+                        console.error('[Sync] Unexpected error during deep load:', err);
+                    });
                 } else {
                     // 没有新session，直接保存
                     setTimeout(() => saveState(), 100);
@@ -1550,7 +1589,7 @@ function renderResults() {
     }
 
     if (s.prompt) {
-        const pSep = '\n\n---\n\n';
+        const pSep = MULTI_TURN_SEPARATOR.PROMPT;
         const prompts = s.prompt.split(pSep);
         prompts.forEach(p => {
             const m = document.createElement('div');
@@ -1649,7 +1688,7 @@ function renderResults() {
     convo.appendChild(timelineContainer);
 
     if (s.response) {
-        const rSep = '\n\n---\n\n**新的回答：**\n\n';
+        const rSep = MULTI_TURN_SEPARATOR.RESPONSE;
         const responses = s.response.split(rSep);
         responses.forEach((resp, index) => {
             let filteredResp = resp;
@@ -2538,8 +2577,8 @@ function bindUI() {
                 }
                 s.currentPhase = data.phases.find(p => p.status === 'active')?.id || null;
             } else if (data.type === 'answer_chunk') {
-                const pSep = '\n\n---\n\n';
-                const rSep = '\n\n---\n\n**新的回答：**\n\n';
+                const pSep = MULTI_TURN_SEPARATOR.PROMPT;
+                const rSep = MULTI_TURN_SEPARATOR.RESPONSE;
                 const pCount = s.prompt.split(pSep).length - 1;
                 const rCount = s.response.split(rSep).length - 1;
                 if (pCount > rCount) s.response += rSep;

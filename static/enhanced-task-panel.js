@@ -257,30 +257,6 @@ function renderEnhancedTaskPanel(session) {
         }
 
         // 2b. thoughtEvents 已废弃，thought 通过 orphanEvents 按轮次处理
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        }
-
         // 2c. orphanEvents 平铺渲染（没有真实 phase 时，action/thought/error 直接平铺）
         // 2c. orphanEvents 平铺渲染 - 每轮按 _turnIndex 过滤显示
         if (session.orphanEvents && session.orphanEvents.length > 0) {
