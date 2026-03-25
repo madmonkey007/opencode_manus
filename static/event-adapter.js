@@ -649,3 +649,4 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // 全局访问
 window.EventAdapter = EventAdapter;
+

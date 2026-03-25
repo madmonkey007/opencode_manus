@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OpenCode.js 新 API 扩展 (V2.8)
  * 修复 404 错误：强制丢弃前端生成的旧版伪造 Session ID
  * 完整功能修复：找回丢失的 executeSubmission, prepareSession 等核心函数
@@ -1068,6 +1068,15 @@ window.Logger = {
             }
         }
 
+        // ✅ 追问分隔符：第一个 chunk 到来时插入分隔符，此时 s.response 还是上一轮的内容
+        // 在差值算法之前插入，确保 currentResp 包含分隔符，算法能正确处理
+        const RESPONSE_SEP = '\n\n---\n\n**新的回答：**\n\n';
+        if (s._needsResponseSeparator) {
+            s._needsResponseSeparator = false;
+            s.response = (s.response || '') + RESPONSE_SEP;
+            console.log('[NewAPI] Inserted response separator for follow-up turn');
+        }
+
         // 📝 逐步输出核心逻辑 (差值算法)
         const currentResp = s.response || '';
         let delta = '';
@@ -1236,6 +1245,15 @@ window.Logger = {
             // ✅ 追问场景：直接复用现有 session，不拼接历史 prompt
             // opencode server 自己维护上下文，前端只需记录最新一条 prompt 用于 UI 展示
             existing._lastPrompt = prompt;
+            //  追问：把新 prompt 追加到 existing.prompt，用分隔符隔开，确保 query 气泡正确渲染
+            const pSep = '\n\n---\n\n';
+            existing.prompt = (existing.prompt || '') + pSep + prompt;
+
+
+            // ✅ 重置本轮状态标志，避免影响新一轮的完成判断
+            existing._hasCompletionSummary = false;
+            existing._hasAnswerChunk = false;
+            existing._needsResponseSeparator = false; // 由 handleNewAPIConnection 重新设置
 
             console.log('[NewAPI] Follow-up: reusing session', existing.id, 'prompt length:', prompt.length);
 
@@ -1352,6 +1370,24 @@ window.Logger = {
         if (window.state.activeSSE) {
             console.log('[NewAPI] Closing existing SSE');
             window.state.activeSSE.close();
+        }
+
+        // ✅ 追问标记：如果 session 已有回复内容，标记下一个 chunk 前需要插入分隔符
+        if (s.response && s.response.trim()) {
+            // fix: 立即插入分隔符，不等 chunk（避免无回复轮次导致 responses 偏移）
+            const RESPONSE_SEP = '\n\n---\n\n**新的回答：**\n\n';
+            s.response = s.response + RESPONSE_SEP;
+            s._needsResponseSeparator = false;
+            console.log('[NewAPI] Follow-up: inserted response separator immediately');
+        }
+
+        // ✅ 追问时重置 thoughtEvents/currentPhase，避免旧思考事件残留
+        // 注意：不清空 s.phases！phases 带有 turn_index，渲染器会按轮次过滤
+        // 清空 phases 会导致 SSE 重连时后端重播旧 phases 事件，造成历史 phases 重新出现
+        if (s.response && s.response.trim()) {
+            s.thoughtEvents = [];
+            s.currentPhase = null;
+            console.log('[NewAPI] Follow-up: reset thoughtEvents/currentPhase for new turn (phases preserved for turn_index filtering)');
         }
 
         // ✅ P1修复：网络重连时清理thinking消息
@@ -1771,6 +1807,24 @@ window.Logger = {
     function processEvent(s, adapted, depth = 0) {
         // ✅ 添加错误边界：确保任何事件处理异常都不会中断整个数据流
         try {
+            // 🔍 调试日志：仅在DEBUG模式下追踪所有事件
+            if (window.DEBUG_MODE) {
+                const now = Date.now();
+                const timeSinceLastEvent = s._lastEventTime ? now - s._lastEventTime : 0;
+                s._lastEventTime = now;
+
+                console.log('[processEvent] Event received:', {
+                    type: adapted.type,
+                    sessionId: s.id,
+                    currentPhase: s.currentPhase,
+                    phasesCount: s.phases?.length || 0,
+                    actionsCount: s.actions?.length || 0,
+                    depth: depth,
+                    timestamp: now,
+                    timeSinceLastEvent: timeSinceLastEvent + 'ms'
+                });
+            }
+
             // ====================================================================
             // 🔴 CRITICAL FIX: 递归深度检查
             // Early Exit: 防止过深的递归导致栈溢出
@@ -2037,6 +2091,18 @@ window.Logger = {
                 // This prevents the "thinking" content from appearing in the visible chat output
                 return;
             } else if (adapted.type === 'phases_init') {
+                // 🔍 时序诊断：记录phases_init事件到达时间
+                if (window.DEBUG_MODE) {
+                    const now = Date.now();
+                    const timeSinceSessionStart = s._sessionStartTime ? now - s._sessionStartTime : 0;
+                    console.log('[phases_init] Event received:', {
+                        timestamp: now,
+                        timeSinceSessionStart: timeSinceSessionStart + 'ms',
+                        phasesCount: adapted.phases?.length || 0
+                    });
+                    if (!s._sessionStartTime) s._sessionStartTime = now;
+                }
+
                 // 处理阶段初始化
                 const currentTurnIndex = window._turnIndex || 0;
 
@@ -2047,12 +2113,14 @@ window.Logger = {
 
                 const isNewTurn = currentTurnIndex > maxExistingTurnIndex;
 
-                console.log('[phases_init] Debug:', {
-                    maxExistingTurnIndex,
-                    currentTurnIndex,
-                    isNewTurn,
-                    phasesCount: adapted.phases?.length
-                });
+                if (window.DEBUG_MODE) {
+                        console.log('[phases_init] Debug:', {
+                        maxExistingTurnIndex,
+                        currentTurnIndex,
+                        isNewTurn,
+                        phasesCount: adapted.phases?.length
+                    });
+                }
 
                 const newPhases = (adapted.phases || []).map(p => {
                     // ✅ P0修复v3：新轮次时创建独立的phase对象，不复用旧phase
@@ -2294,14 +2362,19 @@ window.Logger = {
                         });
                     }
                     s.status = isError ? 'error' : 'completed';
-                    s.currentPhase = null;
+                    // Fix: Keep currentPhase for rendering after task completion
+                    // Setting currentPhase to null would cause rendering to fail
+                    // s.currentPhase = null; // REMOVED: Causes rendering issues
+                    if (window.DEBUG_MODE) {
+                        console.log('[processEvent] Task completed, keeping currentPhase:', s.currentPhase);
+                    }
 
                     // ✅ 等待右侧预览完成后再隐藏停止按钮（带超时保护）
                     const MAX_WAIT_TIME = 5000; // 最大等待5秒
                     const startTime = Date.now();
 
                     const checkTypingAndHide = () => {
-                        const isTyping = window.rightPanelManager?.isTyping();
+                        const isTyping = window.rightPanelManager?._isTyping;
                         const elapsed = Date.now() - startTime;
 
                         // ✅ 添加多重检查条件，避免误判
@@ -2516,12 +2589,63 @@ window.Logger = {
                 const phase = s.phases.find(p => p.id === adapted.phase_id);
                 if (phase) phase.status = 'completed';
             } else if (adapted.type === 'action' || adapted.type === 'thought' || adapted.type === 'error') {
-                // ✅ 修复：更新 session 的 actions 和 orphanEvents 数组
+                // Debug: Log action/thought/error events only in DEBUG mode
+                if (window.DEBUG_MODE) {
+                    console.log('[processEvent] Action/Thought/Error event:', {
+                        type: adapted.type,
+                        currentPhase: s.currentPhase,
+                        hasPhases: !!s.phases,
+                        phasesCount: s.phases?.length || 0,
+                        toolName: adapted.data?.tool_name || adapted.data?.tool
+                    });
+                }
+
+                // Fallback: Auto-create default phase if no currentPhase exists
+                // This handles cases where backend doesn't send phases_init event
+                if (!s.currentPhase && adapted.type === 'action') {
+                    try {
+                        // Check if default phase already exists to prevent duplicates
+                        let defaultPhase = s.phases?.find(p => p.id.startsWith('phase_default_'));
+
+                        if (!defaultPhase) {
+                            if (window.DEBUG_MODE) {
+                                console.warn('[processEvent] No current phase, creating default phase');
+                            }
+
+                            const defaultPhaseId = `phase_default_${Date.now()}`;
+                            defaultPhase = {
+                                id: defaultPhaseId,
+                                title: '执行任务',
+                                description: '正在执行任务',
+                                status: 'active',
+                                events: [],
+                                turn_index: window._turnIndex || 1,
+                                number: 1
+                            };
+
+                            if (!s.phases) s.phases = [];
+                            s.phases.push(defaultPhase);
+
+                            if (window.DEBUG_MODE) {
+                                console.log('[processEvent] Created default phase:', defaultPhaseId);
+                            }
+                        }
+
+                        s.currentPhase = defaultPhase.id;
+                    } catch (error) {
+                        console.error('[processEvent] Failed to create default phase:', error);
+                        // Continue processing without interrupting event flow
+                    }
+                }
+
+                // Fix: Update session's actions and orphanEvents arrays
                 if (adapted.type === 'action') {
                     const actionEvent = {
                         type: 'action',
                         id: adapted.id || adapted.call_id,
-                        data: adapted.data || {}
+                        data: adapted.data || {},
+                        // ✅ 修复：标记所属轮次，防止在多轮对话中重复显示
+                        _turnIndex: window._turnIndex || 0
                     };
 
                     const actionData = actionEvent.data || {};
@@ -2557,14 +2681,25 @@ window.Logger = {
                         }
                     }
 
-                    // 确保 actions 和 orphanEvents 数组存在
+                    // 确保 actions 数组存在
                     if (!s.actions) s.actions = [];
-                    if (!s.orphanEvents) s.orphanEvents = [];
 
-                    // 添加到数组
-                    s.actions.push(actionEvent);
-                    s.orphanEvents.push(actionEvent);
+                    // ✅ 修复：添加到 actions 数组前先去重，避免重复添加
+                    const actionEventId = actionEvent.id || (actionEvent.data && (actionEvent.data.id || actionEvent.data.call_id));
+                    const existingActionIdx = actionEventId ? s.actions.findIndex(e => {
+                        const eId = e.id || (e.data && (e.data.id || e.data.call_id));
+                        return eId === actionEventId;
+                    }) : -1;
 
+                    if (existingActionIdx > -1) {
+                        // 更新已存在的 action
+                        s.actions[existingActionIdx].data = { ...s.actions[existingActionIdx].data, ...actionEvent.data };
+                    } else {
+                        // 添加新的 action
+                        s.actions.push(actionEvent);
+                    }
+
+                    // orphanEvents 由下方统一去重逻辑处理（第 2930-2946 行）
                     // 避免同一个事件被添加两次到 phase.events
                     // 通用处理器已经有完整的去重和更新逻辑（第1942-1961行）
 
@@ -2625,49 +2760,22 @@ window.Logger = {
                             : content;
                         console.log('[NewAPI] Thought event received:', preview);
 
-                        // ✅ Option C: 判断当前是否有active phase
-                        if (s.currentPhase && s.phases) {
-                            const currentPhase = s.phases.find(p => p.id === s.currentPhase);
-                            if (currentPhase) {
-                                // 添加到当前phase的events
-                                if (!currentPhase.events) currentPhase.events = [];
-                                currentPhase.events.push({
-                                    type: 'thought',
-                                    content: content,
-                                    timestamp: Date.now()
-                                });
-                                console.log('[NewAPI] Thought added to phase.events, phase:', currentPhase.id);
-                            } else {
-                                // phase未找到 - 由最后的统一添加逻辑处理
-                                console.log('[NewAPI] Phase not found, will add to orphanEvents via unified logic');
-                            }
-                        } else {
-                            // ✅ 没有active phase - 由最后的统一添加逻辑处理
-                            console.log('[NewAPI] No active phase, will add to orphanEvents via unified logic');
-
-                            // 保留到 thoughtEvents 用于其他可能的用途
-                            if (!s.thoughtEvents) s.thoughtEvents = [];
-                            s.thoughtEvents.push({
-                                type: 'thought',
-                                content: content,
-                                timestamp: Date.now()
-                            });
-                        }
+                        // ✅ thought 事件由下方统一处理逻辑处理（有去重）
+                        // 不在这里直接添加，避免重复
+                        console.log('[NewAPI] Thought event will be processed by unified logic with deduplication');
 
                         // Store last thought for fallback use only if final answer is missing
                         if (content) {
                             s._lastThoughtContent = content;
                         }
+                        // orphanEvents 由下方方案A统一处理，此处不重复添加
 
-                        // ✅ 修复：总是添加到 orphanEvents（增强任务面板需要）
-                        if (!s.orphanEvents) s.orphanEvents = [];
-                        s.orphanEvents.push({
-                            type: 'thought',
-                            content: content,
-                            timestamp: Date.now()
-                        });
+
+
+
+
+
                         console.log('[NewAPI] Thought also added to orphanEvents for panel display');
-
                         // ✅ 使用节流渲染 - 实现流式显示
                         if (typeof window.throttledRenderResults === 'function') {
                             window.throttledRenderResults();
@@ -3014,34 +3122,31 @@ window.Logger = {
             }
 
             if (data.messages && Array.isArray(data.messages)) {
+                // 直接从 messages 重建 prompt/response，按 user/assistant 角色分组
+                // 避免通过 processEvent 导致多轮内容混在一起
+                const pSep = '\n\n---\n\n';
+                const rSep = '\n\n---\n\n**新的回答：**\n\n';
+                const userTexts = [];
+                const assistantTexts = [];
+
                 data.messages.forEach(msg => {
                     const info = msg.info || {};
                     const parts = msg.parts || [];
+                    const textPart = parts.find(p => p.type === 'text');
+                    const text = textPart?.content?.text || '';
+                    if (!text.trim()) return;
 
-                    parts.forEach(part => {
-                        let adapted;
-                        if (part.type === 'text') {
-                            adapted = {
-                                type: info.role === 'user' ? 'user_message' : 'text',
-                                content: part.content.text || '',
-                                id: info.id
-                            };
-                            processEvent(s, adapted);
-                        } else if (part.type === 'tool') {
-                            const content = part.content;
-                            adapted = {
-                                type: 'action',
-                                data: {
-                                    tool_name: content.tool,
-                                    id: content.call_id,
-                                    input: content.tool_input
-                                },
-                                id: content.call_id
-                            };
-                            processEvent(s, adapted);
-                        }
-                    });
+                    if (info.role === 'user') {
+                        userTexts.push(text);
+                    } else {
+                        assistantTexts.push(text);
+                    }
                 });
+
+                if (userTexts.length > 0) s.prompt = userTexts.join(pSep);
+                if (assistantTexts.length > 0) s.response = assistantTexts.join(rSep);
+
+                console.log('[History] Rebuilt prompt/response from messages:', userTexts.length, 'user,', assistantTexts.length, 'assistant');
             }
 
             await loadSessionTimeline(sessionId);
@@ -3073,3 +3178,8 @@ window.Logger = {
     });
     console.log('[NewAPI] ChildSessionManager exposed to global scope');
 })();
+
+
+
+
+
