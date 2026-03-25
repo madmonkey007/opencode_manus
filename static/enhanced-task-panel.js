@@ -256,34 +256,34 @@ function renderEnhancedTaskPanel(session) {
             turnContainer.appendChild(phasesCard);
         }
 
-        // 2b. thoughtEvents（历史恢复时 thought 不在 phase.events 里）
-        // 只在最后一轮插入，避免多轮对话重复显示
-        // 包进伪 phase 卡片，样式与真实 phase 一致（兜底：phases 为空时也能显示）
-        // ✅ 修复：如果phase.events中已有thought，不显示thoughtEvents避免重复
-        const hasThoughtInPhases = turnPhases && turnPhases.some(p =>
-            p.events && p.events.some(e => e.type === 'thought')
-        );
+        // 2b. thoughtEvents 已废弃，thought 通过 orphanEvents 按轮次处理
 
-        if (i === turnsCount - 1 && session.thoughtEvents && session.thoughtEvents.length > 0 && !hasThoughtInPhases) {
-            const thoughtEvents = session.thoughtEvents.map(ev => ({
-                type: 'thought',
-                content: ev.content || ev.data?.text || '',
-                id: ev.id
-            })).filter(ev => ev.content);
-            if (thoughtEvents.length > 0) {
-                const thoughtPhaseCard = createPhasesCard([{
-                    id: '_thought_pseudo_phase',
-                    title: '思考过程',
-                    status: 'done',
-                    events: thoughtEvents
-                }], null);
-                turnContainer.appendChild(thoughtPhaseCard);
-            }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         }
 
         // 2c. orphanEvents 平铺渲染（没有真实 phase 时，action/thought/error 直接平铺）
-        // 只在最后一轮插入，避免多轮对话重复显示
-        if (i === turnsCount - 1 && session.orphanEvents && session.orphanEvents.length > 0) {
+        // 2c. orphanEvents 平铺渲染 - 每轮按 _turnIndex 过滤显示
+        if (session.orphanEvents && session.orphanEvents.length > 0) {
             // 过滤出属于当前轮次的 orphanEvents（或没有 _turnIndex 的旧数据）
             const orphanForThisTurn = session.orphanEvents.filter(ev => {
                 return !ev._turnIndex || ev._turnIndex === i + 1;
@@ -1316,4 +1316,5 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // 挂载到全局作用域，确保其他脚本可以访问（浏览器环境）
 window.renderEnhancedTaskPanel = renderEnhancedTaskPanel;
+
 
