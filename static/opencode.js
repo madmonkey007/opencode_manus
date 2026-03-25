@@ -332,6 +332,59 @@ function _executeSave(retryCount = 0) {
 }
 
 
+
+//  多轮对话重建公共函数：从后端 messages 正确重建 prompt/response（带分隔符）
+function rebuildMultiTurnFromMessages(s, messages) {
+    const pSep = '\n\n---\n\n';
+    const rSep = '\n\n---\n\n**新的回答：**\n\n';
+    const userTexts = [];
+    const assistantTexts = [];
+
+    s.orphanEvents = [];
+    s.actions = [];
+    s.thoughtEvents = [];
+
+    messages.forEach(msg => {
+        const role = msg.info?.role || msg.role;
+        if (role === 'user') {
+            const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
+            if (userText) userTexts.push(userText);
+        } else {
+            let assistantText = '';
+            msg.parts?.forEach(part => {
+                if (part.type === 'text') {
+                    assistantText += (part.content?.text || part.text || '');
+                } else if (part.type === 'thought') {
+                    const thoughtText = part.content?.text || part.text || '';
+                    if (thoughtText) {
+                        s.thoughtEvents = s.thoughtEvents || [];
+                        s.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
+                    }
+                } else if (part.type === 'tool' || part.type === 'action') {
+                    const toolContent = part.content || part;
+                    const toolEv = {
+                        type: 'action',
+                        id: part.id,
+                        data: {
+                            tool_name: toolContent.tool || toolContent.tool_name,
+                            input: toolContent.input || toolContent.state?.input,
+                            output: toolContent.output || toolContent.state?.output,
+                            status: toolContent.status || toolContent.state?.status
+                        }
+                    };
+                    s.orphanEvents.push(toolEv);
+                    s.actions.push(toolEv);
+                }
+            });
+            if (assistantText) assistantTexts.push(assistantText);
+        }
+    });
+
+    s.prompt = userTexts.join(pSep);
+    s.response = assistantTexts.join(rSep);
+    console.log('[rebuildMultiTurn] turns:', userTexts.length, 'prompt len:', s.prompt.length, 'response len:', s.response.length);
+}
+
 async function loadState() {
     console.log('[loadState] Loading state...');
     const saved = localStorage.getItem('opencode_state');
@@ -707,12 +760,58 @@ async function loadState() {
                     s.orphanEvents = [];
                     repairedCount++;
                 }
+
+                // ✅ 格式检测：检查 localStorage 里的旧格式数据（多轮但无分隔符）
+                // 条件：有 actions（说明之前保存过完整数据）但 prompt/response 无分隔符
+                if (s.id.startsWith('ses_') && !s._needsFormatFix && !s._deepLoaded && !s._isLoading) {
+                    const pSep = '\n\n---\n\n';
+                    const rSep = '\n\n---\n\n**新的回答：**\n\n';
+                    const hasMultiTurnActions = s.actions && s.actions.length > 0;
+                    const promptHasSep = s.prompt && s.prompt.includes(pSep);
+                    const responseHasSep = s.response && s.response.includes(rSep);
+                    // 如果有 actions 但 prompt/response 都没有分隔符，说明是旧格式
+                    if (hasMultiTurnActions && !promptHasSep && !responseHasSep) {
+                        console.log('[loadState] Detected old-format session (no separators):', s.id, '- marking for format fix');
+                        s._needsFormatFix = true;
+                        repairedCount++;
+                    }
+                }
             }
 
             if (repairedCount > 0) {
                 console.warn(`[loadState] Repaired ${repairedCount} data issues`);
                 // 保存修复后的数据
                 setTimeout(() => saveState(), 100);
+            }
+
+            // ✅ 格式修复：对旧格式 session 异步触发 deep load，重建多轮 prompt/response
+            const needsFixSessions = state.sessions.filter(s => s._needsFormatFix && !s._isLoading);
+            if (needsFixSessions.length > 0 && typeof apiClient !== 'undefined') {
+                console.log('[loadState] Fixing old-format sessions:', needsFixSessions.length);
+                needsFixSessions.forEach(async s => {
+                    s._isLoading = true;
+                    try {
+                        const data = await apiClient.getMessages(s.id);
+                        if (data && data.messages && data.messages.length > 0) {
+                            if (data.phases && data.phases.length > 0) {
+                                s.phases = data.phases;
+                            }
+                            rebuildMultiTurnFromMessages(s, data.messages);
+                            s._needsFormatFix = false;
+                            s._deepLoaded = true;
+                            console.log('[loadState] Format fix complete for:', s.id);
+                            saveState();
+                            if (state.activeId === s.id && typeof renderAll === 'function') {
+                                renderAll();
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[loadState] Format fix failed for:', s.id, e);
+                        s._needsFormatFix = false; // 避免无限重试
+                    } finally {
+                        s._isLoading = false;
+                    }
+                });
             }
 
         } catch (e) {
@@ -813,46 +912,12 @@ async function loadState() {
                         try {
                             const data = await apiClient.getMessages(bs.id);
                             if (data && data.messages) {
-                                // 转换后端消息格式到前端 state 格式
-                                session.response = '';
-                                session.phases = data.phases && data.phases.length > 0 ? data.phases : [];
-                                session.orphanEvents = [];
-                                session.actions = [];
-                                session.thoughtEvents = [];
-
-                                data.messages.forEach(msg => {
-                                    if ((msg.info?.role || msg.role) === 'user') {
-                                        const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
-                                        if (userText) session.prompt = userText;
-                                    } else {
-                                        msg.parts?.forEach(part => {
-                                            if (part.type === 'text') {
-                                                session.response += (part.content?.text || part.text || '');
-                                            } else if (part.type === 'thought') {
-                                                const thoughtText = part.content?.text || part.text || '';
-                                                if (thoughtText) {
-                                                    session.thoughtEvents = session.thoughtEvents || [];
-                                                    session.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
-                                                }
-                                            } else if (part.type === 'tool' || part.type === 'action') {
-                                                const toolContent = part.content || part;
-                                                const toolEv = {
-                                                    type: 'action',
-                                                    id: part.id,
-                                                    data: {
-                                                        tool_name: toolContent.tool || toolContent.tool_name,
-                                                        input: toolContent.input || toolContent.state?.input,
-                                                        output: toolContent.output || toolContent.state?.output,
-                                                        status: toolContent.status || toolContent.state?.status
-                                                    }
-                                                };
-                                                session.orphanEvents.push(toolEv);
-                                                session.actions.push(toolEv);
-                                            }
-                                        });
-                                    }
-                                });
-
+                                // ✅ 修复：data.phases 为空时保留 localStorage 里的 phases，不覆盖
+                                if (data.phases && data.phases.length > 0) {
+                                    session.phases = data.phases;
+                                }
+                                // ✅ 多轮重建：用 pSep/rSep 正确拼接多轮 prompt/response
+                                rebuildMultiTurnFromMessages(session, data.messages);
                                 console.log('[Sync] Deep load complete for:', bs.id, '(', session.actions.length, 'actions)');
                             }
                         } catch (e) {
@@ -1033,57 +1098,12 @@ function renderSidebar() {
                                 try {
                                     const data = await apiClient.getMessages(s.id);
                                     if (data && data.messages) {
-                                        // 转换后端消息格式到前端 state 格式
-                                        s.response = '';
                                         // ✅ 修复：data.phases 为空时保留 localStorage 里的 phases，不覆盖
                                         if (data.phases && data.phases.length > 0) {
                                             s.phases = data.phases;
                                         }
-                                        // data.phases 为空时 s.phases 保持不变（可能来自 localStorage）
-                                        s.orphanEvents = [];
-                                        s.actions = [];
-                                        s.thoughtEvents = [];
-
-                                        const pSep = '\n\n---\n\n';
-                                        const rSep = '\n\n---\n\n**新的回答：**\n\n';
-                                        const userTexts = [];
-                                        const assistantTexts = [];
-                                        data.messages.forEach(msg => {
-                                            if ((msg.info?.role || msg.role) === 'user') {
-                                                const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
-                                                if (userText) userTexts.push(userText);
-                                            } else {
-                                                let assistantText = '';
-                                                msg.parts?.forEach(part => {
-                                                    if (part.type === 'text') {
-                                                        assistantText += (part.content?.text || part.text || '');
-                                                    } else if (part.type === 'thought') {
-                                                        const thoughtText = part.content?.text || part.text || '';
-                                                        if (thoughtText) {
-                                                            s.thoughtEvents = s.thoughtEvents || [];
-                                                            s.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
-                                                        }
-                                                    } else if (part.type === 'tool' || part.type === 'action') {
-                                                        const toolContent = part.content || part;
-                                                        const toolEv = {
-                                                            type: 'action',
-                                                            id: part.id,
-                                                            data: {
-                                                                tool_name: toolContent.tool || toolContent.tool_name,
-                                                                input: toolContent.input || toolContent.state?.input,
-                                                                output: toolContent.output || toolContent.state?.output,
-                                                                status: toolContent.status || toolContent.state?.status
-                                                            }
-                                                        };
-                                                        s.orphanEvents.push(toolEv);
-                                                        s.actions.push(toolEv);
-                                                    }
-                                                });
-                                                if (assistantText) assistantTexts.push(assistantText);
-                                            }
-                                        });
-                                        if (userTexts.length > 0) s.prompt = userTexts.join(pSep);
-                                        if (assistantTexts.length > 0) s.response = assistantTexts.join(rSep);
+                                        // ✅ 多轮重建：用 pSep/rSep 正确拼接多轮 prompt/response
+                                        rebuildMultiTurnFromMessages(s, data.messages);
                                         console.log('[History] Deep load complete for:', s.id);
 
                                         // 保存到localStorage，下次无需重新加载
@@ -1183,53 +1203,12 @@ function renderSidebar() {
                     try {
                         const data = await apiClient.getMessages(s.id);
                         if (data && data.messages) {
-                            // 转换后端消息格式到前端 state 格式
-                            s.response = '';
-                            s.phases = data.phases && data.phases.length > 0 ? data.phases : [];
-                            s.orphanEvents = [];
-                            s.actions = [];
-                            s.thoughtEvents = [];
-
-                            const pSep = '\n\n---\n\n';
-                            const rSep = '\n\n---\n\n**新的回答：**\n\n';
-                            const userTexts = [];
-                            const assistantTexts = [];
-                            data.messages.forEach(msg => {
-                                if ((msg.info?.role || msg.role) === 'user') {
-                                    const userText = msg.parts?.[0]?.content?.text || msg.parts?.[0]?.text;
-                                    if (userText) userTexts.push(userText);
-                                } else {
-                                    let assistantText = '';
-                                    msg.parts?.forEach(part => {
-                                        if (part.type === 'text') {
-                                            assistantText += (part.content?.text || part.text || '');
-                                        } else if (part.type === 'thought') {
-                                            const thoughtText = part.content?.text || part.text || '';
-                                            if (thoughtText) {
-                                                s.thoughtEvents = s.thoughtEvents || [];
-                                                s.thoughtEvents.push({ type: 'thought', id: part.id, data: { text: thoughtText } });
-                                            }
-                                        } else if (part.type === 'tool' || part.type === 'action') {
-                                            const toolContent = part.content || part;
-                                            const toolEv = {
-                                                type: 'action',
-                                                id: part.id,
-                                                data: {
-                                                    tool_name: toolContent.tool || toolContent.tool_name,
-                                                    input: toolContent.input || toolContent.state?.input,
-                                                    output: toolContent.output || toolContent.state?.output,
-                                                    status: toolContent.status || toolContent.state?.status
-                                                }
-                                            };
-                                            s.orphanEvents.push(toolEv);
-                                            s.actions.push(toolEv);
-                                        }
-                                    });
-                                    if (assistantText) assistantTexts.push(assistantText);
-                                }
-                            });
-                            if (userTexts.length > 0) s.prompt = userTexts.join(pSep);
-                            if (assistantTexts.length > 0) s.response = assistantTexts.join(rSep);
+                            // ✅ 修复：data.phases 为空时保留 localStorage 里的 phases，不覆盖
+                            if (data.phases && data.phases.length > 0) {
+                                s.phases = data.phases;
+                            }
+                            // ✅ 多轮重建：用 pSep/rSep 正确拼接多轮 prompt/response
+                            rebuildMultiTurnFromMessages(s, data.messages);
                             console.log('[History] Deep load complete for:', s.id);
 
                             // 保存到localStorage，下次无需重新加载
@@ -1395,9 +1374,36 @@ async function renderFiles() {
     }
 
     try {
-        const res = await fetch(`/opencode/list_session_files?sid=${s.id}`);
-        const data = await res.json();
-        let files = data.files || [];
+        let files = [];
+
+        // ✅ 优先使用 deliverables（前端已有数据，与交付面板一致）
+        if (s.deliverables && s.deliverables.length > 0) {
+            console.log('[renderFiles] Using deliverables:', s.deliverables.length);
+            files = s.deliverables.map(d => {
+                if (typeof d === 'string') {
+                    // 旧格式：字符串路径
+                    return {
+                        name: d.split('/').pop(),
+                        path: d,
+                        type: 'file'
+                    };
+                } else {
+                    // 新格式：对象
+                    return {
+                        name: d.name || (d.path && d.path.split('/').pop()),
+                        path: d.path,
+                        type: d.type || 'file',
+                        content: d.content
+                    };
+                }
+            });
+        } else {
+            // ⚠️ 降级方案：如果 deliverables 为空，调用后端API
+            console.log('[renderFiles] Fallback to backend API');
+            const res = await fetch(`/opencode/list_session_files?sid=${s.id}`);
+            const data = await res.json();
+            files = data.files || [];
+        }
 
         // Apply Search
         if (state.fileSearch) {
